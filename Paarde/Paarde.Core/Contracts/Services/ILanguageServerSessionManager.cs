@@ -34,4 +34,8 @@ public interface ILanguageServerSessionManager
     Task<IReadOnlyList<LspLocation>> GetDefinitionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<LspLocation>> GetReferencesAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
+
+    // specs/editor-autocomplete: same no-client/unmapped-extension no-op rule as every other
+    // request above.
+    Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 }

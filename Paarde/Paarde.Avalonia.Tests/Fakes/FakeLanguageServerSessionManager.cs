@@ -9,6 +9,8 @@ public class FakeLanguageServerSessionManager : ILanguageServerSessionManager
 
     public IReadOnlyList<LspLocation> ReferencesToReturn { get; set; } = Array.Empty<LspLocation>();
 
+    public IReadOnlyList<LspCompletionItem> CompletionsToReturn { get; set; } = Array.Empty<LspCompletionItem>();
+
     public string? LastStartedWorkingDirectoryPath { get; private set; }
 
     public bool StopAllCalled { get; private set; }
@@ -38,6 +40,9 @@ public class FakeLanguageServerSessionManager : ILanguageServerSessionManager
 
     public Task<IReadOnlyList<LspLocation>> GetReferencesAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
         Task.FromResult(ReferencesToReturn);
+
+    public Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CompletionsToReturn);
 
     public void RaiseDiagnosticsPublished(string filePath, IReadOnlyList<LspDiagnostic> diagnostics) =>
         DiagnosticsPublished?.Invoke(filePath, diagnostics);

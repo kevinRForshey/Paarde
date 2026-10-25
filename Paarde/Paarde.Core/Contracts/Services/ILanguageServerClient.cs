@@ -40,4 +40,9 @@ public interface ILanguageServerClient
     Task<IReadOnlyList<LspLocation>> GetDefinitionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<LspLocation>> GetReferencesAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
+
+    // specs/editor-autocomplete: textDocument/completion at position. Result ordering mirrors
+    // whatever order the server returned (no client-side re-sorting) - CompletionWindow (R3.1)
+    // does its own filtering/ordering as the user keeps typing.
+    Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 }

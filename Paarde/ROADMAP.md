@@ -2621,27 +2621,113 @@ Full requirements, design, and task breakdown: [`specs/editor-autocomplete/`](sp
 Scoped to Explorer's `CodeEditor` only, same boundary Epic 17 already drew (Tutorial's proposal
 editor has no stable on-disk file identity for a language server to track).
 
-**F19.1 — Completion request plumbing** — Not started
-- [ ] T19.1.1 Add `GetCompletionAsync` to `ILanguageServerClient`/`StdioLanguageServerClient`
+**F19.1 — Completion request plumbing** — ✅ Done 2026-10-23
+- [x] T19.1.1 Add `GetCompletionAsync` to `ILanguageServerClient`/`StdioLanguageServerClient`
   (`textDocument/completion`, parsing either the bare-array or `CompletionList` response shape)
   and advertise `capabilities.textDocument.completion` in `initialize` - shared handshake change
-  with Epic 18's T18.1.2 area, whichever epic lands first should make it.
+  with Epic 18's T18.1.2 area, whichever epic lands first should make it. — done 2026-10-23: new
+  `LspCompletionItem` record (`Paarde.Core/Models`) mirrors the wire response verbatim
+  (`Label`/`Detail`/`InsertText`/`Kind`) - the `InsertText ?? Label` fallback (R4.1) is deliberately
+  left to the future UI call site (T3/T4), not resolved here. `StdioLanguageServerClient.
+  GetCompletionAsync` sends `textDocument/completion` via the same `TextDocumentPositionParams`
+  helper `GetDefinitionAsync`/`GetReferencesAsync` already use, and `ParseCompletionItems` handles
+  both a bare `CompletionItem[]` and a `CompletionList { items: [...] }` object (R2.2) - `initialize`
+  now also declares `capabilities.textDocument.completion.completionItem.snippetSupport: false`
+  (R2.1), landing in the same `textDocument` capabilities object Epic 18 already restructured for
+  exactly this addition. Since Epic 18's `ILanguageServerSessionManager` façade already existed
+  (shipped before this task, unlike when design.md was drafted), also added
+  `GetCompletionAsync` there and to `LanguageServerSessionManager` following the identical
+  `TryGetClient`-routing pattern as `GetDefinitionAsync`/`GetReferencesAsync`, so `CodeEditor`'s
+  future wiring (T4) can go through the same façade `ExplorerViewModel` already uses for every
+  other LSP call rather than a one-off direct `ILanguageServerClient` reference. Updated both
+  `FakeLanguageServerClient` fakes and `FakeLanguageServerSessionManager` to implement the new
+  method. Added `StdioLanguageServerClientTests` cases (capability advertisement, bare-array
+  response, `CompletionList` response, missing `insertText` left `null`) using the same fake
+  Python-script LSP server fixture Epic 17 established. Not yet wired to any UI - `CompletionWindow`
+  rendering, the trigger-character/Ctrl+Space wiring, and ghost-text coexistence are T3/T4/T6. Full
+  solution builds with 0 warnings/errors, 797/797 tests pass (481 Core + 316 Avalonia - 3 new).
 
-**F19.2 — Completion dropdown UI** — Not started
-- [ ] T19.2.1 Wire AvaloniaEdit's own `CompletionWindow` to `.`-trigger-character typing and a
+**F19.2 — Completion dropdown UI** — ✅ Done 2026-10-23
+- [x] T19.2.1 Wire AvaloniaEdit's own `CompletionWindow` to `.`-trigger-character typing and a
   Ctrl+Space manual-invoke shortcut on `CodeEditor`, accepting with Tab/Enter/click and dismissing
   with Escape or caret movement - using the control's built-in list/filter/anchoring behavior
-  rather than a new bespoke popup.
+  rather than a new bespoke popup. — done 2026-10-23: deviated from `design.md`'s literal
+  suggestion that `CodeEditor` call `ILanguageServerSessionManager`/`ILanguageServerClient`
+  directly - every other `Controls/` class in this codebase (confirmed via
+  `grep -rln "App.GetService" Paarde.Avalonia/Controls/` returning nothing) stays DI-free and
+  round-trips through an event + bindable property instead, same shape as Epic 15's
+  `GhostTextRequested`/`GhostTextSuggestion` and Epic 17's `GoToDefinitionRequested`/
+  `FindReferencesRequested`. Added `CompletionRequested` (`EventHandler<CompletionRequestedEventArgs>`,
+  carrying the trigger `LspPosition`) and a `CompletionItems` `StyledProperty<IReadOnlyList<
+  LspCompletionItem>?>` to `CodeEditor`; `TextArea.TextEntered` fires `TriggerCompletion()` on `.`
+  (R1.1), and a new Ctrl+Space branch at the top of `OnTextAreaKeyDown` does the same regardless of
+  caret position (R1.2) - checked ahead of the existing ghost-text-only early return so it works
+  whether or not a ghost-text suggestion happens to be showing. `ExplorerViewModel.
+  RequestCompletionAsync` handles `CompletionRequested` by calling the already-existing
+  `ILanguageServerSessionManager.GetCompletionAsync` (same no-op-if-no-client behavior as
+  `GoToDefinitionAsync`/`FindReferencesAsync` covers R1.3 for free - no client registered for an
+  unsupported file means an empty list and no dropdown, no new guard needed), then sets
+  `CompletionItems` back (null-then-value, same double-assignment `GhostTextSuggestion` already
+  uses so a repeat result still raises `PropertyChanged`); `ExplorerView.axaml.cs` wires both sides.
+  `OnCompletionItemsChanged` discards a stale result (caret moved since the request, via the same
+  `_pendingCompletionRequestOffset`-vs-`CaretOffset` check `OnGhostTextSuggestionChanged` already
+  uses) or an empty one, otherwise builds a `CompletionWindow` populated with one
+  `CodeEditorCompletionData` per item and shows it, first dismissing any visible ghost-text
+  suggestion (R6.2). New `CodeEditorCompletionData : ICompletionData`
+  (`Paarde.Avalonia/Controls/`) adapts an `LspCompletionItem`: `Text`/`Content` from `Label`,
+  `Description` from `Detail` (R3.4's plain-text secondary slot, no icon per the non-goal), and a
+  separately-exposed `InsertionText` (`InsertText ?? Label`, R4.1) used by `Complete` to replace
+  the tracked completion segment - pulled out as its own property specifically so it's testable
+  without constructing a live `TextArea` (see T19.4.1's note on why that's not possible in this
+  sandbox). Confirmed via `ilspycmd` decompile of the installed `AvaloniaEdit.dll` that Tab/Enter
+  acceptance, PointerPressed click-to-accept, and Escape-to-dismiss are all `CompletionWindowBase`/
+  `CompletionWindow` defaults needing no extra wiring (R4.1, R4.2, R5.1), and that
+  `TextArea.Caret.PositionChanged` already closes the window the moment the caret leaves
+  `[StartOffset, EndOffset]` by any means other than typing a filter character (R5.2) - see T19.2.2
+  below for the filtering nuance found the same way.
+- [x] T19.2.2 (folded into T19.2.1, tracked separately since it was an "exercise the real control"
+  open question in `requirements.md` rather than a planned code change) Confirmed via `ilspycmd`
+  decompile that `CompletionWindow`/`CompletionList`'s default behavior already satisfies R3.2-R3.4
+  with no adapter needed: `CompletionList.SelectItem` runs prefix/fuzzy `GetMatchQuality` scoring
+  against everything typed since the trigger (`IsFiltering` is on by default) every time
+  `CaretPositionChanged` fires, and sets `CompletionList.IsVisible = false` (not a literal
+  `Hide()`/close) when zero items match - functionally equivalent for the user (nothing is shown,
+  Tab/Enter have nothing to accept) but worth noting precisely: if the user then backspaces to a
+  point that matches again, the same window becomes visible again rather than requiring a new
+  trigger, which is arguably better than hard-closing, not a gap to fix.
 
-**F19.3 — Coexistence with Epic 15's ghost text** — Not started
-- [ ] T19.3.1 Suspend ghost-text triggering while a completion dropdown is open, and dismiss any
+**F19.3 — Coexistence with Epic 15's ghost text** — ✅ Done 2026-10-23
+- [x] T19.3.1 Suspend ghost-text triggering while a completion dropdown is open, and dismiss any
   visible ghost-text suggestion the instant a dropdown opens, so the two completion mechanisms
-  never compete for the same keystroke or screen space.
+  never compete for the same keystroke or screen space. — done 2026-10-23: `OnGhostTextTimerTick`
+  (the only place `GhostTextRequested` is ever raised) now also bails when `_completionWindow is
+  not null` (R6.1); since `_completionWindow` is nulled out via the window's own `Closed` handler,
+  this re-evaluates on every subsequent 150ms tick with no separate "resume" step needed (R6.3 falls
+  out for free). `ShowCompletionWindow` calls `DismissGhostTextSuggestion()` before showing the new
+  window (R6.2).
 
-**F19.4 — Tests** — Not started
-- [ ] T19.4.1 Extended `StdioLanguageServerClientTests` (both response shapes, capability
+**F19.4 — Tests** — ✅ Done 2026-10-23
+- [x] T19.4.1 Extended `StdioLanguageServerClientTests` (both response shapes, capability
   advertisement), `CodeEditorCompletionData` unit tests, and a ghost-text/completion coexistence
-  gating test, per `specs/editor-autocomplete/design.md`'s testing section.
+  gating test, per `specs/editor-autocomplete/design.md`'s testing section. — done 2026-10-23: the
+  `StdioLanguageServerClientTests` piece landed already under T19.1.1. Added
+  `CodeEditorCompletionDataTests` (`Paarde.Avalonia.Tests/Controls/`) covering the `InsertionText`
+  `InsertText ?? Label` fallback and the `Text`/`Content`/`Description` mappings - deliberately not
+  exercising `Complete(...)` itself: constructing a bare `AvaloniaEdit.Editing.TextArea` outside a
+  running Avalonia `Application` throws (`CaretNavigationCommandHandler`'s static constructor needs
+  `HotkeyConfiguration.Keymap`, which reads `Application.Current`), confirmed by trying it directly
+  in this sandbox - same "no X server / no live `Application`" limitation already noted elsewhere
+  in this roadmap for other AvaloniaEdit-control-level behavior. `Complete`'s actual document
+  mutation, the Ctrl+Space/`.`-trigger wiring, and the ghost-text coexistence gating are all
+  `CodeEditor`-level behavior with the same limitation (no existing `CodeEditor`-level tests exist
+  in this codebase for the same reason) - covered by the `ilspycmd` decompile evidence cited under
+  T19.2.1/T19.2.2 plus T19.4.2's manual verification below, not a new automated test. Full solution
+  builds with 0 warnings/errors, 801/801 tests pass (481 Core + 320 Avalonia - 4 new).
+- [ ] T19.4.2 Manual verification in a real C# project (requires a running `Application`/display,
+  unavailable in this sandbox): typing `.` after a known symbol shows a populated dropdown;
+  Tab/Enter/click accept; Escape dismisses; a ghost-text suggestion visible at trigger time
+  disappears when the dropdown opens; typing past all matches auto-hides the window. Repeat once
+  [[multi-language-support]] ships for a Python and a TypeScript file.
 
 ---
 

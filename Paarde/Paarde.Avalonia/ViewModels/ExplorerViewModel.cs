@@ -95,6 +95,12 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     [ObservableProperty]
     private IReadOnlyList<LspDiagnostic>? diagnostics;
 
+    // specs/editor-autocomplete T4: the most recent completion list CodeEditor asked for - same
+    // null-then-value double assignment GhostTextSuggestion above uses, for the same reason (a
+    // repeat trigger at the same offset would otherwise short-circuit and never redisplay).
+    [ObservableProperty]
+    private IReadOnlyList<LspCompletionItem>? completionItems;
+
     public ExplorerViewModel(
         ILocalSettingsService localSettingsService,
         IPromptResultStore promptResultStore,
@@ -445,6 +451,28 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         {
             _logger.LogWarning(ex, "Find-references failed for {FilePath}.", SelectedFilePath);
             return Array.Empty<LspLocation>();
+        }
+    }
+
+    // specs/editor-autocomplete T4: handles CodeEditor.CompletionRequested. Unlike
+    // RequestGhostTextCompletionAsync above, this goes straight to the language server (not the
+    // LLM runner) - R2's whole point is a server-verified completion list, not a guess.
+    public async Task RequestCompletionAsync(LspPosition position)
+    {
+        if (string.IsNullOrEmpty(SelectedFilePath))
+        {
+            return;
+        }
+
+        try
+        {
+            var items = await _languageServerSessionManager.GetCompletionAsync(SelectedFilePath, position);
+            CompletionItems = null;
+            CompletionItems = items;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Completion request failed for {FilePath}.", SelectedFilePath);
         }
     }
 

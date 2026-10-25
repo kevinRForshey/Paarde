@@ -59,6 +59,9 @@ public class FakeLanguageServerClient : ILanguageServerClient
     public Task<IReadOnlyList<LspLocation>> GetReferencesAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<LspLocation>>([]);
 
+    public Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<LspCompletionItem>>([]);
+
     public void RaiseDiagnosticsPublished(string filePath, IReadOnlyList<LspDiagnostic> diagnostics) =>
         DiagnosticsPublished?.Invoke(filePath, diagnostics);
 }

@@ -22,6 +22,7 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
     private Process? _process;
     private CancellationTokenSource? _readLoopCancellationTokenSource;
     private Task? _readLoopTask;
+    private Task? _stderrDrainTask;
     private string? _workingDirectoryPath;
     private int _nextRequestId;
     private readonly Dictionary<int, TaskCompletionSource<JToken?>> _pendingRequests = new();
@@ -83,6 +84,12 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         _readLoopCancellationTokenSource = readLoopCancellationTokenSource;
         _readLoopTask = Task.Run(() => ReadLoopAsync(process.StandardOutput.BaseStream, readLoopCancellationTokenSource.Token));
 
+        // RedirectStandardError fills the OS pipe buffer (~64KB) if nothing ever reads it, which
+        // blocks the child process's writes - including mid-handshake, before "initialize" ever
+        // gets a response. Drained and discarded rather than surfaced; stderr content from language
+        // servers is diagnostic noise, not something this client acts on.
+        _stderrDrainTask = Task.Run(() => DrainStandardErrorAsync(process.StandardError.BaseStream, readLoopCancellationTokenSource.Token));
+
         var rootUri = PathToUri(workingDirectoryPath);
         await SendRequestAsync("initialize", new JObject
         {
@@ -100,6 +107,13 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
                     ["publishDiagnostics"] = new JObject(),
                     ["definition"] = new JObject(),
                     ["references"] = new JObject(),
+
+                    // specs/editor-autocomplete/requirements.md R2.1: snippetSupport is false,
+                    // matching this spec's non-goal of snippet-placeholder expansion.
+                    ["completion"] = new JObject
+                    {
+                        ["completionItem"] = new JObject { ["snippetSupport"] = false },
+                    },
                 },
             },
         }, cancellationToken);
@@ -154,11 +168,20 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         {
         }
 
+        try
+        {
+            await (_stderrDrainTask ?? Task.CompletedTask);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
         FailAllPendingRequests();
         process.Dispose();
         _readLoopCancellationTokenSource?.Dispose();
         _readLoopCancellationTokenSource = null;
         _readLoopTask = null;
+        _stderrDrainTask = null;
     }
 
     public Task NotifyDocumentOpenedAsync(string filePath, string text, string languageId)
@@ -216,6 +239,12 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         return ParseLocations(result);
     }
 
+    public async Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default)
+    {
+        var result = await SendRequestAsync("textDocument/completion", TextDocumentPositionParams(filePath, position), cancellationToken);
+        return ParseCompletionItems(result);
+    }
+
     private static JObject TextDocumentPositionParams(string filePath, LspPosition position) => new()
     {
         ["textDocument"] = new JObject { ["uri"] = PathToUri(filePath) },
@@ -247,6 +276,39 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         }
 
         return locations;
+    }
+
+    // Result is either a bare CompletionItem[] or a CompletionList { isIncomplete, items: [...] } -
+    // the LSP spec allows a server to return either (R2.2). isIncomplete isn't surfaced to callers:
+    // v1 requests completions exactly once per trigger (R1.4) and never re-queries to page in more
+    // results.
+    private static IReadOnlyList<LspCompletionItem> ParseCompletionItems(JToken? result)
+    {
+        var itemsArray = result switch
+        {
+            JArray array => array,
+            JObject list => list["items"] as JArray,
+            _ => null,
+        };
+
+        if (itemsArray is null)
+        {
+            return [];
+        }
+
+        var items = new List<LspCompletionItem>();
+
+        foreach (var token in itemsArray)
+        {
+            if (token is not JObject item || item["label"]?.ToString() is not { } label)
+            {
+                continue;
+            }
+
+            items.Add(new LspCompletionItem(label, item["detail"]?.ToString(), item["insertText"]?.ToString(), item["kind"]?.ToObject<int?>()));
+        }
+
+        return items;
     }
 
     private async Task<JToken?> SendRequestAsync(string method, JObject? parameters, CancellationToken cancellationToken)
@@ -349,6 +411,23 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
             }
         }
         catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private static async Task DrainStandardErrorAsync(Stream stderr, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var buffer = new byte[4096];
+            while (await stderr.ReadAsync(buffer, cancellationToken) > 0)
+            {
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (IOException)
         {
         }
     }

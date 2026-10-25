@@ -9,6 +9,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 
 using AvaloniaEdit;
+using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.TextMate;
 
 using Paarde.Avalonia.Helpers;
@@ -33,6 +34,15 @@ public sealed class GhostTextRequestedEventArgs(string textBeforeCaret, string t
 // shared by both GoToDefinitionRequested and FindReferencesRequested since neither needs anything
 // beyond where the caret was when the key was pressed.
 public sealed class CodeNavigationRequestedEventArgs(LspPosition position) : EventArgs
+{
+    public LspPosition Position { get; } = position;
+}
+
+// specs/editor-autocomplete, T4: raised by CodeEditor when a trigger character is typed or the
+// manual-invoke shortcut is pressed - same "just the caret's LSP position" shape as
+// CodeNavigationRequestedEventArgs, kept as its own type since it's a conceptually distinct event
+// (completion vs. navigation) even though the payload happens to be identical today.
+public sealed class CompletionRequestedEventArgs(LspPosition position) : EventArgs
 {
     public LspPosition Position { get; } = position;
 }
@@ -69,6 +79,13 @@ public class CodeEditor : TextEditor
     public static readonly StyledProperty<IReadOnlyList<LspDiagnostic>?> DiagnosticsProperty =
         AvaloniaProperty.Register<CodeEditor, IReadOnlyList<LspDiagnostic>?>(nameof(Diagnostics));
 
+    // specs/editor-autocomplete, T4: set by the host ViewModel once a CompletionRequested round
+    // trip returns (or left alone if the caret has since moved past the request's offset, same
+    // staleness rule GhostTextSuggestion already uses) - null/empty means "nothing to show", not
+    // an error (R1.1's "if any are returned").
+    public static readonly StyledProperty<IReadOnlyList<LspCompletionItem>?> CompletionItemsProperty =
+        AvaloniaProperty.Register<CodeEditor, IReadOnlyList<LspCompletionItem>?>(nameof(CompletionItems));
+
     private readonly TextMate.Installation _textMateInstallation;
     private readonly BracketHighlightRenderer _bracketHighlightRenderer;
     private readonly DiffBackgroundRenderer _diffBackgroundRenderer;
@@ -82,6 +99,12 @@ public class CodeEditor : TextEditor
     private readonly DispatcherTimer _ghostTextTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private bool _isApplyingGhostTextSuggestion;
     private int _pendingGhostTextRequestOffset = -1;
+
+    // specs/editor-autocomplete, T4/T5: null whenever no dropdown is currently open - checked by
+    // R6's ghost-text-suppression gating (OnGhostTextTimerTick/OnCodeEditorTextChanged) and by
+    // OnCompletionItemsChanged to avoid stacking a second window on top of one already showing.
+    private CompletionWindow? _completionWindow;
+    private int _pendingCompletionRequestOffset = -1;
 
     // TemplatedControl resolves its default ControlTheme via StyleKeyOverride, which defaults to
     // GetType(). Without this override Avalonia looks for a theme keyed {x:Type CodeEditor} - which
@@ -119,6 +142,12 @@ public class CodeEditor : TextEditor
         set => SetValue(DiagnosticsProperty, value);
     }
 
+    public IReadOnlyList<LspCompletionItem>? CompletionItems
+    {
+        get => GetValue(CompletionItemsProperty);
+        set => SetValue(CompletionItemsProperty, value);
+    }
+
     // T13.1.3: raised when the gutter's Accept/Reject button for a hunk is clicked; the host
     // (TutorialDetailControl) is the one that knows which ProposedFileChangeViewModel owns that
     // hunk's selection, so this control just forwards which DiffHunk and which action.
@@ -137,6 +166,13 @@ public class CodeEditor : TextEditor
 
     public event EventHandler<CodeNavigationRequestedEventArgs>? FindReferencesRequested;
 
+    // specs/editor-autocomplete, T4: raised on a trigger character or the manual-invoke shortcut -
+    // same "control forwards where the caret was, host decides what to ask and sets the result
+    // back via a bindable property" split GoToDefinitionRequested/GhostTextRequested already use,
+    // rather than giving CodeEditor its own ILanguageServerSessionManager dependency (Controls/ in
+    // this codebase never reach into DI directly - only Views' code-behind does).
+    public event EventHandler<CompletionRequestedEventArgs>? CompletionRequested;
+
     static CodeEditor()
     {
         FilePathProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.ApplyGrammarForFilePath());
@@ -144,6 +180,7 @@ public class CodeEditor : TextEditor
         DiffHunksProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor._diffHunkGutterMargin.UpdateHunks(editor.DiffHunks));
         GhostTextSuggestionProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.OnGhostTextSuggestionChanged());
         DiagnosticsProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor._diagnosticsRenderer.UpdateDiagnostics(editor.Diagnostics));
+        CompletionItemsProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.OnCompletionItemsChanged());
     }
 
     public CodeEditor()
@@ -170,6 +207,10 @@ public class CodeEditor : TextEditor
         PointerMoved += OnPointerMovedForDiagnostics;
         PointerExited += (_, _) => HideDiagnosticTooltip();
         KeyDown += OnCodeEditorKeyDownForNavigation;
+
+        // specs/editor-autocomplete, R1.1: TextEntered fires once per inserted character, after
+        // it's already in the document - CaretOffset below is already past the typed ".".
+        TextArea.TextEntered += OnTextAreaTextEntered;
 
         // Tunnel runs top-down before TextArea's own OnKeyDown override (which unconditionally
         // handles Tab when Options.AcceptsTab is set) reaches it, so this gets first look at Tab
@@ -225,7 +266,9 @@ public class CodeEditor : TextEditor
             return;
         }
 
-        if (IsReadOnly || Document is null || GhostTextRequested is null)
+        // specs/editor-autocomplete R6.1/T6: a completion dropdown already answers "what goes
+        // here" with a server-verified list - don't also fire off a competing LLM guess underneath it.
+        if (IsReadOnly || Document is null || GhostTextRequested is null || _completionWindow is not null)
         {
             return;
         }
@@ -272,6 +315,15 @@ public class CodeEditor : TextEditor
 
     private void OnTextAreaKeyDown(object? sender, KeyEventArgs e)
     {
+        // R1.2: manual invoke works at any caret position, suggestion-showing or not - checked
+        // ahead of the ghost-text-only logic below rather than folded into it.
+        if (e.Key == Key.Space && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            TriggerCompletion();
+            return;
+        }
+
         if (!_ghostTextSuggestionState.HasSuggestion)
         {
             return;
@@ -316,6 +368,61 @@ public class CodeEditor : TextEditor
         _ghostTextSuggestionState.Dismiss();
         _ghostTextRenderer.Clear();
         _ghostTextDebouncer.Cancel();
+    }
+
+    // R1.1: the shared trigger character across C#, Python, and TypeScript/JavaScript/JSX (design
+    // decision in specs/editor-autocomplete/design.md - not per-server triggerCharacters for v1).
+    private void OnTextAreaTextEntered(object? sender, TextInputEventArgs e)
+    {
+        if (e.Text == ".")
+        {
+            TriggerCompletion();
+        }
+    }
+
+    // R1.4: requests completions exactly once per trigger - CompletionRequested's subscriber sets
+    // CompletionItems back once the (async, host-owned) lookup resolves; narrowing as the user
+    // keeps typing is CompletionList's own built-in filtering (R3.3), not a re-request here.
+    private void TriggerCompletion()
+    {
+        if (Document is null || CompletionRequested is null)
+        {
+            return;
+        }
+
+        var offset = CaretOffset;
+        _pendingCompletionRequestOffset = offset;
+        CompletionRequested.Invoke(this, new CompletionRequestedEventArgs(ToLspPosition(offset)));
+    }
+
+    // Mirrors OnGhostTextSuggestionChanged's staleness check: the round trip to the host is async,
+    // so the caret may have moved on by the time CompletionItems actually arrives.
+    private void OnCompletionItemsChanged()
+    {
+        var items = CompletionItems;
+        if (items is null || items.Count == 0 || _pendingCompletionRequestOffset != CaretOffset || Document is null)
+        {
+            return;
+        }
+
+        ShowCompletionWindow(items);
+    }
+
+    private void ShowCompletionWindow(IReadOnlyList<LspCompletionItem> items)
+    {
+        // R6.2: the dropdown is server-verified and takes precedence - whatever ghost-text
+        // suggestion (a guess) was showing disappears the instant this one opens.
+        DismissGhostTextSuggestion();
+
+        var window = new CompletionWindow(TextArea);
+        foreach (var item in items)
+        {
+            window.CompletionList.CompletionData.Add(new CodeEditorCompletionData(item));
+        }
+
+        window.Closed += (_, _) => _completionWindow = null;
+        _completionWindow = window;
+        window.Show();
     }
 
     // Epic 17, T17.1.2: GetPositionFromPoint (inherited from TextEditor) already translates a

@@ -62,6 +62,15 @@ public partial class ExplorerView : UserControl
             var locations = await ViewModel.FindReferencesAsync(e.Position);
             ShowReferencesFlyout(locations);
         };
+
+        // specs/editor-autocomplete T4: same "Editor just reports, ViewModel decides" split as
+        // GhostTextRequested above - the round trip here hits the language server directly rather
+        // than ILlmRunner.
+        Editor.CompletionRequested += async (_, e) =>
+        {
+            await ViewModel.RequestCompletionAsync(e.Position);
+            Editor.CompletionItems = ViewModel.CompletionItems;
+        };
     }
 
     private void ShowReferencesFlyout(IReadOnlyList<LspLocation> locations)

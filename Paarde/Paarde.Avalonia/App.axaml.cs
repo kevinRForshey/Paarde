@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 
 using Paarde.Avalonia.Contracts.Services;
@@ -226,6 +227,13 @@ public partial class App : Application
             var window = new Views.MainWindow { Content = shell };
             MainWindow = window;
             desktop.MainWindow = window;
+
+#if DEBUG
+            // Avalonia.Diagnostics is Debug-only (Paarde.Avalonia.csproj), same as this call.
+            // The Avalonia.Generators default (F12) is disabled in that csproj because it collides
+            // with CodeEditor's own F12 go-to-definition binding (Epic 17) - Ctrl+Shift+F12 instead.
+            window.AttachDevTools(new KeyGesture(Key.F12, KeyModifiers.Control | KeyModifiers.Shift));
+#endif
 
             // On Linux, Avalonia's X11 backend keeps a D-Bus connection alive for the app's lifetime to
             // watch for OS theme changes. Its teardown races Dispatcher.UIThread.InvokeShutdown() (which

@@ -88,6 +88,28 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
                         {"uri": "file:///tmp/ref-two.cs", "range": {"start": {"line": 2, "character": 0}, "end": {"line": 2, "character": 3}}},
                     ],
                 })
+            elif method == "textDocument/completion":
+                position = message["params"]["position"]
+                if position["character"] == 99:
+                    write_message({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": {
+                            "isIncomplete": False,
+                            "items": [
+                                {"label": "WrappedLabel", "detail": "string", "insertText": "WrappedInsertText", "kind": 5},
+                            ],
+                        },
+                    })
+                else:
+                    write_message({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": [
+                            {"label": "BareLabel", "detail": "void BareLabel()", "insertText": "BareLabel()", "kind": 2},
+                            {"label": "NoInsertText"},
+                        ],
+                    })
             elif method == "shutdown":
                 write_message({"jsonrpc": "2.0", "id": msg_id, "result": None})
             elif method == "exit":
@@ -240,6 +262,46 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
         Assert.NotNull(textDocumentCapabilities!["publishDiagnostics"]);
         Assert.NotNull(textDocumentCapabilities!["definition"]);
         Assert.NotNull(textDocumentCapabilities!["references"]);
+    }
+
+    [Fact]
+    public async Task StartAsync_SendsInitializeRequestDeclaringCompletionCapabilityWithoutSnippetSupport()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var initializeMessage = await WaitForReceivedMessageAsync("initialize");
+
+        var completionCapability = initializeMessage["params"]?["capabilities"]?["textDocument"]?["completion"];
+        Assert.NotNull(completionCapability);
+        Assert.Equal(false, completionCapability!["completionItem"]?["snippetSupport"]?.ToObject<bool>());
+    }
+
+    [Fact]
+    public async Task GetCompletionAsync_ServerRespondsWithABareArray_ReturnsEveryItemInOrder()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var items = await _client.GetCompletionAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 0));
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal("BareLabel", items[0].Label);
+        Assert.Equal("void BareLabel()", items[0].Detail);
+        Assert.Equal("BareLabel()", items[0].InsertText);
+        Assert.Equal(2, items[0].Kind);
+        Assert.Equal("NoInsertText", items[1].Label);
+        Assert.Null(items[1].InsertText);
+    }
+
+    [Fact]
+    public async Task GetCompletionAsync_ServerRespondsWithACompletionListObject_ReturnsItsItems()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var items = await _client.GetCompletionAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 99));
+
+        var item = Assert.Single(items);
+        Assert.Equal("WrappedLabel", item.Label);
+        Assert.Equal("WrappedInsertText", item.InsertText);
     }
 
     [Fact]

@@ -4,6 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Paarde.Avalonia</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Avalonia.Generators defaults this to true and auto-attaches DevTools to F12, which swallows
+         the key before it ever reaches CodeEditor's own F12 (go-to-definition, specs/editor-
+         autocomplete's sibling Epic 17 feature) - App.axaml.cs attaches DevTools itself instead,
+         on a gesture that doesn't collide. -->
+    <AvaloniaNameGeneratorAttachDevTools>false</AvaloniaNameGeneratorAttachDevTools>
   </PropertyGroup>
 
   <ItemGroup>
