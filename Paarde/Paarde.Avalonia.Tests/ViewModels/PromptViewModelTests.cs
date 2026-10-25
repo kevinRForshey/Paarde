@@ -17,9 +17,10 @@ public class PromptViewModelTests
     private readonly FakePromptResultStore _promptResultStore = new();
     private readonly PromptTemplateProvider _promptTemplateProvider = new();
     private readonly FakeRunSessionStore _runSessionStore = new();
+    private readonly FakeCodebaseIndexService _codebaseIndexService = new();
 
     private PromptViewModel CreateSut() =>
-        new(_llmRunner, _localSettingsService, _folderPickerService, _filePickerService, _promptResultStore, _promptTemplateProvider, _runSessionStore);
+        new(_llmRunner, _localSettingsService, _folderPickerService, _filePickerService, _promptResultStore, _promptTemplateProvider, _runSessionStore, _codebaseIndexService);
 
     [Fact]
     public async Task RunPromptAsync_SuccessWithNoFiles_StoresTutorialAndReportsCompletion()
@@ -1211,5 +1212,74 @@ public class PromptViewModelTests
         Assert.Equal("/rerun/dir", sut.WorkingDirectoryPath);
         Assert.Equal(1, _runSessionStore.RecordRunCallCount);
         Assert.Equal("Rerun prompt text", _runSessionStore.LastRecordedUserPromptText);
+    }
+
+    [Fact]
+    public async Task SuggestRelevantFilesAsync_MatchesFromIndexService_PopulatesSuggestedRelevantFiles()
+    {
+        var sut = CreateSut();
+        sut.WorkingDirectoryPath = "/my/project";
+        sut.PromptText = "Fix the bug in Foo";
+        _codebaseIndexService.MatchesToReturn = [new RelevantFileMatch("Foo.cs", 1.5), new RelevantFileMatch("Bar.cs", 0.5)];
+
+        await sut.SuggestRelevantFilesCommand.ExecuteAsync(null);
+
+        Assert.Equal(["Foo.cs", "Bar.cs"], sut.SuggestedRelevantFiles);
+        Assert.Equal("/my/project", _codebaseIndexService.LastWorkingDirectoryPath);
+        Assert.Equal("Fix the bug in Foo", _codebaseIndexService.LastQueryText);
+    }
+
+    [Fact]
+    public async Task SuggestRelevantFilesAsync_MatchAlreadyAttached_ExcludesItFromSuggestions()
+    {
+        var sut = CreateSut();
+        sut.WorkingDirectoryPath = "/my/project";
+        sut.PromptText = "Fix the bug in Foo";
+        sut.AttachedPaths.Add(Path.Combine("/my/project", "Foo.cs"));
+        _codebaseIndexService.MatchesToReturn = [new RelevantFileMatch("Foo.cs", 1.5), new RelevantFileMatch("Bar.cs", 0.5)];
+
+        await sut.SuggestRelevantFilesCommand.ExecuteAsync(null);
+
+        Assert.Equal(["Bar.cs"], sut.SuggestedRelevantFiles);
+    }
+
+    [Fact]
+    public void SuggestRelevantFilesCommand_BlankPromptOrWorkingDirectory_CannotExecute()
+    {
+        var sut = CreateSut();
+
+        Assert.False(sut.SuggestRelevantFilesCommand.CanExecute(null));
+
+        sut.WorkingDirectoryPath = "/my/project";
+        Assert.False(sut.SuggestRelevantFilesCommand.CanExecute(null));
+
+        sut.PromptText = "Fix the bug";
+        Assert.True(sut.SuggestRelevantFilesCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AttachSuggestedFile_ResolvesRelativePathAndAttachesIt_RemovingItFromSuggestions()
+    {
+        var sut = CreateSut();
+        sut.WorkingDirectoryPath = "/my/project";
+        sut.SuggestedRelevantFiles.Add("Foo.cs");
+
+        sut.AttachSuggestedFile("Foo.cs");
+
+        Assert.Contains(Path.GetFullPath(Path.Combine("/my/project", "Foo.cs")), sut.AttachedPaths);
+        Assert.DoesNotContain("Foo.cs", sut.SuggestedRelevantFiles);
+    }
+
+    [Fact]
+    public void DismissSuggestedRelevantFilesCommand_ClearsSuggestionsWithoutAttachingAnything()
+    {
+        var sut = CreateSut();
+        sut.WorkingDirectoryPath = "/my/project";
+        sut.SuggestedRelevantFiles.Add("Foo.cs");
+
+        sut.DismissSuggestedRelevantFilesCommand.Execute(null);
+
+        Assert.Empty(sut.SuggestedRelevantFiles);
+        Assert.Empty(sut.AttachedPaths);
     }
 }

@@ -101,6 +101,34 @@
             <TextBox Text="{Binding TestCommand}" Watermark="dotnet test" />
         </StackPanel>
 
+        <TextBlock Margin="0,16,0,0" Text="Code intelligence" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Powers Explorer's diagnostics, go-to-definition, and find-references, one language server per row. Each must speak the Language Server Protocol over stdio. Clear a row's executable path to disable that language."
+                   FontSize="12"
+                   Opacity="0.7"
+                   TextWrapping="Wrap" />
+
+        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding LanguageServerRows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,0,8" Padding="12" CornerRadius="6" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                        <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding LanguageId}" FontWeight="SemiBold" />
+                                <TextBlock Text="Available"
+                                           Foreground="Green"
+                                           IsVisible="{Binding IsAvailable}" />
+                                <TextBlock Text="Not found on PATH"
+                                           Foreground="OrangeRed"
+                                           IsVisible="{Binding !IsAvailable}" />
+                            </StackPanel>
+                            <TextBox Text="{Binding ExecutablePath}" Watermark="executable path" />
+                            <TextBox Text="{Binding Arguments}" Watermark="arguments" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <TextBlock Margin="0,16,0,0" Text="Prompt template" FontSize="20" FontWeight="SemiBold" />
 
         <StackPanel Margin="0,8,0,0" Spacing="4">

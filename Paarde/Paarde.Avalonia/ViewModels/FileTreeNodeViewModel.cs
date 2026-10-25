@@ -14,4 +14,25 @@ public sealed record FileTreeNodeViewModel(string Name, string FullPath, bool Is
 
         return new FileTreeNodeViewModel(entry.Name, entry.FullPath, entry.IsDirectory, touchedFullPaths.Contains(entry.FullPath), children);
     }
+
+    // Epic 17, T17.1.3: resolves a go-to-definition/find-references target (an absolute path from
+    // the language server) back to its node in the already-built tree, so selecting it can reuse
+    // ExplorerViewModel's existing SelectedNode -> LoadNode flow instead of a separate file-open path.
+    public static FileTreeNodeViewModel? FindByPath(FileTreeNodeViewModel node, string fullPath)
+    {
+        if (string.Equals(node.FullPath, fullPath, StringComparison.Ordinal))
+        {
+            return node;
+        }
+
+        foreach (var child in node.Children)
+        {
+            if (FindByPath(child, fullPath) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
 }

@@ -49,6 +49,20 @@ public partial class TutorialDetailControl : UserControl
         RefreshUndoRedoButtons();
 
         Editor.DiffHunkActionRequested += OnDiffHunkActionRequested;
+
+        // Epic 15: Editor's own DataContext is a ProposedFileChangeViewModel, which deliberately has
+        // no ILlmRunner, so the request is forwarded up to the page-level TutorialViewModel (the
+        // same ancestor lookup ApplyPendingStepTarget already uses) and the result is assigned back
+        // directly rather than through an AXAML binding, since that VM isn't Editor's DataContext.
+        Editor.GhostTextRequested += async (_, e) =>
+        {
+            if (this.FindAncestorOfType<TutorialView>()?.ViewModel is not { } tutorialViewModel)
+            {
+                return;
+            }
+
+            Editor.GhostTextSuggestion = await tutorialViewModel.RequestGhostTextCompletionAsync(e.TextBeforeCaret, e.TextAfterCaret);
+        };
     }
 
     // T13.1.3/T13.2.2: the gutter's Accept/Reject buttons are an alternate entry point into the

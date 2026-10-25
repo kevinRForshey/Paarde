@@ -23,7 +23,9 @@ with an explanation, and nothing is written to your files until you choose to ap
 5. **Apply, undo, revert** — apply the selected changes to disk, undo the last apply, or revert
    everything the current session has applied — all without leaving the app.
 6. **Explore** — browse your whole project tree, gitignore-aware, with files touched by the current
-   proposal marked; open any file, proposed or not, in a read-only preview.
+   proposal marked; open any file, proposed or not, in a read-only preview. For C#/.NET projects, an
+   optional background language server adds live diagnostics, go-to-definition, and find-references
+   to that preview.
 7. **History** — every run is saved. Browse past runs, re-run one as-is, or fork it (reload its
    prompt and working directory for editing) to continue down a different path.
 
@@ -48,6 +50,7 @@ a modern desktop app on any of the three.
 | DI / hosting | `Microsoft.Extensions.Hosting` generic host, wired up in `Paarde.Avalonia/App.axaml.cs` |
 | Domain/shared logic | `Paarde.Core` — parsing, diffing, apply orchestration, session persistence; UI-framework-agnostic so it's unit-testable without Avalonia |
 | LLM integration | Shells out to the `claude` CLI (`Paarde.Core/Services/ClaudeCliRunner.cs`), streaming NDJSON (`stream-json`) for live progress |
+| Code intelligence | Shells out to a Language Server Protocol server over stdio (`Paarde.Core/Services/StdioLanguageServerClient.cs`, `csharp-ls` by default) for Explorer's diagnostics/go-to-definition/find-references |
 | Tests | xUnit (`Paarde.Core.Tests`, `Paarde.Avalonia.Tests`) |
 
 ### Project layout
@@ -70,6 +73,13 @@ Paarde.slnx
   ```
   Paarde shells out to this CLI; it needs to be on your `PATH` (or pointed to explicitly — see
   Settings below) and already logged in.
+- *(Optional)* [`csharp-ls`](https://github.com/razzmatazz/csharp-language-server) for Explorer's
+  diagnostics/go-to-definition/find-references on C#/.NET projects:
+  ```
+  dotnet tool install --global csharp-ls
+  ```
+  Not required to run Paarde — if it's missing, those three features are simply inactive and
+  everything else works as normal.
 
 ## Building and running
 
@@ -109,7 +119,9 @@ Prompt page's working directory to one you've used before) lists.
 - **Context files** — optionally attach specific files or a whole folder as extra context for the
   model, beyond what's in the working directory. You can also attach a file by typing `@` followed
   by part of its name directly in the prompt text box — a popup lists matching files (gitignore-aware)
-  for you to pick from.
+  for you to pick from. **Suggest relevant files** ranks every file in the working directory against
+  your prompt text (keyword matching, not a cloud embeddings call — no API key or extra setup needed)
+  and lists candidates below; double-click one to attach it, or **Dismiss** to ignore the suggestions.
 - **Prompt text** — describe what you want built, fixed, or changed, in plain English. A live
   estimated token count is shown above the box.
 - **Preset** — a short instruction nudge appended ahead of your prompt: `General`, `Feature`,
@@ -133,6 +145,16 @@ proposal. The tree is gitignore-aware (it matches your project's root `.gitignor
 apply-time safety checks do) and always excludes `.git`. Files touched by the current proposal are
 marked with a small accent dot next to their name. Select any file, proposed or not, to see its
 content in a read-only, syntax-highlighted preview on the right.
+
+If `csharp-ls` is installed (see Prerequisites), the preview also gets live code intelligence for
+C#/.NET projects:
+
+- **Diagnostics** — compiler errors and warnings are underlined as you browse; hover one to see the
+  message.
+- **Go to Definition** — press **F12** with the caret on a symbol to jump to where it's defined,
+  even in another file.
+- **Find References** — press **Shift+F12** to list every place the symbol under the caret is used,
+  in a small popup; click one to jump there.
 
 ### 4. Diffs page
 
@@ -222,6 +244,8 @@ Every run is persisted automatically. Select a past session from the list to see
   turning this on causes an error, upgrade with `npm install -g @anthropic-ai/claude-code`.
 - **Prompt template** — view or override the instruction preamble sent ahead of every prompt;
   **Reset to default** restores the built-in template.
+- **Code intelligence** — override the language server's executable path and arguments if
+  `csharp-ls` isn't on your `PATH`, or swap in a different LSP-speaking server entirely.
 
 ## Project status
 

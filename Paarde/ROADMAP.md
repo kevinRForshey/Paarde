@@ -2256,7 +2256,7 @@ diff rendering too.*
 
 ---
 
-### EPIC 14 — Codebase-aware context: @-mentions + semantic search *(P2)*
+### EPIC 14 — Codebase-aware context: @-mentions + semantic search *(P2)* — ✅ Done 2026-10-23
 
 *Why: `PromptViewModel.AddContextFilesAsync` (T5.4.1) only attaches whatever the user manually browses
 to and inlines full file contents via `BuildContextFilesBlock` - there's no way to ask "find the files
@@ -2301,18 +2301,43 @@ dependency.*
   here without Epic 17's LSP integration; file-level `@mention` ships first. Confirmed still out of
   scope - nothing here attempts symbol-level matching.
 
-**F14.2 — Relevance ranking (semantic, second slice)**
-- [ ] T14.2.1 New `ICodebaseIndexService`: chunks each non-ignored file (same `GitIgnoreMatcher`/
+**F14.2 — Relevance ranking (semantic, second slice)** — ✅ Done 2026-10-23, as **lexical** (TF-IDF)
+ranking rather than true semantic (embedding) search - resolves the open question below by sidestepping
+it: no embeddings provider, no API key, no new runtime dependency, at the cost of missing
+synonyms/paraphrases a real embedding model would catch. Revisit with a local ONNX-hosted embedding
+model if lexical matching proves too weak in practice.
+- [x] T14.2.1 New `ICodebaseIndexService`: chunks each non-ignored file (same `GitIgnoreMatcher`/
   `FileTreeBuilder` exclusions as Explorer) and embeds each chunk. **Open question:** Anthropic doesn't
   currently expose a public embeddings endpoint, so this may need a different provider configured
   specifically for embeddings - a real added dependency, not a trivial add; needs a decision before
-  F14.2 starts.
-- [ ] T14.2.2 A local on-disk index (e.g. SQLite + a simple cosine-similarity scan - no dedicated
+  F14.2 starts. Done as: `ICodebaseIndexService.FindRelevantFilesAsync` and `TfIdfCodebaseIndexService` -
+  scores *whole files*, not chunks, since the only consumer (T14.2.3) attaches a whole file to the
+  prompt the same way `PromptViewModel.AttachedPaths` already does; chunk-level granularity would have
+  had nowhere to surface. Tokenizes to lowercase alphanumeric terms (`[A-Za-z0-9]+`, no camelCase
+  splitting, no stopword list - kept deliberately simple for a first pass) and scores the prompt text's
+  terms against each file's standard TF-IDF weight. Files are skipped (not just "scored low") if they're
+  over 1MB or contain a NUL byte in their first 8KB - the same cheap binary heuristic used nowhere else
+  in this codebase yet, since nothing else here reads arbitrary file content for scoring.
+- [x] T14.2.2 A local on-disk index (e.g. SQLite + a simple cosine-similarity scan - no dedicated
   vector DB needed at this project's likely repo sizes) keyed by working directory, invalidated
-  per-file on mtime change rather than a full re-index per run.
-- [ ] T14.2.3 The manual attach flow stays the explicit override; this adds an opt-in "suggest relevant
+  per-file on mtime change rather than a full re-index per run. Done as: in-memory only (not on-disk -
+  a TF-IDF term-count table is cheap enough to rebuild once per app run and not worth persisting), a
+  `ConcurrentDictionary<workingDirectoryPath, Dictionary<filePath, FileTermVector>>` on the singleton
+  `TfIdfCodebaseIndexService`. Each call re-walks the file tree and only re-tokenizes a file whose
+  `LastWriteTimeUtc` changed since it was last indexed; files no longer present (deleted or newly
+  gitignored) are dropped from the cache at the same time. No cross-directory eviction - acceptable
+  since a session typically has one project open at a time.
+- [x] T14.2.3 The manual attach flow stays the explicit override; this adds an opt-in "suggest relevant
   files" step before sending a prompt, surfaced as suggestions the user accepts into the same
-  attachment list - never silently auto-injected context.
+  attachment list - never silently auto-injected context. Done as: a new "Suggest relevant files"
+  button next to Prompt's existing "Add files.../Add folder..." row, wired to
+  `PromptViewModel.SuggestRelevantFilesCommand` (gated on a non-blank working directory and prompt
+  text). Results populate `SuggestedRelevantFiles`, rendered as a dismissible list below the attached-
+  files list; already-attached files are filtered out of the suggestions. Double-clicking a suggestion
+  calls `AttachSuggestedFile` - the same `AddAttachedPaths`/`SaveAttachedPathsAsync` pair
+  `AttachMentionedFile` (T14.1.2) already uses - and removes just that one entry, so multiple
+  suggestions can be accepted without re-running the search; "Dismiss" clears the rest without
+  attaching anything.
 
 **F14.3 — Tests**
 - [x] T14.3.1 `@mention` popup filtering against a fake file tree; selecting an entry attaches the
@@ -2326,12 +2351,20 @@ dependency.*
   `UpdateMentionSuggestions_NoWorkingDirectory_LeavesMentionSuggestionsEmpty`,
   `CloseMentionPopup_ClearsMentionSuggestions`, and
   `AttachMentionedFile_ResolvesTheRelativePathAgainstWorkingDirectoryAndAttachesIt`.
-- [ ] T14.3.2 `ICodebaseIndexService` chunking/invalidation logic (pure, no real embedding calls) -
-  embedding-call correctness itself isn't something to unit test against a live API.
+- [x] T14.3.2 `ICodebaseIndexService` chunking/invalidation logic (pure, no real embedding calls) -
+  embedding-call correctness itself isn't something to unit test against a live API. Done as:
+  `TfIdfCodebaseIndexServiceTests` against real temp directories (same pattern as
+  `FileTreeBuilderTests`) - covers ranking order (a file that repeats the query term scores above one
+  that mentions it once), no-match/blank-query/missing-directory returning empty, the binary-NUL-byte
+  skip, relative-path shaping, `maxResults` capping, and the two invalidation paths: a file's content
+  changing between calls (old term gone, new term found) and a file being deleted between calls
+  (silently dropped, no exception). `PromptViewModelTests` covers the ViewModel-level glue
+  (`FakeCodebaseIndexService`) - suggestion population, already-attached filtering, the command's
+  CanExecute gating, attach-and-remove-one, and dismiss-clears-without-attaching.
 
 ---
 
-### EPIC 15 — Inline ghost-text autocomplete *(P3)*
+### EPIC 15 — Inline ghost-text autocomplete *(P3)* — ✅ Done 2026-10-23
 
 *Why: Copilot/Cursor Tab-style completion predicts the next few tokens as you type; Paarde has no
 equivalent anywhere `CodeEditor` is used read/write (Explorer's F10.2 editor, Tutorial's proposal
@@ -2340,28 +2373,57 @@ with the apply/review pipeline at all - but it's also the one most exposed to la
 that arrives after the user has already typed past it is worse than none), which is why it's ranked
 lowest alongside Epic 17.*
 
-**F15.1 — Ghost-text rendering**
-- [ ] T15.1.1 New `GhostTextRenderer` on `CodeEditor` (same extension-point family as
+**F15.1 — Ghost-text rendering** — ✅ Done 2026-10-23
+- [x] T15.1.1 New `GhostTextRenderer` on `CodeEditor` (same extension-point family as
   `BracketHighlightRenderer`/Epic 13's `DiffBackgroundRenderer`; AvaloniaEdit's own samples use a
   `VisualLineElementGenerator` for inline ghost suggestions) renders a dimmed inline suggestion at the
-  caret, accepted with Tab and dismissed on any other keystroke.
-- [ ] T15.1.2 Debounced trigger (e.g. 300ms after the caret stops moving in insert mode) rather than
-  firing a completion request per keystroke.
+  caret, accepted with Tab and dismissed on any other keystroke. Done as: `GhostTextRenderer`
+  (`VisualLineElementGenerator` + `InlineObjectElement(0, textBlock)`, dimmed via a translucent grey
+  brush, font matched to `GlobalTextRunProperties`), plus `GhostTextSuggestionState` tracking the
+  active offset/text. `CodeEditor` intercepts Tab/Escape via a tunnel-routed `KeyDown` handler on
+  `TextArea` (needed because `TextArea.OnKeyDown` unconditionally consumes Tab itself when
+  `Options.AcceptsTab` is set - confirmed by decompiling the installed AvaloniaEdit 11.4.0 with
+  `ilspycmd`, since this sandbox has no X server to verify visually); Tab inserts the suggestion and
+  moves the caret past it, any other key (via the existing `TextChanged` hook) dismisses it. Not
+  visually verified, same caveat as every other Avalonia-touching task in this roadmap.
+- [x] T15.1.2 Debounced trigger (e.g. 300ms after the caret stops moving in insert mode) rather than
+  firing a completion request per keystroke. Done as: `GhostTextDebouncer`, a pure clock-injected
+  state machine (`NotifyInput(now)`/`ShouldFire(now)`/`Cancel()`) kept separate from the real
+  `DispatcherTimer` glue in `CodeEditor` so it's unit-testable without a real timer. 400ms delay,
+  polled by a 150ms `DispatcherTimer` tick.
 
-**F15.2 — Completion source**
-- [ ] T15.2.1 A small, fast prompt (file content up to the caret plus a short suffix window, not the
+**F15.2 — Completion source** — ✅ Done 2026-10-23
+- [x] T15.2.1 A small, fast prompt (file content up to the caret plus a short suffix window, not the
   whole-file/whole-tutorial prompt shape every other feature here uses) sent via the existing
   `ILlmRunner.RunPromptAsync` - reuses the runner abstraction, but needs its own short request timeout
   distinct from the main run's configurable one, which is tuned for multi-file generation, not a
-  300ms-budget completion.
-- [ ] T15.2.2 **Open question, not resolved in this plan:** is a per-keystroke-adjacent call to the
-  configured runner (CLI process spawn, or a billed API call) fast/cheap enough to feel like real
-  autocomplete, or does this need a separate, smaller/faster model configured specifically for
-  completions? Needs a spike before committing to F15.2's shape.
+  300ms-budget completion. Done as: `ExplorerViewModel.RequestGhostTextCompletionAsync` and
+  `TutorialViewModel.RequestGhostTextCompletionAsync`, each following this codebase's existing
+  convention that view models - not views - own every `ILlmRunner` call. Text before/after the caret
+  is capped at 4000/1000 characters; the prompt asks for only the inserted text, with an `<cursor/>`
+  marker, no markdown fences. Each request gets its own `CancellationTokenSource` with a 2s timeout,
+  cancelled outright if a newer keystroke supersedes it. `CodeEditor` separately guards against a
+  stale response landing after the caret has moved on by comparing the request's caret offset against
+  the current one before showing a suggestion. Explorer's `CodeEditor.GhostTextSuggestion` binds
+  directly to `ExplorerViewModel.GhostTextSuggestion` (same `DataContext`); Tutorial's proposal editor
+  can't do that - `TutorialDetailControl`'s `Editor` is bound to a `ProposedFileChangeViewModel`, which
+  deliberately has no `ILlmRunner` - so there `RequestGhostTextCompletionAsync` returns the suggestion
+  directly and `TutorialDetailControl`'s code-behind forwards the request up to the page-level
+  `TutorialViewModel` (via the same `FindAncestorOfType<TutorialView>()` lookup `ApplyPendingStepTarget`
+  already uses) and assigns the result straight onto `Editor.GhostTextSuggestion`.
+- [x] T15.2.2 **Open question, resolved:** reuses whichever `ILlmRunner` the user already has
+  configured, rather than adding a dedicated fast/cheap completion model - simpler, and the existing
+  400ms debounce + 2s per-request timeout + caret-offset staleness check (T15.2.1) keeps a slow runner
+  from feeling broken even if it doesn't feel instant. Revisit a dedicated fast model only if real
+  usage shows the reused runner is consistently too slow to be useful.
 
-**F15.3 — Tests**
-- [ ] T15.3.1 Debounce timing and accept/dismiss state transitions (pure logic, no real completion
-  calls).
+**F15.3 — Tests** — ✅ Done 2026-10-23
+- [x] T15.3.1 Debounce timing and accept/dismiss state transitions (pure logic, no real completion
+  calls). Done as: `GhostTextDebouncerTests` (no-input/pre-delay/post-delay firing, fires-once-per-
+  input, input resets the window, `Cancel` suppresses a pending fire) and
+  `GhostTextSuggestionStateTests` (`Show`/`Accept`/`Dismiss` transitions, `Accept` at the wrong caret
+  offset leaves the suggestion in place, empty-text `Show` doesn't count as a suggestion) in
+  `Paarde.Avalonia.Tests/Helpers/`.
 
 ---
 
@@ -2410,7 +2472,7 @@ context-switching to an external terminal window.*
 
 ---
 
-### EPIC 17 — LSP-backed code intelligence *(P3)*
+### EPIC 17 — LSP-backed code intelligence *(P3)* — ✅ Done 2026-10-23
 
 *Why: `CodeEditor` today is AvaloniaEdit + TextMate syntax coloring - real syntax highlighting, zero
 semantic understanding. Go-to-definition, find-references, and live diagnostics all need an actual
@@ -2419,28 +2481,253 @@ lowest priority: `CodeEditor` is a preview/light-edit surface (Explorer's F10.2,
 review), not this app's primary authoring surface, so the payoff-per-effort is weaker than for a tool
 where the editor *is* the product.*
 
-**F17.1 — A language server client**
-- [ ] T17.1.1 For C#/.NET specifically (this repo's own stack): OmniSharp or `csharp-ls` over stdio,
+Scoped to Explorer's `CodeEditor` only, not Tutorial's proposal editor - Tutorial's editor shows
+unsaved/proposed diffs rather than real on-disk project files, so there's no stable file identity for
+a language server to track there.
+
+**F17.1 — A language server client** — ✅ Done 2026-10-23
+- [x] T17.1.1 For C#/.NET specifically (this repo's own stack): OmniSharp or `csharp-ls` over stdio,
   speaking LSP; a generic `ILanguageServerClient` abstraction (mirroring `ILlmRunner`'s
   provider-agnostic shape) so other languages could plug in later, but **only one implementation ships
-  in this epic** - no speculative multi-language support built ahead of a second real use case.
-- [ ] T17.1.2 Diagnostics: subscribe to `textDocument/publishDiagnostics`, render as squiggly
+  in this epic** - no speculative multi-language support built ahead of a second real use case. Done
+  as: `ILanguageServerClient` (mirrors `ILlmRunner`'s `IsAvailableAsync` preflight shape, plus explicit
+  `StartAsync`/`StopAsync` lifecycle and a `DiagnosticsPublished` push event, since one implementation
+  is a long-lived process rather than one-shot-per-call) and `StdioLanguageServerClient`, targeting
+  `csharp-ls` (simpler/more-standard LSP surface than OmniSharp). Speaks raw JSON-RPC 2.0 over stdio,
+  framed with LSP's `Content-Length: N\r\n\r\n` header - distinct enough from `ClaudeCliRunner`'s
+  NDJSON and `ProcessCommandRunner`'s plain-text line streaming that it reads stdout as raw bytes
+  (`ReadContentLengthAsync`/`ReadHeaderLineAsync`/`ReadExactAsync`) rather than using
+  `Process.OutputDataReceived`'s line-based callback. Requests are correlated to responses via an
+  incrementing id and a `Dictionary<int, TaskCompletionSource<JToken?>>`; full `initialize` →
+  `initialized` → ... → `shutdown` → `exit` handshake. `LspOptions`/`LspSettingsKeys`/
+  `LspOptionsProvider` (executable path + arguments, defaulting to `csharp-ls`) follow the exact
+  settings-provider seam `ClaudeCliOptions`/`ClaudeCliSettingsKeys`/`ClaudeCliOptionsProvider` already
+  established, surfaced in Settings under a new "Code intelligence" section. Registered as a DI
+  **singleton** (`App.axaml.cs`) rather than transient like every other process runner here - Explorer
+  only ever has one active working directory at a time, so one long-lived session is simpler than a
+  keyed multi-session manager.
+- [x] T17.1.2 Diagnostics: subscribe to `textDocument/publishDiagnostics`, render as squiggly
   underlines via another `IBackgroundRenderer` (same family as Epics 13/15's renderers) plus a tooltip
-  with the message.
-- [ ] T17.1.3 Go-to-definition/find-references: `textDocument/definition`/`textDocument/references`
+  with the message. Done as: `DiagnosticsRenderer` (straight underline, not a true squiggle glyph -
+  the severity color already conveys the distinction a squiggle would) following
+  `BracketHighlightRenderer`/`DiffBackgroundRenderer`'s self-registering `IBackgroundRenderer`
+  convention; `CodeEditor.Diagnostics` feeds it and also drives a hover tooltip
+  (`Avalonia.Controls.ToolTip.SetTip`/`SetIsOpen`, force-closed/reopened on message change rather than
+  relying on Avalonia's hover-delay auto-refresh) via `TextEditor.GetPositionFromPoint`, which already
+  handles the point-to-document-offset conversion (scroll offset included) that a manual
+  `TextView`-level conversion would otherwise need. `ExplorerViewModel.Diagnostics` is populated from
+  `ILanguageServerClient.DiagnosticsPublished`, marshaled to the UI thread and filtered to whichever
+  file is currently open.
+- [x] T17.1.3 Go-to-definition/find-references: `textDocument/definition`/`textDocument/references`
   requests on a keybind/context-menu action, opening results through Explorer's existing file-open
-  path (T8.1.3) rather than a new navigation surface.
+  path (T8.1.3) rather than a new navigation surface. Done as: F12 (go to definition, jumps straight to
+  the first result) / Shift+F12 (find references, lists every result - unlike a definition, there's no
+  single "right" one to prefer) on `CodeEditor`, raising `GoToDefinitionRequested`/
+  `FindReferencesRequested` with the caret's `LspPosition`. `ExplorerViewModel.NavigateToLocation`
+  reuses the existing `SelectedNode` → `LoadNode` flow (including its unsaved-edits guard) for
+  cross-file jumps via a new `FileTreeNodeViewModel.FindByPath` helper; the caret position itself is
+  applied through a `TakePendingCaretTarget()` pull method mirroring
+  `TutorialViewModel.TakePendingStepTarget()`'s "consume once, after the target content has already
+  loaded" pattern - `ExplorerView.axaml.cs` applies it from `Editor.TextChanged` (cross-file case) and
+  directly after each await (same-file case, where `TextChanged` never fires). Find-references renders
+  through a minimal `Flyout`/`ListBox` attached to `Editor`, not a new results-panel control.
 
-**F17.2 — Lifecycle**
-- [ ] T17.2.1 Start one server process per working directory (keyed the same way other
+**F17.2 — Lifecycle** — ✅ Done 2026-10-23
+- [x] T17.2.1 Start one server process per working directory (keyed the same way other
   per-working-directory state already is, e.g. `WorkingDirectorySettingsKeys`), torn down on app exit
   or working-directory switch - needs explicit process-lifetime ownership, unlike the CLI runner's
-  one-process-per-prompt shape.
+  one-process-per-prompt shape. Done as: `ExplorerViewModel.OnNavigatedTo` calls `StartAsync` (a no-op
+  if already running against the same path); `App.axaml.cs`'s `desktop.Exit` handler now stops the
+  server before the process-wide `Environment.Exit(0)` that follows it, which would otherwise orphan
+  an unmanaged child process. The server process itself is **not** torn down on navigating away from
+  Explorer (only app exit) - `ExplorerViewModel` is `AddTransient` (a fresh instance per navigation to
+  the page), so `OnNavigatedFrom` only unsubscribes that instance's `DiagnosticsPublished` handler, to
+  avoid an accumulating-handler leak across repeated navigations, confirmed by tracing
+  `NavigationService`/`FrameExtensions` - `ExplorerView`'s parameterless constructor resolves a new
+  `ExplorerViewModel` from DI on every `Frame.Navigate`. `LoadNode` sends `didOpen`/`didClose` as the
+  tree selection changes; `OnSelectedFileContentChanged` sends `didChange` (full-document sync, not
+  incremental - the simplest correct option, and this app has no existing incremental-diff plumbing
+  that would make incremental sync cheap to add). All three are fire-and-forget (`_ = ...Async(...)`):
+  `StdioLanguageServerClient`'s own notification methods already no-op safely when the server isn't
+  running, and an unexpected exception lands in the app's existing global
+  `TaskScheduler.UnobservedTaskException` handler rather than needing per-call awaiting.
 
-**F17.3 — Tests**
-- [ ] T17.3.1 `ILanguageServerClient` contract tests against a fake/stub server (JSON-RPC framing,
+**F17.3 — Tests** — ✅ Done 2026-10-23
+- [x] T17.3.1 `ILanguageServerClient` contract tests against a fake/stub server (JSON-RPC framing,
   request/response correlation) - not against a real OmniSharp process in CI, which would be slow and
-  environment-fragile.
+  environment-fragile. Done as: `StdioLanguageServerClientTests`, standing a small Python script in
+  for a real LSP server (same "fake external process" approach `ClaudeCliRunnerTests` already takes
+  with a shell script standing in for the `claude` CLI) - covers `IsAvailableAsync` (present/missing
+  executable), start/stop lifecycle (`IsRunning`), `textDocument/definition`'s single-object result
+  shape and `textDocument/references`'s array result shape (`ParseLocations`' two branches), and a
+  `textDocument/publishDiagnostics` push correctly raising `DiagnosticsPublished` for the right file
+  path. `FakeLanguageServerClient` (`Paarde.Avalonia.Tests/Fakes`) added alongside for
+  `ExplorerViewModelTests`' constructor, which now also takes `ILanguageServerClient`. Not visually
+  verified (the diagnostics underline/tooltip, F12 keybind, and references flyout) - no X server in
+  this sandbox, same caveat as every other Avalonia-touching task in this roadmap.
+
+---
+
+### EPIC 18 — Multi-language code intelligence (Python, TypeScript/JavaScript/JSX) *(P2)*
+
+*Why: Epic 17 shipped C#-only code intelligence by deliberate scope decision ("no speculative
+multi-language support built ahead of a second real use case"). This is that second use case:
+extend the same diagnostics/go-to-definition/find-references trio to Python and to
+TypeScript/JavaScript/JSX (one server, `typescript-language-server`, handles all four of those
+extensions - "React" is not a distinct LSP target). Syntax highlighting needs no work at all -
+confirmed by directly probing `TextMateSharp.Grammars`' `RegistryOptions.GetLanguageByExtension`,
+which already resolves `.py`/`.ts`/`.tsx`/`.js`/`.jsx` correctly; the gap is entirely semantic.*
+
+Full requirements, design, and task breakdown: [`specs/multi-language-support/`](specs/multi-language-support/requirements.md).
+
+**F18.1 — Per-language server configuration and routing** — Not started
+- [ ] T18.1.1 Replace the single global `LspOptions` with a per-language collection
+  (`LanguageServerOptions`), with built-in defaults for `csharp`→`csharp-ls`,
+  `python`→`pyright-langserver --stdio`, `typescript`→`typescript-language-server --stdio`, each
+  independently overridable in Settings. See `specs/multi-language-support/design.md`.
+- [ ] T18.1.2 Fix `StdioLanguageServerClient.NotifyDocumentOpenedAsync`'s hardcoded
+  `"languageId": "csharp"` to send the language actually detected for the open file.
+- [ ] T18.1.3 Add a project-type detector (`*.csproj`/`*.sln`, `pyproject.toml`/`setup.py`/
+  `requirements.txt`, `package.json`) so only relevant servers are attempted per working
+  directory, with a per-language force-enable escape hatch in Settings.
+
+**F18.2 — Concurrent multi-server lifecycle** — Not started
+- [ ] T18.2.1 New `ILanguageServerSessionManager` owning N `ILanguageServerClient` instances keyed
+  by language, so a polyglot working directory (e.g. a Python backend + TypeScript frontend) gets
+  intelligence in both languages at once, with one language's start failure never affecting
+  another's.
+
+**F18.3 — Settings UI** — Not started
+- [ ] T18.3.1 Replace the single flat executable-path/arguments field pair in Settings' "Code
+  intelligence" section with one row per configured language.
+
+**F18.4 — Tests** — Not started
+- [ ] T18.4.1 `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, and extended
+  `StdioLanguageServerClientTests` per `specs/multi-language-support/design.md`'s testing section.
+
+---
+
+### EPIC 19 — Editor autocomplete (LSP symbol/member completion) *(P2)*
+
+*Why: Epic 15's "autocomplete" is LLM-guessed ghost text, not real symbol completion - there is no
+`textDocument/completion` call anywhere in this codebase, and `initialize` advertises an empty
+`capabilities` object so no server would even offer it. AvaloniaEdit already ships a complete,
+reusable completion-popup toolkit (`CodeCompletion.CompletionWindow`/`CompletionList`/
+`ICompletionData`, confirmed by inspecting the installed package directly) - this is a
+materially cheaper build than Epic 15's ghost text or Epic 13's diff rendering, both of which had
+no existing AvaloniaEdit primitive to anchor on.*
+
+Full requirements, design, and task breakdown: [`specs/editor-autocomplete/`](specs/editor-autocomplete/requirements.md).
+Scoped to Explorer's `CodeEditor` only, same boundary Epic 17 already drew (Tutorial's proposal
+editor has no stable on-disk file identity for a language server to track).
+
+**F19.1 — Completion request plumbing** — ✅ Done 2026-10-23
+- [x] T19.1.1 Add `GetCompletionAsync` to `ILanguageServerClient`/`StdioLanguageServerClient`
+  (`textDocument/completion`, parsing either the bare-array or `CompletionList` response shape)
+  and advertise `capabilities.textDocument.completion` in `initialize` - shared handshake change
+  with Epic 18's T18.1.2 area, whichever epic lands first should make it. — done 2026-10-23: new
+  `LspCompletionItem` record (`Paarde.Core/Models`) mirrors the wire response verbatim
+  (`Label`/`Detail`/`InsertText`/`Kind`) - the `InsertText ?? Label` fallback (R4.1) is deliberately
+  left to the future UI call site (T3/T4), not resolved here. `StdioLanguageServerClient.
+  GetCompletionAsync` sends `textDocument/completion` via the same `TextDocumentPositionParams`
+  helper `GetDefinitionAsync`/`GetReferencesAsync` already use, and `ParseCompletionItems` handles
+  both a bare `CompletionItem[]` and a `CompletionList { items: [...] }` object (R2.2) - `initialize`
+  now also declares `capabilities.textDocument.completion.completionItem.snippetSupport: false`
+  (R2.1), landing in the same `textDocument` capabilities object Epic 18 already restructured for
+  exactly this addition. Since Epic 18's `ILanguageServerSessionManager` façade already existed
+  (shipped before this task, unlike when design.md was drafted), also added
+  `GetCompletionAsync` there and to `LanguageServerSessionManager` following the identical
+  `TryGetClient`-routing pattern as `GetDefinitionAsync`/`GetReferencesAsync`, so `CodeEditor`'s
+  future wiring (T4) can go through the same façade `ExplorerViewModel` already uses for every
+  other LSP call rather than a one-off direct `ILanguageServerClient` reference. Updated both
+  `FakeLanguageServerClient` fakes and `FakeLanguageServerSessionManager` to implement the new
+  method. Added `StdioLanguageServerClientTests` cases (capability advertisement, bare-array
+  response, `CompletionList` response, missing `insertText` left `null`) using the same fake
+  Python-script LSP server fixture Epic 17 established. Not yet wired to any UI - `CompletionWindow`
+  rendering, the trigger-character/Ctrl+Space wiring, and ghost-text coexistence are T3/T4/T6. Full
+  solution builds with 0 warnings/errors, 797/797 tests pass (481 Core + 316 Avalonia - 3 new).
+
+**F19.2 — Completion dropdown UI** — ✅ Done 2026-10-23
+- [x] T19.2.1 Wire AvaloniaEdit's own `CompletionWindow` to `.`-trigger-character typing and a
+  Ctrl+Space manual-invoke shortcut on `CodeEditor`, accepting with Tab/Enter/click and dismissing
+  with Escape or caret movement - using the control's built-in list/filter/anchoring behavior
+  rather than a new bespoke popup. — done 2026-10-23: deviated from `design.md`'s literal
+  suggestion that `CodeEditor` call `ILanguageServerSessionManager`/`ILanguageServerClient`
+  directly - every other `Controls/` class in this codebase (confirmed via
+  `grep -rln "App.GetService" Paarde.Avalonia/Controls/` returning nothing) stays DI-free and
+  round-trips through an event + bindable property instead, same shape as Epic 15's
+  `GhostTextRequested`/`GhostTextSuggestion` and Epic 17's `GoToDefinitionRequested`/
+  `FindReferencesRequested`. Added `CompletionRequested` (`EventHandler<CompletionRequestedEventArgs>`,
+  carrying the trigger `LspPosition`) and a `CompletionItems` `StyledProperty<IReadOnlyList<
+  LspCompletionItem>?>` to `CodeEditor`; `TextArea.TextEntered` fires `TriggerCompletion()` on `.`
+  (R1.1), and a new Ctrl+Space branch at the top of `OnTextAreaKeyDown` does the same regardless of
+  caret position (R1.2) - checked ahead of the existing ghost-text-only early return so it works
+  whether or not a ghost-text suggestion happens to be showing. `ExplorerViewModel.
+  RequestCompletionAsync` handles `CompletionRequested` by calling the already-existing
+  `ILanguageServerSessionManager.GetCompletionAsync` (same no-op-if-no-client behavior as
+  `GoToDefinitionAsync`/`FindReferencesAsync` covers R1.3 for free - no client registered for an
+  unsupported file means an empty list and no dropdown, no new guard needed), then sets
+  `CompletionItems` back (null-then-value, same double-assignment `GhostTextSuggestion` already
+  uses so a repeat result still raises `PropertyChanged`); `ExplorerView.axaml.cs` wires both sides.
+  `OnCompletionItemsChanged` discards a stale result (caret moved since the request, via the same
+  `_pendingCompletionRequestOffset`-vs-`CaretOffset` check `OnGhostTextSuggestionChanged` already
+  uses) or an empty one, otherwise builds a `CompletionWindow` populated with one
+  `CodeEditorCompletionData` per item and shows it, first dismissing any visible ghost-text
+  suggestion (R6.2). New `CodeEditorCompletionData : ICompletionData`
+  (`Paarde.Avalonia/Controls/`) adapts an `LspCompletionItem`: `Text`/`Content` from `Label`,
+  `Description` from `Detail` (R3.4's plain-text secondary slot, no icon per the non-goal), and a
+  separately-exposed `InsertionText` (`InsertText ?? Label`, R4.1) used by `Complete` to replace
+  the tracked completion segment - pulled out as its own property specifically so it's testable
+  without constructing a live `TextArea` (see T19.4.1's note on why that's not possible in this
+  sandbox). Confirmed via `ilspycmd` decompile of the installed `AvaloniaEdit.dll` that Tab/Enter
+  acceptance, PointerPressed click-to-accept, and Escape-to-dismiss are all `CompletionWindowBase`/
+  `CompletionWindow` defaults needing no extra wiring (R4.1, R4.2, R5.1), and that
+  `TextArea.Caret.PositionChanged` already closes the window the moment the caret leaves
+  `[StartOffset, EndOffset]` by any means other than typing a filter character (R5.2) - see T19.2.2
+  below for the filtering nuance found the same way.
+- [x] T19.2.2 (folded into T19.2.1, tracked separately since it was an "exercise the real control"
+  open question in `requirements.md` rather than a planned code change) Confirmed via `ilspycmd`
+  decompile that `CompletionWindow`/`CompletionList`'s default behavior already satisfies R3.2-R3.4
+  with no adapter needed: `CompletionList.SelectItem` runs prefix/fuzzy `GetMatchQuality` scoring
+  against everything typed since the trigger (`IsFiltering` is on by default) every time
+  `CaretPositionChanged` fires, and sets `CompletionList.IsVisible = false` (not a literal
+  `Hide()`/close) when zero items match - functionally equivalent for the user (nothing is shown,
+  Tab/Enter have nothing to accept) but worth noting precisely: if the user then backspaces to a
+  point that matches again, the same window becomes visible again rather than requiring a new
+  trigger, which is arguably better than hard-closing, not a gap to fix.
+
+**F19.3 — Coexistence with Epic 15's ghost text** — ✅ Done 2026-10-23
+- [x] T19.3.1 Suspend ghost-text triggering while a completion dropdown is open, and dismiss any
+  visible ghost-text suggestion the instant a dropdown opens, so the two completion mechanisms
+  never compete for the same keystroke or screen space. — done 2026-10-23: `OnGhostTextTimerTick`
+  (the only place `GhostTextRequested` is ever raised) now also bails when `_completionWindow is
+  not null` (R6.1); since `_completionWindow` is nulled out via the window's own `Closed` handler,
+  this re-evaluates on every subsequent 150ms tick with no separate "resume" step needed (R6.3 falls
+  out for free). `ShowCompletionWindow` calls `DismissGhostTextSuggestion()` before showing the new
+  window (R6.2).
+
+**F19.4 — Tests** — ✅ Done 2026-10-23
+- [x] T19.4.1 Extended `StdioLanguageServerClientTests` (both response shapes, capability
+  advertisement), `CodeEditorCompletionData` unit tests, and a ghost-text/completion coexistence
+  gating test, per `specs/editor-autocomplete/design.md`'s testing section. — done 2026-10-23: the
+  `StdioLanguageServerClientTests` piece landed already under T19.1.1. Added
+  `CodeEditorCompletionDataTests` (`Paarde.Avalonia.Tests/Controls/`) covering the `InsertionText`
+  `InsertText ?? Label` fallback and the `Text`/`Content`/`Description` mappings - deliberately not
+  exercising `Complete(...)` itself: constructing a bare `AvaloniaEdit.Editing.TextArea` outside a
+  running Avalonia `Application` throws (`CaretNavigationCommandHandler`'s static constructor needs
+  `HotkeyConfiguration.Keymap`, which reads `Application.Current`), confirmed by trying it directly
+  in this sandbox - same "no X server / no live `Application`" limitation already noted elsewhere
+  in this roadmap for other AvaloniaEdit-control-level behavior. `Complete`'s actual document
+  mutation, the Ctrl+Space/`.`-trigger wiring, and the ghost-text coexistence gating are all
+  `CodeEditor`-level behavior with the same limitation (no existing `CodeEditor`-level tests exist
+  in this codebase for the same reason) - covered by the `ilspycmd` decompile evidence cited under
+  T19.2.1/T19.2.2 plus T19.4.2's manual verification below, not a new automated test. Full solution
+  builds with 0 warnings/errors, 801/801 tests pass (481 Core + 320 Avalonia - 4 new).
+- [ ] T19.4.2 Manual verification in a real C# project (requires a running `Application`/display,
+  unavailable in this sandbox): typing `.` after a known symbol shows a populated dropdown;
+  Tab/Enter/click accept; Escape dismisses; a ghost-text suggestion visible at trigger time
+  disappears when the dropdown opens; typing past all matches auto-hides the window. Repeat once
+  [[multi-language-support]] ships for a Python and a TypeScript file.
 
 ---
 
@@ -2469,9 +2756,32 @@ where the editor *is* the product.*
     Epic 12's `ProcessCommandRunner`.
 14. **Epic 13** — inline diff view in the editor. Polish on an already-solid review/apply flow, not a
     new safety-critical path.
-15. **Epic 14** — codebase-aware context. F14.1 (`@file` mention, no embeddings) before F14.2
-    (semantic ranking, which adds a new embeddings-provider dependency).
-16. **Epic 15** — inline ghost-text autocomplete. Needs a latency/cost spike (F15.2.2) before
-    committing to its final shape.
-17. **Epic 17** — LSP-backed code intelligence. Largest and most speculative; lowest priority given
-    `CodeEditor` is a review/light-edit surface here, not the app's primary authoring surface.
+15. **Epic 15** — inline ghost-text autocomplete. ✅ Done 2026-10-23.
+16. **Epic 17** — LSP-backed code intelligence. Largest and most speculative; lowest priority given
+    `CodeEditor` is a review/light-edit surface here, not the app's primary authoring surface. ✅ Done
+    2026-10-23.
+
+17. **Epic 14 (F14.2)** — relevance ranking, shipped as lexical TF-IDF rather than true semantic
+    (embedding) search, sidestepping the embeddings-provider/API-key decision entirely. ✅ Done
+    2026-10-23.
+
+18. **Epic 18** — multi-language code intelligence (Python, TypeScript/JavaScript/JSX). Extends
+    Epic 17's single-language C# work to the second real use case it was waiting for. Full spec:
+    `specs/multi-language-support/`. ✅ Done 2026-10-23: per-language `LanguageServerOptions`
+    replacing the old single global `LspOptions`, `ProjectTypeDetector` (marker-file scan, depth
+    0-1) gating which servers even start, `LanguageIdResolver` splitting "LSP languageId for this
+    file" from "which configured process handles it" (one `typescript-language-server` instance
+    serves typescript/typescriptreact/javascript/javascriptreact alike), and
+    `LanguageServerSessionManager` replacing the single `ILanguageServerClient` consumer in
+    `ExplorerViewModel`/DI with per-language isolation (one language's start failure never blocks
+    another) and a same-working-directory no-op guard. Settings' "Code intelligence" section
+    reworked into a per-language repeated row. Solution builds clean, 794/794 tests pass (22 new:
+    `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, 2 extended
+    `StdioLanguageServerClientTests` cases). Not manually verified against real
+    `pyright-langserver`/`typescript-language-server`/`csharp-ls` processes across C#-only/
+    Python-only/TypeScript-only/polyglot repos (no X server in this sandbox, same limitation noted
+    on earlier UI-touching tasks, and these executables aren't installed here regardless).
+19. **Epic 19** — editor autocomplete (real LSP completion, distinct from Epic 15's LLM ghost
+    text). Builds on AvaloniaEdit's existing `CompletionWindow`, and shares an `initialize`
+    capability-advertisement change with Epic 18 - either can land first. Full spec:
+    `specs/editor-autocomplete/`.

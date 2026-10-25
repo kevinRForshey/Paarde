@@ -24,10 +24,22 @@
                      ToolTip.Tip="Undo the last edit (Ctrl+Z)." />
             <Button Name="RedoButton" Content="Redo" Click="OnRedoButtonClick"
                      ToolTip.Tip="Redo the last undone edit (Ctrl+Y)." />
-            <Button Content="Revert to proposed" Command="{Binding RevertToProposedCommand}"
-                     ToolTip.Tip="Discard your edits and go back to what Claude proposed." />
-            <Button Content="Revert to original" Command="{Binding RevertToOriginalCommand}"
-                     ToolTip.Tip="Discard your edits and the proposed change, going back to the file on disk." />
+            <Button Command="{Binding RevertToProposedCommand}"
+                     Classes="danger"
+                     ToolTip.Tip="Discard your edits and go back to what Claude proposed.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Restore" FontSize="14" />
+                    <TextBlock Text="Revert to proposed" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding RevertToOriginalCommand}"
+                     Classes="danger"
+                     ToolTip.Tip="Discard your edits and the proposed change, going back to the file on disk.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Restore" FontSize="14" />
+                    <TextBlock Text="Revert to original" />
+                </StackPanel>
+            </Button>
             <TextBlock Text="Edited" IsVisible="{Binding IsDirty}" VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" />
         </StackPanel>
 

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 
 using Paarde.Avalonia.Contracts.Services;
@@ -122,6 +123,22 @@ public partial class App : Application
             services.AddTransient<IGitStatusService, GitStatusService>();
             services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
             services.AddTransient<ITerminalCommandRunner, ProcessCommandRunner>();
+
+            // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
+            // prompts in the same session instead of re-tokenizing the whole project on every
+            // "Suggest relevant files" click.
+            services.AddSingleton<ICodebaseIndexService, TfIdfCodebaseIndexService>();
+
+            // Epic 17 (T17.2.1)/Epic 18 (specs/multi-language-support): singleton, not transient
+            // like the per-call runners above - ILanguageServerSessionManager owns zero-or-more
+            // long-lived per-language server processes tied to Explorer's current working
+            // directory, started/stopped by ExplorerViewModel rather than spun up fresh per call.
+            services.AddSingleton<LanguageServerOptionsProvider>();
+            services.AddSingleton<IProjectTypeDetector, ProjectTypeDetector>();
+            services.AddSingleton<ILanguageServerSessionManager>(sp => new LanguageServerSessionManager(
+                sp.GetRequiredService<IProjectTypeDetector>(),
+                sp.GetRequiredService<LanguageServerOptionsProvider>().GetOptionsAsync,
+                logger: sp.GetRequiredService<ILogger<LanguageServerSessionManager>>()));
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
@@ -211,12 +228,28 @@ public partial class App : Application
             MainWindow = window;
             desktop.MainWindow = window;
 
+#if DEBUG
+            // Avalonia.Diagnostics is Debug-only (Paarde.Avalonia.csproj), same as this call.
+            // The Avalonia.Generators default (F12) is disabled in that csproj because it collides
+            // with CodeEditor's own F12 go-to-definition binding (Epic 17) - Ctrl+Shift+F12 instead.
+            window.AttachDevTools(new KeyGesture(Key.F12, KeyModifiers.Control | KeyModifiers.Shift));
+#endif
+
             // On Linux, Avalonia's X11 backend keeps a D-Bus connection alive for the app's lifetime to
             // watch for OS theme changes. Its teardown races Dispatcher.UIThread.InvokeShutdown() (which
             // ClassicDesktopStyleApplicationLifetime calls right after raising Exit), surfacing as an
             // unhandled TaskCanceledException from a background thread. Exiting here, before that
             // InvokeShutdown() call, sidesteps the race instead of letting Avalonia's internal teardown hit it.
-            desktop.Exit += (_, _) => Environment.Exit(0);
+            desktop.Exit += (_, _) =>
+            {
+                // Epic 17 (T17.2.1)/Epic 18: every language server is a child process with no
+                // owner other than this app - Environment.Exit(0) below terminates this process
+                // immediately and would otherwise orphan it/them. Each client's StopAsync kill is
+                // bounded (a couple of seconds at most), so blocking briefly here is acceptable on
+                // the way out.
+                GetService<ILanguageServerSessionManager>().StopAllAsync().GetAwaiter().GetResult();
+                Environment.Exit(0);
+            };
 
             InitializeThemeAndNavigate();
         }

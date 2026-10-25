@@ -87,14 +87,26 @@
                 <!-- T10.2.1: editable now - BindableText is TwoWay by default (T2.2.2), so edits
                      flow straight back into SelectedFileContent, where OnSelectedFileContentChanged
                      derives IsFileDirty. -->
-                <controls:CodeEditor Grid.Row="1"
+                <!-- Epic 17, T17.1.2/T17.1.3: Diagnostics feeds the underline renderer/hover
+                     tooltip; GoToDefinitionRequested/FindReferencesRequested (F12/Shift+F12) and
+                     the references flyout below are wired up in ExplorerView.axaml.cs. -->
+                <controls:CodeEditor Name="Editor"
+                                      Grid.Row="1"
                                       Margin="8,0,0,0"
                                       helpers:TextEditorExtensions.BindableText="{Binding SelectedFileContent}"
                                       FilePath="{Binding SelectedFilePath}"
+                                      GhostTextSuggestion="{Binding GhostTextSuggestion}"
+                                      Diagnostics="{Binding Diagnostics}"
                                       IsReadOnly="False"
                                       HorizontalScrollBarVisibility="Auto"
                                       VerticalScrollBarVisibility="Auto"
-                                      IsVisible="{Binding SelectedFilePath, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                                      IsVisible="{Binding SelectedFilePath, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}">
+                    <FlyoutBase.AttachedFlyout>
+                        <Flyout Placement="Bottom">
+                            <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
+                        </Flyout>
+                    </FlyoutBase.AttachedFlyout>
+                </controls:CodeEditor>
 
                 <!-- T10.1.4: collapsed until there's something to show, so the preview pane keeps
                      its full height while browsing and only gives up space once an explanation has

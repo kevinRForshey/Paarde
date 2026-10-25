@@ -1,3 +1,4 @@
+using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
@@ -11,8 +12,14 @@ public class SettingsViewModelTests
     private readonly FakeLocalSettingsService _localSettingsService = new();
     private readonly FakeSecureStorageService _secureStorageService = new();
     private readonly PromptTemplateProvider _promptTemplateProvider = new();
+    private readonly LanguageServerOptionsProvider _languageServerOptionsProvider;
 
-    private SettingsViewModel CreateSut() => new(_themeSelectorService, _localSettingsService, _secureStorageService, _promptTemplateProvider);
+    public SettingsViewModelTests()
+    {
+        _languageServerOptionsProvider = new LanguageServerOptionsProvider(_localSettingsService);
+    }
+
+    private SettingsViewModel CreateSut() => new(_themeSelectorService, _localSettingsService, _secureStorageService, _promptTemplateProvider, _languageServerOptionsProvider);
 
     [Fact]
     public void ClaudeCliSettings_DefaultToClaudeAndDashP()

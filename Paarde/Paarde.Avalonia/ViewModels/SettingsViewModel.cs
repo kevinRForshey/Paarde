@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Windows.Input;
 
@@ -23,6 +24,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     private readonly IThemeSelectorService _themeSelectorService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ISecureStorageService _secureStorageService;
+    private readonly LanguageServerOptionsProvider _languageServerOptionsProvider;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -52,6 +54,11 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
     [ObservableProperty]
     private string testCommand = "dotnet test";
+
+    // Epic 18 (R6.1): one row per configured language, replacing Epic 17's single flat
+    // LspExecutablePath/LspArguments pair - populated from LanguageServerOptionsProvider in
+    // OnNavigatedTo, saved back as a whole collection on any row's edit.
+    public ObservableCollection<LanguageServerOptionsRowViewModel> LanguageServerRows { get; } = [];
 
     // T6.3.2/T6.3.3: which ILlmRunner implementation LlmRunnerSelector should delegate to.
     [ObservableProperty]
@@ -100,11 +107,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
         get;
     }
 
-    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, ILogger<SettingsViewModel>? logger = null)
+    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, ILogger<SettingsViewModel>? logger = null)
     {
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
         _secureStorageService = secureStorageService;
+        _languageServerOptionsProvider = languageServerOptionsProvider;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _themeVariant = _themeSelectorService.Theme;
         _versionDescription = GetVersionDescription();
@@ -143,6 +151,14 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             BuildCommand = await _localSettingsService.ReadSettingAsync<string>(BuildTestSettingsKeys.BuildCommand) ?? BuildCommand;
             TestCommand = await _localSettingsService.ReadSettingAsync<string>(BuildTestSettingsKeys.TestCommand) ?? TestCommand;
 
+            var languageServerOptions = await _languageServerOptionsProvider.GetOptionsAsync();
+
+            LanguageServerRows.Clear();
+            foreach (var options in languageServerOptions)
+            {
+                LanguageServerRows.Add(new LanguageServerOptionsRowViewModel(options, OnLanguageServerRowChanged));
+            }
+
             PromptTemplateOverride = await _localSettingsService.ReadSettingAsync<string>(PromptTemplateSettingsKeys.Override) ?? string.Empty;
 
             var savedRunnerKind = await _localSettingsService.ReadSettingAsync<string>(LlmRunnerSettingsKeys.SelectedRunner);
@@ -177,6 +193,9 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     partial void OnBuildCommandChanged(string value) => _localSettingsService.SaveSettingAsync(BuildTestSettingsKeys.BuildCommand, value);
 
     partial void OnTestCommandChanged(string value) => _localSettingsService.SaveSettingAsync(BuildTestSettingsKeys.TestCommand, value);
+
+    private void OnLanguageServerRowChanged(LanguageServerOptionsRowViewModel row) =>
+        _languageServerOptionsProvider.SaveOptionsAsync(LanguageServerRows.Select(r => r.ToOptions()).ToList());
 
     partial void OnSelectedRunnerKindChanged(LlmRunnerKind value) => _localSettingsService.SaveSettingAsync(LlmRunnerSettingsKeys.SelectedRunner, value.ToString());
 

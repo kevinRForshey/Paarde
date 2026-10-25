@@ -20,14 +20,40 @@
 
         <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto">
             <StackPanel Grid.Row="0" Margin="8" Spacing="4">
+
+                <!-- UX pass: grouped into labeled clusters (Apply / Export / Refine) instead of one
+                     flat stack of same-weight buttons, with "Apply Selected" as the one accent
+                     (primary) action and the two destructive actions in "danger" styling - the
+                     sidebar previously gave all seven buttons identical visual weight. -->
+                <TextBlock Text="APPLY" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
                 <CheckBox Content="Stage applied files in git" IsChecked="{Binding StageAppliedFilesInGit, Mode=TwoWay}"
                           ToolTip.Tip="Run `git add` on the files Apply Selected just wrote, so they already show as staged in your next git status." />
-                <Button Content="Apply Selected" Command="{Binding ApplySelectedCommand}" HorizontalAlignment="Stretch"
-                         ToolTip.Tip="Write every selected change, across every file, to disk." />
-                <Button Content="Undo Last Apply" Command="{Binding UndoLastApplyCommand}" HorizontalAlignment="Stretch"
-                         ToolTip.Tip="Restore the files from the most recent apply to their content from right before it." />
-                <Button Content="Revert All Applied" Command="{Binding RevertAllAppliedCommand}" HorizontalAlignment="Stretch"
-                         ToolTip.Tip="Restore every file this session has applied a change to back to its content from before this session." />
+                <Button Command="{Binding ApplySelectedCommand}" HorizontalAlignment="Stretch"
+                         Classes="accent"
+                         ToolTip.Tip="Write every selected change, across every file, to disk.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Checkmark" FontSize="14" />
+                        <TextBlock Text="Apply Selected" />
+                    </StackPanel>
+                </Button>
+                <!-- Icons on the danger buttons are deliberate, not decorative: they give the
+                     destructive-action signal a second channel beyond color (WCAG 1.4.1). -->
+                <Button Command="{Binding UndoLastApplyCommand}" HorizontalAlignment="Stretch"
+                         Classes="danger"
+                         ToolTip.Tip="Restore the files from the most recent apply to their content from right before it.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ui:SymbolIcon Symbol="RotateCounterClockwise" FontSize="14" />
+                        <TextBlock Text="Undo Last Apply" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding RevertAllAppliedCommand}" HorizontalAlignment="Stretch"
+                         Classes="danger"
+                         ToolTip.Tip="Restore every file this session has applied a change to back to its content from before this session.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Restore" FontSize="14" />
+                        <TextBlock Text="Revert All Applied" />
+                    </StackPanel>
+                </Button>
                 <TextBlock Text="{Binding ApplyStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
                            IsVisible="{Binding ApplyStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
@@ -39,17 +65,33 @@
                 <TextBlock Text="{Binding SendBuildTestErrorsStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
                            IsVisible="{Binding SendBuildTestErrorsStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
+                <Separator Margin="0,8,0,0" />
+
                 <!-- T8.4.4: saves the overview + every file's numbered steps as a standalone document. -->
+                <TextBlock Margin="0,8,0,0" Text="EXPORT" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button Content="Export as Markdown" Command="{Binding ExportTutorialAsMarkdownCommand}"
-                             ToolTip.Tip="Save the tutorial's overview and steps as a Markdown file." />
-                    <Button Content="Export as HTML" Command="{Binding ExportTutorialAsHtmlCommand}"
-                             ToolTip.Tip="Save the tutorial's overview and steps as an HTML file." />
+                    <Button Command="{Binding ExportTutorialAsMarkdownCommand}"
+                             ToolTip.Tip="Save the tutorial's overview and steps as a Markdown file.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:SymbolIcon Symbol="SaveAs" FontSize="14" />
+                            <TextBlock Text="Export as Markdown" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ExportTutorialAsHtmlCommand}"
+                             ToolTip.Tip="Save the tutorial's overview and steps as an HTML file.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:SymbolIcon Symbol="SaveAs" FontSize="14" />
+                            <TextBlock Text="Export as HTML" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
                 <TextBlock Text="{Binding ExportStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
                            IsVisible="{Binding ExportStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
+                <Separator Margin="0,8,0,0" />
+
                 <!-- T7.3.2: scoped follow-up that only asks Claude to change the selected file. -->
+                <TextBlock Margin="0,8,0,0" Text="REFINE" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
                 <TextBox Text="{Binding RefineInstruction, Mode=TwoWay}"
                          Watermark="Refine selected file..."
                          ToolTip.Tip="Describe a change to make to only the selected file, continuing this tutorial's conversation." />

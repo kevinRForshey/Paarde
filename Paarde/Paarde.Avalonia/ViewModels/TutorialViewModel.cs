@@ -70,6 +70,12 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
     [ObservableProperty]
     private bool isRefining;
 
+    // Epic 15, T15.2: no bindable GhostTextSuggestion property here like ExplorerViewModel's -
+    // TutorialDetailControl's Editor binds to a ProposedFileChangeViewModel, not this VM, so there's
+    // nothing for an AXAML binding to reach. RequestGhostTextCompletionAsync below just returns the
+    // suggestion directly and TutorialDetailControl's code-behind assigns it to Editor.GhostTextSuggestion.
+    private CancellationTokenSource? _ghostTextCancellationTokenSource;
+
     // T8.4.4: status for the export-to-file commands below, surfaced the same inline way as
     // ApplyStatusMessage rather than a dialog - exporting isn't a destructive/multi-outcome
     // operation worth interrupting the user for.
@@ -655,6 +661,47 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
     }
 
     private bool CanRefineSelectedFile() => Selected is not null && !string.IsNullOrWhiteSpace(RefineInstruction) && !IsRefining;
+
+    // Epic 15, T15.2.1/T15.2.2: handles TutorialDetailControl's Editor.GhostTextRequested, forwarded
+    // up via FindAncestorOfType<TutorialView>().ViewModel the same way ApplyPendingStepTarget already
+    // reaches this page-level view model - Editor's DataContext is the per-file
+    // ProposedFileChangeViewModel, which has no ILlmRunner (deliberately - see its own doc comment),
+    // so this is the nearest VM that actually owns one. Same reused-runner/no-dedicated-fast-model
+    // tradeoff as ExplorerViewModel.RequestGhostTextCompletionAsync; see its comment for why. No
+    // resumeSessionId - a one-off completion lookup, not a continuation of the main run's conversation.
+    public async Task<string?> RequestGhostTextCompletionAsync(string textBeforeCaret, string textAfterCaret)
+    {
+        if (Selected is not { } file)
+        {
+            return null;
+        }
+
+        _ghostTextCancellationTokenSource?.Cancel();
+        var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        _ghostTextCancellationTokenSource = cancellationTokenSource;
+
+        try
+        {
+            var prompt =
+                "Complete the code at the <cursor/> marker below. Respond with ONLY the text that " +
+                "should be inserted at the cursor - no explanation, no markdown fences, nothing before " +
+                "or after it. If nothing reasonable completes the code there, respond with nothing.\n\n" +
+                $"File: {file.FilePath}\n\n{textBeforeCaret}<cursor/>{textAfterCaret}";
+
+            var result = await _llmRunner.RunPromptAsync(prompt, _promptResultStore.WorkingDirectoryPath, cancellationToken: cancellationTokenSource.Token);
+            if (cancellationTokenSource.IsCancellationRequested || !result.Success || string.IsNullOrWhiteSpace(result.Output))
+            {
+                return null;
+            }
+
+            return result.Output.Trim();
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer request, or timed out - either way, there's nothing to show.
+            return null;
+        }
+    }
 
     // T8.2.2: closes the active tab - a single command acting on Selected rather than a close
     // affordance on each tab header, consistent with how this page already drives per-row actions

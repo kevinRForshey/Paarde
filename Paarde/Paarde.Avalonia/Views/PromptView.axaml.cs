@@ -87,6 +87,16 @@ public partial class PromptView : UserControl
         }
     }
 
+    // T14.2.3: unlike a mention pick, this doesn't touch the prompt text - it only attaches the
+    // file, so the suggestion list can lose just this one entry rather than closing entirely.
+    private void OnSuggestedRelevantFileDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (SuggestedRelevantFilesListBox.SelectedItem is string selected)
+        {
+            ViewModel.AttachSuggestedFile(selected);
+        }
+    }
+
     private void MoveMentionSelection(int delta)
     {
         var count = ViewModel.MentionSuggestions.Count;

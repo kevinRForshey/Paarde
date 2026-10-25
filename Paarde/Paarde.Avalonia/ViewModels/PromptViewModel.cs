@@ -53,6 +53,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
     private readonly IPromptResultStore _promptResultStore;
     private readonly IPromptTemplateProvider _promptTemplateProvider;
     private readonly IRunSessionStore _runSessionStore;
+    private readonly ICodebaseIndexService _codebaseIndexService;
     private readonly ILogger<PromptViewModel> _logger;
 
     [ObservableProperty]
@@ -121,6 +122,15 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
 
     public bool HasMentionSuggestions => MentionSuggestions.Count > 0;
 
+    // T14.2.3: an opt-in "suggest relevant files" step, populated only when the user clicks
+    // SuggestRelevantFilesCommand - never auto-injected. Separate from MentionSuggestions, which
+    // is the @-trigger popup's own state and has different lifecycle (closes on every keystroke
+    // outside a mention) and selection semantics (one pick closes it; here each suggestion can be
+    // attached independently, or the whole list dismissed).
+    public ObservableCollection<string> SuggestedRelevantFiles { get; } = new();
+
+    public bool HasSuggestedRelevantFiles => SuggestedRelevantFiles.Count > 0;
+
     // T14.1.1: built lazily from WorkingDirectoryPath (same FileTreeBuilder walk Explorer uses, so
     // gitignored/`.git` entries never show up as mention candidates) and cached across keystrokes -
     // invalidated only when WorkingDirectoryPath itself changes (see OnWorkingDirectoryPathChanged),
@@ -185,7 +195,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
 
     private Stopwatch? _runStopwatch;
 
-    public PromptViewModel(ILlmRunner llmRunner, ILocalSettingsService localSettingsService, IFolderPickerService folderPickerService, IFilePickerService filePickerService, IPromptResultStore promptResultStore, IPromptTemplateProvider promptTemplateProvider, IRunSessionStore runSessionStore, ILogger<PromptViewModel>? logger = null)
+    public PromptViewModel(ILlmRunner llmRunner, ILocalSettingsService localSettingsService, IFolderPickerService folderPickerService, IFilePickerService filePickerService, IPromptResultStore promptResultStore, IPromptTemplateProvider promptTemplateProvider, IRunSessionStore runSessionStore, ICodebaseIndexService codebaseIndexService, ILogger<PromptViewModel>? logger = null)
     {
         _llmRunner = llmRunner;
         _localSettingsService = localSettingsService;
@@ -194,6 +204,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         _promptResultStore = promptResultStore;
         _promptTemplateProvider = promptTemplateProvider;
         _runSessionStore = runSessionStore;
+        _codebaseIndexService = codebaseIndexService;
         _logger = logger ?? NullLogger<PromptViewModel>.Instance;
 
         // T5.4.2: ObservableCollection<T> doesn't go through an [ObservableProperty]'s On*Changed
@@ -202,6 +213,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         RecentWorkingDirectories.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentWorkingDirectories));
         ToolActivityLog.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasToolActivity));
         MentionSuggestions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMentionSuggestions));
+        SuggestedRelevantFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSuggestedRelevantFiles));
     }
 
     // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
@@ -371,6 +383,46 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
     }
 
     public void CloseMentionPopup() => MentionSuggestions.Clear();
+
+    // T14.2.1/T14.2.3: the opt-in "suggest relevant files" step - ranks the working directory's
+    // files against the current PromptText via ICodebaseIndexService (TF-IDF, not embeddings; see
+    // TfIdfCodebaseIndexService) and lists them for the user to accept individually. Files already
+    // attached are filtered out since suggesting them again would be noise, not news.
+    [RelayCommand(CanExecute = nameof(CanSuggestRelevantFiles))]
+    private async Task SuggestRelevantFilesAsync()
+    {
+        var alreadyAttached = AttachedPaths
+            .Select(path => Path.GetFullPath(Path.Combine(WorkingDirectoryPath, path)))
+            .ToHashSet();
+
+        var matches = await _codebaseIndexService.FindRelevantFilesAsync(WorkingDirectoryPath, PromptText);
+
+        SuggestedRelevantFiles.Clear();
+        foreach (var match in matches)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(WorkingDirectoryPath, match.RelativePath));
+            if (!alreadyAttached.Contains(fullPath))
+            {
+                SuggestedRelevantFiles.Add(match.RelativePath);
+            }
+        }
+    }
+
+    private bool CanSuggestRelevantFiles() => !string.IsNullOrWhiteSpace(WorkingDirectoryPath) && !string.IsNullOrWhiteSpace(PromptText);
+
+    // T14.2.3: accepting one suggestion attaches it (same mechanism AttachMentionedFile already
+    // uses) and removes just that entry - the rest of the list stays up so the user can accept
+    // more than one without re-running the suggestion step.
+    public void AttachSuggestedFile(string relativePath)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(WorkingDirectoryPath, relativePath));
+        AddAttachedPaths([fullPath]);
+        _ = SaveAttachedPathsAsync();
+        SuggestedRelevantFiles.Remove(relativePath);
+    }
+
+    [RelayCommand]
+    private void DismissSuggestedRelevantFiles() => SuggestedRelevantFiles.Clear();
 
     // T14.1.2: a faster entry point into the same attachment mechanism AddContextFilesAsync already
     // uses (dedup + persist), not a new one - the relative path (what the mention popup shows and
@@ -653,6 +705,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
     partial void OnPromptTextChanged(string value)
     {
         RunPromptCommand.NotifyCanExecuteChanged();
+        SuggestRelevantFilesCommand.NotifyCanExecuteChanged();
         UpdateEstimatedTokenCountDisplay();
     }
 
@@ -668,6 +721,8 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         HasPreviousSession = false;
         ContinuePreviousConversation = false;
         _cachedMentionFileTree = null;
+        SuggestedRelevantFiles.Clear();
+        SuggestRelevantFilesCommand.NotifyCanExecuteChanged();
         UpdateEstimatedTokenCountDisplay();
     }
 

@@ -4,6 +4,9 @@
 # Release. Pushing `main` itself (e.g. after merging a feature branch) does not do this - only the
 # tag push does.
 #
+# The tag is annotated with a changelog (commit subjects since the previous tag), which release.yml
+# reads back out of the tag object and uses as the GitHub Release notes.
+#
 # Usage: scripts/release.sh 0.1.6
 #        scripts/release.sh v0.1.6
 
@@ -56,8 +59,25 @@ if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
     exit 1
 fi
 
+echo "Building changelog since last tag..."
+previous_tag="$(git describe --tags --abbrev=0 "$local_sha" 2>/dev/null || true)"
+
+if [ -n "$previous_tag" ]; then
+    range="$previous_tag..$local_sha"
+else
+    range="$local_sha"
+fi
+
+changelog="$(git log "$range" --no-merges --pretty=format:'- %s (%h)')"
+if [ -z "$changelog" ]; then
+    changelog="- No changes recorded since $previous_tag"
+fi
+
+tag_message="## Changelog
+$changelog"
+
 echo "Tagging $local_sha as $tag..."
-git tag -a "$tag" -m "Release $tag"
+git tag -a "$tag" -m "$tag_message"
 
 echo "Pushing $tag to origin..."
 git push origin "$tag"
