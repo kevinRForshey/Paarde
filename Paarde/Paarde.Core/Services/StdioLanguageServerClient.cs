@@ -54,24 +54,7 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         await StopAsync();
 
         var options = await _optionsProvider();
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = options.ExecutablePath,
-            WorkingDirectory = workingDirectoryPath,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardInputEncoding = new UTF8Encoding(false),
-            StandardOutputEncoding = new UTF8Encoding(false),
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-
-        foreach (var argument in options.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        var startInfo = BuildStartInfo(options, workingDirectoryPath);
 
         var process = new Process { StartInfo = startInfo };
         process.Start();
@@ -119,6 +102,53 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         }, cancellationToken);
 
         await SendNotificationAsync("initialized", new JObject());
+    }
+
+    // Extracted from StartAsync as a pure function (no process spawned, no I/O beyond the PATH
+    // probe inside ExecutablePathResolver) so the Windows shell-wrapper decision below is directly
+    // unit-testable without standing up a real server process. Internal + InternalsVisibleTo
+    // (Paarde.Core.Tests) rather than public - this is an implementation detail of StartAsync, not
+    // part of ILanguageServerClient's surface.
+    internal static ProcessStartInfo BuildStartInfo(LanguageServerOptions options, string workingDirectoryPath)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            WorkingDirectory = workingDirectoryPath,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardInputEncoding = new UTF8Encoding(false),
+            StandardOutputEncoding = new UTF8Encoding(false),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        // Epic 18 follow-up: on Windows, npm-installed servers (typescript-language-server,
+        // pyright-langserver's own nodeenv-based install path, etc.) resolve on PATH as a ".cmd"
+        // shim, not a native .exe - Process.Start(UseShellExecute: false) can launch a .exe
+        // directly via CreateProcess, but a .cmd/.bat only runs through cmd.exe's own batch
+        // interpreter. ExistsOnPath (IsAvailableAsync's preflight) already matches ".cmd", so
+        // launching has to resolve the same way rather than trusting options.ExecutablePath as a
+        // literal, directly-runnable FileName.
+        var resolvedPath = ExecutablePathResolver.ResolveFullPath(options.ExecutablePath) ?? options.ExecutablePath;
+
+        if (ExecutablePathResolver.RequiresShellWrapper(resolvedPath))
+        {
+            startInfo.FileName = "cmd.exe";
+            startInfo.ArgumentList.Add("/c");
+            startInfo.ArgumentList.Add(resolvedPath);
+        }
+        else
+        {
+            startInfo.FileName = resolvedPath;
+        }
+
+        foreach (var argument in options.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        return startInfo;
     }
 
     public async Task StopAsync()
