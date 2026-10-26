@@ -16,4 +16,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Prompts\*.txt" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Paarde.Core.Tests" />
+  </ItemGroup>
 </Project>

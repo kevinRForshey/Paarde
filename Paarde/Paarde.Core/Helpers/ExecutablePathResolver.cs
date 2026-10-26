@@ -10,7 +10,15 @@ public static class ExecutablePathResolver
 {
     // pathVariable defaults to the real PATH environment variable; the parameter exists so tests
     // can point this at a temp directory instead of mutating process-wide state.
-    public static bool ExistsOnPath(string executableName, string? pathVariable = null)
+    public static bool ExistsOnPath(string executableName, string? pathVariable = null) =>
+        ResolveFullPath(executableName, pathVariable) is not null;
+
+    // Same search as ExistsOnPath, but returns the matched path (with whichever extension
+    // resolved) instead of a bool - StdioLanguageServerClient needs the concrete path to decide
+    // whether a server has to be launched through a shell (T18.x follow-up: a bare ".cmd"/".bat"
+    // name, e.g. npm's typescript-language-server shim, is not directly executable via
+    // Process.Start(UseShellExecute: false); CreateProcess only runs native images that way).
+    public static string? ResolveFullPath(string executableName, string? pathVariable = null)
     {
         // Windows resolves a bare command name against these extensions in order (cmd.exe's
         // PATHEXT behavior); npm installs CLI shims as .cmd, so that has to be checked explicitly
@@ -24,14 +32,22 @@ public static class ExecutablePathResolver
         // configurable CLI path point at a specific file instead of only a bare command name.
         if (executableName.Contains(Path.DirectorySeparatorChar) || executableName.Contains(Path.AltDirectorySeparatorChar))
         {
-            return extensions.Any(extension => File.Exists(executableName + extension));
+            foreach (var extension in extensions)
+            {
+                if (File.Exists(executableName + extension))
+                {
+                    return executableName + extension;
+                }
+            }
+
+            return null;
         }
 
         pathVariable ??= Environment.GetEnvironmentVariable("PATH");
 
         if (string.IsNullOrEmpty(pathVariable))
         {
-            return false;
+            return null;
         }
 
         foreach (var directory in pathVariable.Split(Path.PathSeparator))
@@ -43,13 +59,21 @@ public static class ExecutablePathResolver
 
             foreach (var extension in extensions)
             {
-                if (File.Exists(Path.Combine(directory, executableName + extension)))
+                var candidate = Path.Combine(directory, executableName + extension);
+                if (File.Exists(candidate))
                 {
-                    return true;
+                    return candidate;
                 }
             }
         }
 
-        return false;
+        return null;
     }
+
+    // True for the Windows script shims (.cmd/.bat) that npm and similar tools install as a CLI's
+    // launcher - these only run through a shell/batch interpreter, never directly via
+    // Process.Start(UseShellExecute: false).
+    public static bool RequiresShellWrapper(string resolvedFullPath) =>
+        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+        (resolvedFullPath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) || resolvedFullPath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase));
 }
