@@ -29,91 +29,96 @@ public class ProjectTypeDetectorTests : IDisposable
     }
 
     [Fact]
-    public void DetectLanguageIds_EmptyDirectory_ReturnsEmptySet()
+    public void DetectLanguageRoots_EmptyDirectory_ReturnsEmptySet()
     {
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Empty(languageIds);
+        Assert.Empty(languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_CsprojAtRoot_ReturnsCSharp()
+    public void DetectLanguageRoots_CsprojAtRoot_ReturnsCSharp()
     {
         CreateFile("App.csproj");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Equal(new[] { "csharp" }, languageIds);
+        Assert.Equal(new Dictionary<string, string> { ["csharp"] = _workingDirectory }, languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_SlnxAtRoot_ReturnsCSharp()
+    public void DetectLanguageRoots_SlnxAtRoot_ReturnsCSharp()
     {
         CreateFile("App.slnx");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Equal(new[] { "csharp" }, languageIds);
+        Assert.Equal(new Dictionary<string, string> { ["csharp"] = _workingDirectory }, languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_RequirementsTxtAtRoot_ReturnsPython()
+    public void DetectLanguageRoots_RequirementsTxtAtRoot_ReturnsPython()
     {
         CreateFile("requirements.txt");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Equal(new[] { "python" }, languageIds);
+        Assert.Equal(new Dictionary<string, string> { ["python"] = _workingDirectory }, languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_PackageJsonAtRoot_ReturnsTypeScript()
+    public void DetectLanguageRoots_PackageJsonAtRoot_ReturnsTypeScript()
     {
         CreateFile("package.json");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Equal(new[] { "typescript" }, languageIds);
+        Assert.Equal(new Dictionary<string, string> { ["typescript"] = _workingDirectory }, languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_MarkerInImmediateSubdirectory_IsDetected()
+    public void DetectLanguageRoots_MarkerInImmediateSubdirectory_RootsAtThatSubdirectory()
     {
         CreateFile("frontend/package.json");
+        var expectedRoot = Path.Combine(_workingDirectory, "frontend");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Equal(new[] { "typescript" }, languageIds);
+        Assert.Equal(new Dictionary<string, string> { ["typescript"] = expectedRoot }, languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_MarkerTwoLevelsDeep_IsNotDetected()
+    public void DetectLanguageRoots_MarkerTwoLevelsDeep_IsNotDetected()
     {
         CreateFile("frontend/app/package.json");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Empty(languageIds);
+        Assert.Empty(languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_PolyglotRepoWithPythonAndTypeScriptSideBySide_ReturnsBoth()
+    public void DetectLanguageRoots_PolyglotRepoWithPythonAndTypeScriptSideBySide_RootsEachAtItsOwnSubdirectory()
     {
         CreateFile("backend/requirements.txt");
         CreateFile("frontend/package.json");
+        var expectedBackendRoot = Path.Combine(_workingDirectory, "backend");
+        var expectedFrontendRoot = Path.Combine(_workingDirectory, "frontend");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Equal(new HashSet<string> { "python", "typescript" }, languageIds);
+        Assert.Equal(
+            new Dictionary<string, string> { ["python"] = expectedBackendRoot, ["typescript"] = expectedFrontendRoot },
+            languageRoots);
     }
 
     [Fact]
-    public void DetectLanguageIds_GitDirectory_IsIgnored()
+    public void DetectLanguageRoots_GitDirectory_IsIgnored()
     {
         CreateFile(".git/package.json");
 
-        var languageIds = _detector.DetectLanguageIds(_workingDirectory);
+        var languageRoots = _detector.DetectLanguageRoots(_workingDirectory);
 
-        Assert.Empty(languageIds);
+        Assert.Empty(languageRoots);
     }
 }

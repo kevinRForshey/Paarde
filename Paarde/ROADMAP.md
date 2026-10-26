@@ -2580,30 +2580,54 @@ which already resolves `.py`/`.ts`/`.tsx`/`.js`/`.jsx` correctly; the gap is ent
 
 Full requirements, design, and task breakdown: [`specs/multi-language-support/`](specs/multi-language-support/requirements.md).
 
-**F18.1 — Per-language server configuration and routing** — Not started
-- [ ] T18.1.1 Replace the single global `LspOptions` with a per-language collection
+**F18.1 — Per-language server configuration and routing** — ✅ Done 2026-10-23
+- [x] T18.1.1 Replace the single global `LspOptions` with a per-language collection
   (`LanguageServerOptions`), with built-in defaults for `csharp`→`csharp-ls`,
   `python`→`pyright-langserver --stdio`, `typescript`→`typescript-language-server --stdio`, each
   independently overridable in Settings. See `specs/multi-language-support/design.md`.
-- [ ] T18.1.2 Fix `StdioLanguageServerClient.NotifyDocumentOpenedAsync`'s hardcoded
+- [x] T18.1.2 Fix `StdioLanguageServerClient.NotifyDocumentOpenedAsync`'s hardcoded
   `"languageId": "csharp"` to send the language actually detected for the open file.
-- [ ] T18.1.3 Add a project-type detector (`*.csproj`/`*.sln`, `pyproject.toml`/`setup.py`/
+- [x] T18.1.3 Add a project-type detector (`*.csproj`/`*.sln`, `pyproject.toml`/`setup.py`/
   `requirements.txt`, `package.json`) so only relevant servers are attempted per working
-  directory, with a per-language force-enable escape hatch in Settings.
+  directory, with a per-language force-enable escape hatch in Settings. — revised 2026-10-25:
+  manual polyglot verification (T18.4.1 below) found that reporting only *which* languages were
+  detected, and then rooting every server at the same top-level working directory, broke
+  `typescript-language-server` in a polyglot repo - it resolves its workspace TypeScript
+  installation from `rootUri` at `initialize` time, so a `backend/`+`frontend/` split repo left it
+  unable to find `frontend/node_modules/typescript` at all. `IProjectTypeDetector.
+  DetectLanguageIds(string) : IReadOnlySet<string>` is now `DetectLanguageRoots(string) :
+  IReadOnlyDictionary<string, string>`, reporting the directory each language's marker was found
+  in (root-before-subdirectories precedence preserved), and `LanguageServerSessionManager.
+  StartAllAsync` roots each client at its own detected directory instead of the blanket working
+  directory (a force-enabled-but-undetected language still falls back to the working directory,
+  since it has no detected root).
 
-**F18.2 — Concurrent multi-server lifecycle** — Not started
-- [ ] T18.2.1 New `ILanguageServerSessionManager` owning N `ILanguageServerClient` instances keyed
+**F18.2 — Concurrent multi-server lifecycle** — ✅ Done 2026-10-23
+- [x] T18.2.1 New `ILanguageServerSessionManager` owning N `ILanguageServerClient` instances keyed
   by language, so a polyglot working directory (e.g. a Python backend + TypeScript frontend) gets
   intelligence in both languages at once, with one language's start failure never affecting
   another's.
 
-**F18.3 — Settings UI** — Not started
-- [ ] T18.3.1 Replace the single flat executable-path/arguments field pair in Settings' "Code
+**F18.3 — Settings UI** — ✅ Done 2026-10-23
+- [x] T18.3.1 Replace the single flat executable-path/arguments field pair in Settings' "Code
   intelligence" section with one row per configured language.
 
-**F18.4 — Tests** — Not started
-- [ ] T18.4.1 `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, and extended
+**F18.4 — Tests** — ✅ Done 2026-10-23, manual verification completed 2026-10-25
+- [x] T18.4.1 `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, and extended
   `StdioLanguageServerClientTests` per `specs/multi-language-support/design.md`'s testing section.
+  — 2026-10-25: manual verification against real `pyright-langserver`/`typescript-language-server`
+  processes (`specs/multi-language-support/tasks.md` T10, previously "Not attempted" - no X server
+  and the executables weren't installed in that sandbox) is now done, substituting a headless
+  console harness exercising the real `LanguageServerSessionManager`/`StdioLanguageServerClient`
+  production code directly against spawned server processes for the GUI-driven check the task
+  originally called for (no computer-use/GUI-automation tool exists in this environment for a
+  native Avalonia window - browser automation tools only). Verified end-to-end against a synthetic
+  polyglot repo (Python `backend/` + TypeScript `frontend/`): diagnostics, go-to-definition,
+  find-references, and completion all correctly scoped per language. This exercise is what
+  surfaced and led to fixing the `rootUri` bug noted under T18.1.3 - before the fix, TypeScript
+  diagnostics/go-to-definition/references/completion all came back empty in the polyglot case;
+  after, they match Python's (already-correct) results. `csharp-ls` was not separately installed
+  or re-verified in this pass (C#-only code intelligence was already verified under Epic 17).
 
 ---
 
@@ -2727,7 +2751,12 @@ editor has no stable on-disk file identity for a language server to track).
   unavailable in this sandbox): typing `.` after a known symbol shows a populated dropdown;
   Tab/Enter/click accept; Escape dismisses; a ghost-text suggestion visible at trigger time
   disappears when the dropdown opens; typing past all matches auto-hides the window. Repeat once
-  [[multi-language-support]] ships for a Python and a TypeScript file.
+  [[multi-language-support]] ships for a Python and a TypeScript file. — 2026-10-25: the
+  protocol-level half of this (does `GetCompletionAsync` actually return real completions for a
+  Python and a TypeScript file) is now verified - see Epic 18's T18.4.1 note - but the
+  `CodeEditor`-level half (`CompletionWindow` popping up, Tab/Enter/click/Escape, ghost-text
+  coexistence) is still blocked on the same "no display/no GUI-automation tool in this
+  environment" limitation as the original C# check, so this stays unchecked.
 
 ---
 
@@ -2775,12 +2804,17 @@ editor has no stable on-disk file identity for a language server to track).
     `LanguageServerSessionManager` replacing the single `ILanguageServerClient` consumer in
     `ExplorerViewModel`/DI with per-language isolation (one language's start failure never blocks
     another) and a same-working-directory no-op guard. Settings' "Code intelligence" section
-    reworked into a per-language repeated row. Solution builds clean, 794/794 tests pass (22 new:
-    `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, 2 extended
-    `StdioLanguageServerClientTests` cases). Not manually verified against real
-    `pyright-langserver`/`typescript-language-server`/`csharp-ls` processes across C#-only/
-    Python-only/TypeScript-only/polyglot repos (no X server in this sandbox, same limitation noted
-    on earlier UI-touching tasks, and these executables aren't installed here regardless).
+    reworked into a per-language repeated row. Solution builds clean, 802/802 tests pass. ✅ Manually
+    verified 2026-10-25 against real `pyright-langserver`/`typescript-language-server` processes
+    via a headless harness exercising the production code directly (no GUI-automation tool exists
+    in this environment for a native Avalonia window). This verification pass found and fixed a
+    real bug: `LanguageServerSessionManager` rooted every language's server at the same top-level
+    working directory, which broke `typescript-language-server` in a polyglot (Python `backend/` +
+    TypeScript `frontend/`) repo, since it resolves its workspace TypeScript installation from
+    `rootUri` at `initialize` time. `IProjectTypeDetector` now reports each detected language's own
+    marker-file directory (`DetectLanguageRoots`, not just `DetectLanguageIds`), and each server is
+    rooted there instead. `csharp-ls` was not separately re-verified in this pass (C#-only code
+    intelligence was already verified under Epic 17).
 19. **Epic 19** — editor autocomplete (real LSP completion, distinct from Epic 15's LLM ghost
     text). Builds on AvaloniaEdit's existing `CompletionWindow`, and shares an `initialize`
     capability-advertisement change with Epic 18 - either can land first. Full spec:

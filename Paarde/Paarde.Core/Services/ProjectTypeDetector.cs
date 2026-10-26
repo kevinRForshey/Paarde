@@ -12,37 +12,40 @@ public class ProjectTypeDetector : IProjectTypeDetector
     private static readonly string[] PythonMarkerFileNames = ["pyproject.toml", "setup.py", "requirements.txt"];
     private static readonly string[] TypeScriptMarkerFileNames = ["package.json"];
 
-    public IReadOnlySet<string> DetectLanguageIds(string workingDirectoryPath)
+    public IReadOnlyDictionary<string, string> DetectLanguageRoots(string workingDirectoryPath)
     {
-        var languageIds = new HashSet<string>(StringComparer.Ordinal);
+        var languageRoots = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        DetectInDirectory(workingDirectoryPath, languageIds);
+        // Root is scanned before subdirectories, and DetectInDirectory only ever adds a language
+        // that isn't already present, so a root-level marker always wins over one found later in a
+        // subdirectory - same first-found-wins precedence the previous flat-HashSet version had.
+        DetectInDirectory(workingDirectoryPath, workingDirectoryPath, languageRoots);
 
         foreach (var subdirectory in EnumerateDirectoriesSafely(workingDirectoryPath))
         {
-            DetectInDirectory(subdirectory, languageIds);
+            DetectInDirectory(subdirectory, subdirectory, languageRoots);
         }
 
-        return languageIds;
+        return languageRoots;
     }
 
-    private static void DetectInDirectory(string directoryPath, HashSet<string> languageIds)
+    private static void DetectInDirectory(string directoryPath, string languageRootPath, Dictionary<string, string> languageRoots)
     {
         var fileNames = EnumerateFileNamesSafely(directoryPath);
 
         if (fileNames.Any(fileName => CSharpMarkerExtensions.Contains(Path.GetExtension(fileName), StringComparer.OrdinalIgnoreCase)))
         {
-            languageIds.Add("csharp");
+            languageRoots.TryAdd("csharp", languageRootPath);
         }
 
         if (fileNames.Any(fileName => PythonMarkerFileNames.Contains(fileName, StringComparer.OrdinalIgnoreCase)))
         {
-            languageIds.Add("python");
+            languageRoots.TryAdd("python", languageRootPath);
         }
 
         if (fileNames.Any(fileName => TypeScriptMarkerFileNames.Contains(fileName, StringComparer.OrdinalIgnoreCase)))
         {
-            languageIds.Add("typescript");
+            languageRoots.TryAdd("typescript", languageRootPath);
         }
     }
 

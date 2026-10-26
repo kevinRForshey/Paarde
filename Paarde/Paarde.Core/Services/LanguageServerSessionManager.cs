@@ -53,12 +53,14 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
         await StopAllAsync();
         _startedWorkingDirectoryPath = workingDirectoryPath;
 
-        var detectedLanguageIds = _projectTypeDetector.DetectLanguageIds(workingDirectoryPath);
+        var detectedLanguageRoots = _projectTypeDetector.DetectLanguageRoots(workingDirectoryPath);
         var allOptions = await _optionsProvider();
 
         foreach (var options in allOptions)
         {
-            if (!detectedLanguageIds.Contains(options.LanguageId) && !options.ForceEnabled)
+            var isDetected = detectedLanguageRoots.TryGetValue(options.LanguageId, out var languageRootPath);
+
+            if (!isDetected && !options.ForceEnabled)
             {
                 continue;
             }
@@ -73,7 +75,14 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
                 }
 
                 client.DiagnosticsPublished += OnClientDiagnosticsPublished;
-                await client.StartAsync(workingDirectoryPath, cancellationToken);
+
+                // Root each server at the directory where its own marker file was found - never at
+                // the overall workingDirectoryPath - so typescript-language-server (which resolves
+                // its project/toolchain from rootUri at initialize time) finds frontend/'s
+                // node_modules/typescript in a polyglot backend/+frontend/ repo instead of failing
+                // to resolve a TypeScript installation at all. A force-enabled-but-undetected
+                // language has no detected root, so it falls back to workingDirectoryPath.
+                await client.StartAsync(isDetected ? languageRootPath! : workingDirectoryPath, cancellationToken);
                 _clientsByServerGroup[options.LanguageId] = client;
             }
             catch (Exception ex)

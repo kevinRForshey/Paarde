@@ -25,7 +25,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task StartAllAsync_LanguageNotDetectedAndNotForceEnabled_NeverStartsThatClient()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "python" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["python"] = "/repo" };
         var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
 
         await sut.StartAllAsync("/repo");
@@ -36,7 +36,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task StartAllAsync_LanguageDetected_StartsThatClient()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "python" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["python"] = "/repo" };
         var sut = CreateSut([new LanguageServerOptions("python", "pyright-langserver", "--stdio")]);
 
         await sut.StartAllAsync("/repo");
@@ -46,20 +46,40 @@ public class LanguageServerSessionManagerTests
     }
 
     [Fact]
+    public async Task StartAllAsync_PolyglotRepoWithDifferentDetectedRoots_StartsEachClientAtItsOwnRoot()
+    {
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string>
+        {
+            ["python"] = "/repo/backend",
+            ["typescript"] = "/repo/frontend",
+        };
+        var sut = CreateSut([
+            new LanguageServerOptions("python", "pyright-langserver", "--stdio"),
+            new LanguageServerOptions("typescript", "typescript-language-server", "--stdio"),
+        ]);
+
+        await sut.StartAllAsync("/repo");
+
+        Assert.Equal("/repo/backend", _clientsByLanguageId["python"].LastStartedWorkingDirectoryPath);
+        Assert.Equal("/repo/frontend", _clientsByLanguageId["typescript"].LastStartedWorkingDirectoryPath);
+    }
+
+    [Fact]
     public async Task StartAllAsync_ForceEnabledButNotDetected_StillStartsThatClient()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string>();
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string>();
         var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty, ForceEnabled: true)]);
 
         await sut.StartAllAsync("/repo");
 
         Assert.True(_clientsByLanguageId["csharp"].IsRunning);
+        Assert.Equal("/repo", _clientsByLanguageId["csharp"].LastStartedWorkingDirectoryPath);
     }
 
     [Fact]
     public async Task StartAllAsync_ExecutableUnavailable_SkipsThatClientSilently()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "csharp" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo" };
 
         var sut = new LanguageServerSessionManager(
             _projectTypeDetector,
@@ -82,7 +102,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task StartAllAsync_OneLanguageFailsToStart_OtherLanguageStartsAnyway()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "csharp", "python" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo", ["python"] = "/repo" };
 
         var sut = new LanguageServerSessionManager(
             _projectTypeDetector,
@@ -106,7 +126,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task StartAllAsync_CalledAgainWithSameWorkingDirectory_DoesNotRestartRunningClients()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "csharp" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo" };
         var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
 
         await sut.StartAllAsync("/repo");
@@ -120,7 +140,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task StartAllAsync_CalledAgainWithDifferentWorkingDirectory_StopsThePreviousClients()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "csharp" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo-one" };
         var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
 
         await sut.StartAllAsync("/repo-one");
@@ -134,7 +154,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task StopAllAsync_StopsEveryStartedClient()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "csharp", "python" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo", ["python"] = "/repo" };
         var sut = CreateSut([
             new LanguageServerOptions("csharp", "csharp-ls", string.Empty),
             new LanguageServerOptions("python", "pyright-langserver", "--stdio"),
@@ -150,7 +170,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task NotifyDocumentOpenedAsync_MappedExtensionWithRunningClient_RoutesToThatClientWithResolvedLanguageId()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "typescript" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["typescript"] = "/repo" };
         var sut = CreateSut([new LanguageServerOptions("typescript", "typescript-language-server", "--stdio")]);
         await sut.StartAllAsync("/repo");
 
@@ -163,7 +183,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task NotifyDocumentOpenedAsync_UnmappedExtension_IsANoOp()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string> { "csharp" };
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo" };
         var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
         await sut.StartAllAsync("/repo");
 
@@ -175,7 +195,7 @@ public class LanguageServerSessionManagerTests
     [Fact]
     public async Task NotifyDocumentOpenedAsync_MappedExtensionButNoClientRunningForIt_IsANoOp()
     {
-        _projectTypeDetector.LanguageIdsToReturn = new HashSet<string>();
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string>();
         var sut = CreateSut([new LanguageServerOptions("python", "pyright-langserver", "--stdio")]);
         await sut.StartAllAsync("/repo");
 
