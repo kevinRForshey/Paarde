@@ -197,31 +197,26 @@ This is where you actually decide what to keep:
 
 ### 6. Terminal page
 
-Run an arbitrary shell command against your project without leaving the app — the same
-shell-out-and-capture mechanism Epic 12's build/test feedback loop uses, generalized to whatever
-command you type.
+Run an arbitrary shell command against your project without leaving the app, in a real
+PTY-backed terminal — the same terminal emulation (`Porta.Pty` + `XTerm.NET`) Epic 20's "Run"
+toolbar uses, in its own independent slot.
 
-- **What it is** — a scoped-down "run a command, stream its output" panel, not a full interactive
-  terminal. It routes your command through a real shell (`/bin/sh -c` on Linux/macOS, `cmd.exe /c`
-  on Windows) in the working directory last picked on the Prompt page, so `&&`-chains, pipes, and
-  PATH resolution all work the way they would in an actual shell.
-- **How to use it** — type a command (e.g. `dotnet test`, `git log`, `npm install`) and click
-  **Run**. Output streams into the pane below as the command produces it, not just once it exits.
-  **Cancel** stops an in-flight command (and kills the underlying process, not just the UI's wait
-  for it). **Clear** empties the output pane without affecting anything running.
-- **Limits** — this is deliberately not a real terminal/PTY:
-  - **No input.** There's no way to type back to the running process, so anything that needs
-    interactive input will hang or fail — `vim`, `htop`, pagers like `less`/`more`, `git commit`
-    without `-m` (which tries to open an editor), a password prompt, a Python REPL, an `npm init`
-    wizard, and so on.
-  - **No ANSI/escape-code rendering.** Output is shown as plain text, so color codes, progress
-    bars, or cursor-movement sequences will show as raw escape characters rather than rendering.
-  - **No state carries over between runs.** Each **Run** starts a brand-new shell process, so a
-    `cd` or an exported environment variable from one command is gone by the next — there's no
-    persistent session the way a real terminal window has.
-
-  Real, interactive terminal use still belongs in an external terminal window for now; a true PTY
-  (wrapping `Pty.Net`/ConPTY) is a larger, separate piece of work than this scoped-down version.
+- **What it is** — a full terminal emulator, not just an output pane. Your command runs through a
+  real shell (`/bin/sh -c` on Linux/macOS, `cmd.exe /c` on Windows) inside a pseudo-terminal, in
+  the working directory last picked on the Prompt page, so `&&`-chains, pipes, PATH resolution,
+  interactive prompts, and ANSI/color output all work the way they would in an actual terminal
+  window.
+- **How to use it** — type a command (e.g. `dotnet test`, `git log`, `vim`, `npm init`) and click
+  **Run**. Output renders live as real VT100/ANSI terminal output (color, progress bars, cursor
+  movement all render correctly), and you can click into the output pane and type to send
+  keyboard input straight to the running process — so interactive programs (pagers, editors,
+  password prompts, REPLs) work normally. **Cancel** stops the in-flight process. **Clear** wipes
+  the screen without affecting anything running.
+- **Independent from Run** — Terminal has its own PTY process, separate from the Run toolbar's, so
+  running a command here doesn't stop or interfere with whatever Run has going, and vice versa.
+- **Limits** — each **Run** starts a brand-new PTY process, so a `cd` or an exported environment
+  variable from one command is gone by the next; there's no persistent shell session carried
+  across runs the way a long-lived terminal window has.
 
 ### 7. History page
 

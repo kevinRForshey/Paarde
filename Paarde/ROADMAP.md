@@ -2888,7 +2888,7 @@ upgrade, an app-wide regression risk far outside this epic's scope. Decision (co
 Avalonia-version-agnostic), and build a small, Paarde-owned Avalonia-11-compatible rendering
 control instead of adopting the third-party widget.*
 
-**F21.1 — PTY-backed process execution** — T21.1.1 done 2026-10-27
+**F21.1 — PTY-backed process execution** — T21.1.1, T21.1.2 done 2026-10-27
 - [x] T21.1.1 Add the `Porta.Pty` package reference to `Paarde.Core`. Add `IPtyProcessManager`/
   `PtyProcessManager`: spawns via `PtyProvider.SpawnAsync`, exposes the raw byte stream (not
   line-based `OutputReceived`), a `Resize(cols, rows)`/`WriteInput` passthrough, and the same
@@ -2898,8 +2898,20 @@ control instead of adopting the third-party widget.*
   into `App.axaml.cs`'s exit handler. Verified live against the real `TODOTUI1` repro - the PTY
   path streams the app's alternate-screen redraw immediately, where the old pipe-based path
   produced nothing. Full 515/515 Core + 340/340 Avalonia suites still pass.)_
-- [ ] T21.1.2 Wire `RunPanelViewModel` (Epic 20) to use the PTY-backed path for Run (not Build -
+- [x] T21.1.2 Wire `RunPanelViewModel` (Epic 20) to use the PTY-backed path for Run (not Build -
   build output is still naturally line-oriented and doesn't need a PTY).
+  _(Done 2026-10-27: `RunPanelViewModel` now takes `IPtyProcessManager` instead of
+  `IRunProcessManager` and owns a `TerminalBuffer OutputBuffer`; `RunAsync` starts via
+  `_ptyProcessManager.StartAsync(...)`, `OnProcessOutputReceived(byte[])` feeds `OutputBuffer`
+  directly, and `WriteInput`/`Resize` passthroughs let the View wire `TerminalControl`'s events to
+  it without reaching past the ViewModel. Build's output stays line-oriented
+  (`IBuildTestRunner`) but is fed into the same `OutputBuffer` through a new `EncodeForTerminal`
+  helper that normalizes its bare `\n` to `\r\n` first - confirmed via a throwaway harness that
+  XTerm.NET's `Terminal` treats bare `\n` strictly per VT100 semantics (no implicit carriage
+  return), which otherwise renders as a "staircase". `IRunProcessManager`/`RunProcessManager` and
+  their test fake/suite had no other consumers and were deleted outright as dead code, along with
+  their DI registration/exit-stop in `App.axaml.cs`. Full 520/520 Core + 362/362 Avalonia suites
+  pass. See `specs/terminal-emulation/tasks.md` T6 for the full writeup.)_
 
 **F21.2 — VT100/ANSI emulation** — T21.2.1 done 2026-10-27
 - [x] T21.2.1 Add the `XTerm.NET` package reference. Add a thin adapter that feeds PTY output bytes
@@ -2917,7 +2929,7 @@ control instead of adopting the third-party widget.*
   gives for free, Sixel/Kitty graphics, and terminal window-manipulation escape sequences (resize-
   the-OS-window, etc.) - none of which Run/Terminal's use case needs.
 
-**F21.3 — A Paarde-owned terminal rendering control** — T21.3.1 done 2026-10-27
+**F21.3 — A Paarde-owned terminal rendering control** — T21.3.1, T21.3.2 done 2026-10-27
 - [x] T21.3.1 New Avalonia 11-compatible control: a grid of styled character cells + a blinking
   cursor, repainted from the XTerm.NET buffer adapter (F21.2) on each update. Scoped to monospace
   text + ANSI colors/attributes only - no custom theming beyond what the app's existing color
@@ -2930,15 +2942,35 @@ control instead of adopting the third-party widget.*
   cursor rectangle (filled when focused, outlined when not). All Avalonia API shapes were confirmed
   by reflecting against the installed 11.3.22 DLLs rather than guessed. Verified with a throwaway
   headless-rendering harness that feeds the real captured `TODOTUI1` byte blob through a live
-  `TerminalControl` and renders it with no exceptions. Keyboard input (T21.3.2) and wiring into
-  Run/Terminal (T21.3.3) are separate, not-yet-done tasks. Full 526/526 Core + 340/340 Avalonia
-  suites pass.)_
-- [ ] T21.3.2 Keyboard input from the control is written back to the PTY's `WriterStream` (F21.1),
+  `TerminalControl` and renders it with no exceptions. Keyboard input (T21.3.2, below) and wiring
+  into Run/Terminal (T21.3.3) are separate tasks. Full 526/526 Core + 340/340 Avalonia suites
+  pass. Resize handling also landed as part of this control (not broken out as its own roadmap
+  line): `OnSizeChanged` recomputes `cols`/`rows` from pixel size and the measured monospace cell
+  via a pure `ComputeGridSize` method, calls `Buffer.Resize` directly, and raises a `Resized`
+  event shaped to match `IPtyProcessManager.Resize(int, int)` so a consumer wires
+  `control.Resized += ptyProcessManager.Resize;` directly - verified end-to-end with a headless
+  harness that arranged a real control at 1600x1000px and confirmed its bound buffer resized
+  accordingly with no redundant re-resize on an unchanged size. Full 526/526 Core + 362/362
+  Avalonia suites pass.)_
+- [x] T21.3.2 Keyboard input from the control is written back to the PTY's `WriterStream` (F21.1),
   including control characters (Ctrl+C, arrow keys as their VT100 escape sequences, etc.) so
   interactive full-screen apps (Terminal.Gui, `vim`, `htop`) behave normally.
+  _(Done 2026-10-27: `TerminalControl.OnTextInput`/`OnKeyDown` raise a new `InputReceived`
+  (`Action<byte[]>?`) event rather than taking a direct `IPtyProcessManager` dependency - its
+  byte-shape deliberately matches `WriteInput(byte[])` so a consumer wires
+  `control.InputReceived += ptyProcessManager.WriteInput;` directly, and `WriteInput`'s existing
+  no-op-when-nothing-running behavior satisfies "only while a process is running" without this
+  control needing to track process state. Special-key encoding (arrows, Home/End/Page Up/Down,
+  Insert/Delete, Enter/Tab/Backspace/Escape, Ctrl+A-Z) is a pure `internal TryEncodeSpecialKey`
+  method, unit-tested directly (19 cases in `TerminalControlTests`) without an Avalonia display.
+  Full 526/526 Core + 359/359 Avalonia suites pass.)_
 - [ ] T21.3.3 Wire the control into Run's output strip (Epic 20) as the renderer when a run is
   PTY-backed, and into Epic 16's `TerminalView` page, replacing its current plain-text
   `OutputText` append for the cases where a PTY is in use.
+  _(Run half done 2026-10-27 as part of T21.1.2 above: `ShellView.axaml`'s output-strip `TextBox`
+  is replaced by `<controls:TerminalControl Buffer="{Binding RunPanelViewModel.OutputBuffer}" />`
+  inside the unchanged `Expander`, with `ShellView.axaml.cs` wiring `InputReceived`/`Resized` to
+  `RunPanelViewModel`'s passthroughs. Epic 16's `TerminalView`/`TerminalViewModel` half remains.)_
 
 **F21.4 — Tests**
 - [ ] T21.4.1 `PtyProcessManagerTests` (or equivalent): a real PTY-backed process starts, streams

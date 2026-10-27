@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 
 using Avalonia.Threading;
 
@@ -7,6 +8,7 @@ using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Models;
+using Paarde.Core.Services;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -23,9 +25,14 @@ namespace Paarde.Avalonia.ViewModels;
 // INavigationAware.OnNavigatedTo, which this class has no equivalent lifecycle hook for.
 public partial class RunPanelViewModel : ObservableObject
 {
+    // specs/terminal-emulation T6 (R5.1): one \x1b[2J\x1b[H (clear screen + home cursor) fed to
+    // OutputBuffer in place of the old OutputText = string.Empty - there's no "clear" concept on a
+    // TerminalBuffer beyond feeding it the same escape sequence a real terminal would receive.
+    private static readonly byte[] ClearScreenSequence = Encoding.ASCII.GetBytes("\x1b[2J\x1b[H");
+
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
     private readonly IBuildTestRunner _buildTestRunner;
-    private readonly IRunProcessManager _runProcessManager;
+    private readonly IPtyProcessManager _ptyProcessManager;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ILogger<RunPanelViewModel> _logger;
 
@@ -33,11 +40,14 @@ public partial class RunPanelViewModel : ObservableObject
 
     public ObservableCollection<RunConfiguration> Configurations { get; } = [];
 
-    [ObservableProperty]
-    private RunConfiguration? selectedConfiguration;
+    // specs/terminal-emulation T6 (R3.3): the strip's single TerminalBuffer, fed by both Run (via
+    // IPtyProcessManager.OutputReceived) and Build (via IBuildTestRunner's plain-text result,
+    // normalized through EncodeForTerminal) - ShellView.axaml binds a TerminalControl to this
+    // instead of the old OutputText TextBox.
+    public TerminalBuffer OutputBuffer { get; } = new(cols: 80, rows: 24);
 
     [ObservableProperty]
-    private string outputText = string.Empty;
+    private RunConfiguration? selectedConfiguration;
 
     [ObservableProperty]
     private bool isBuilding;
@@ -57,20 +67,20 @@ public partial class RunPanelViewModel : ObservableObject
     public RunPanelViewModel(
         RunConfigurationsProvider runConfigurationsProvider,
         IBuildTestRunner buildTestRunner,
-        IRunProcessManager runProcessManager,
+        IPtyProcessManager ptyProcessManager,
         ILocalSettingsService localSettingsService,
         IWorkingDirectoryContext workingDirectoryContext,
         ILogger<RunPanelViewModel>? logger = null)
     {
         _runConfigurationsProvider = runConfigurationsProvider;
         _buildTestRunner = buildTestRunner;
-        _runProcessManager = runProcessManager;
+        _ptyProcessManager = ptyProcessManager;
         _localSettingsService = localSettingsService;
         _logger = logger ?? NullLogger<RunPanelViewModel>.Instance;
 
         workingDirectoryContext.Changed += OnWorkingDirectoryChanged;
-        _runProcessManager.OutputReceived += OnProcessOutputReceived;
-        _runProcessManager.Exited += OnProcessExited;
+        _ptyProcessManager.OutputReceived += OnProcessOutputReceived;
+        _ptyProcessManager.Exited += OnProcessExited;
 
         // Covers the case where the user never visits the Prompt page this session - the saved
         // working directory (if any) is picked up here instead of only ever waiting for
@@ -172,15 +182,15 @@ public partial class RunPanelViewModel : ObservableObject
             return;
         }
 
-        OutputText = string.Empty;
+        OutputBuffer.Feed(ClearScreenSequence);
         IsOutputExpanded = true;
         StatusMessage = string.Format("RunPanel_Running".Resolve(), configuration.Name);
 
         try
         {
-            // R4.5: Start() stops whatever's already active first, so re-pressing Run while a
+            // R4.5: StartAsync() stops whatever's already active first, so re-pressing Run while a
             // previous session is live restarts it rather than erroring.
-            _runProcessManager.Start(configuration.RunCommand, configuration.WorkingDirectoryPath);
+            await _ptyProcessManager.StartAsync(configuration.RunCommand, configuration.WorkingDirectoryPath, OutputBuffer.Cols, OutputBuffer.Rows);
             IsRunning = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -210,14 +220,14 @@ public partial class RunPanelViewModel : ObservableObject
 
         IsBuilding = true;
         IsOutputExpanded = true;
-        OutputText = string.Empty;
+        OutputBuffer.Feed(ClearScreenSequence);
         StatusMessage = string.Format("RunPanel_Building".Resolve(), configuration.Name);
 
         try
         {
             var result = await _buildTestRunner.RunAsync(configuration.BuildCommand, configuration.WorkingDirectoryPath);
 
-            OutputText = CombineOutput(result.StandardOutput, result.StandardError);
+            OutputBuffer.Feed(EncodeForTerminal(CombineOutput(result.StandardOutput, result.StandardError)));
             StatusMessage = result.Succeeded
                 ? string.Format("RunPanel_BuildSucceeded".Resolve(), result.Duration.TotalSeconds)
                 : string.Format("RunPanel_BuildFailed".Resolve(), result.ExitCode, result.Duration.TotalSeconds);
@@ -239,15 +249,33 @@ public partial class RunPanelViewModel : ObservableObject
     private static string CombineOutput(string standardOutput, string standardError) =>
         string.IsNullOrEmpty(standardError) ? standardOutput : standardOutput + Environment.NewLine + standardError;
 
+    // specs/terminal-emulation T6: IBuildTestRunner's result comes from a plain, non-PTY Process
+    // redirect, so its strings carry bare \n. XTerm.NET's Terminal treats \n strictly per VT100
+    // semantics - it moves down a row without returning to column 0 - so feeding bare \n produces
+    // a "staircase" (each line starting one column further right than the last), confirmed
+    // empirically against the real library. IPtyProcessManager.OutputReceived bytes don't need
+    // this: a real PTY's line discipline already translates outgoing \n to \r\n before the reader
+    // stream sees it.
+    private static byte[] EncodeForTerminal(string text) =>
+        Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+
     [RelayCommand(CanExecute = nameof(CanStop))]
-    private void Stop() => _runProcessManager.Stop();
+    private void Stop() => _ptyProcessManager.Stop();
 
     private bool CanStop() => IsRunning;
 
+    // specs/terminal-emulation T6: thin passthroughs so ShellView.axaml.cs can wire
+    // OutputTerminal.InputReceived/.Resized directly (the same "stay ignorant of the service"
+    // shape TerminalControl itself uses for those events) without the View reaching past this
+    // ViewModel to IPtyProcessManager.
+    public void WriteInput(byte[] input) => _ptyProcessManager.WriteInput(input);
+
+    public void Resize(int cols, int rows) => _ptyProcessManager.Resize(cols, rows);
+
     // T16.1.3-style: fires on a background thread as the process streams output, so UI state is
     // only ever touched after marshaling onto the UI thread.
-    private void OnProcessOutputReceived(string line) =>
-        Dispatcher.UIThread.Post(() => OutputText += line + Environment.NewLine);
+    private void OnProcessOutputReceived(byte[] bytes) =>
+        Dispatcher.UIThread.Post(() => OutputBuffer.Feed(bytes));
 
     private void OnProcessExited(int? exitCode) =>
         Dispatcher.UIThread.Post(() =>

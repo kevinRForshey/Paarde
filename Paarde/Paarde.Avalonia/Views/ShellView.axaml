@@ -3,6 +3,7 @@
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:controls="using:Paarde.Avalonia.Controls"
              x:Class="Paarde.Avalonia.Views.ShellView"
              x:DataType="vm:ShellViewModel">
 
@@ -83,18 +84,23 @@
             <ui:Frame x:Name="NavigationFrame" />
         </ui:NavigationView>
 
+        <!-- specs/terminal-emulation T6: the plain-text TextBox is replaced by TerminalControl,
+             bound to the TerminalBuffer RunPanelViewModel feeds from IPtyProcessManager.
+             InputReceived/Resized are wired in code-behind (ShellView.axaml.cs) rather than bound
+             here, since they need to reach RunPanelViewModel's IPtyProcessManager, not just set a
+             property. -->
+        <!-- MaxHeight caps how much of the window the strip can claim when expanded; the
+             terminal's own natural size is a standard 80x24 grid, so this is what decides how
+             many rows are actually usable (~22 at FontSize 14). FontSize is set here rather than
+             left to the control's default so legibility is tunable without a recompile. -->
         <Expander Grid.Row="2"
                   Margin="8,0,8,8"
                   Header="Output"
                   IsExpanded="{Binding RunPanelViewModel.IsOutputExpanded}"
-                  MaxHeight="220">
-            <TextBox Text="{Binding RunPanelViewModel.OutputText}"
-                     IsReadOnly="True"
-                     AcceptsReturn="True"
-                     TextWrapping="NoWrap"
-                     FontFamily="Cascadia Mono,Consolas,monospace"
-                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                  MaxHeight="360">
+            <controls:TerminalControl Name="OutputTerminal"
+                                      FontSize="14"
+                                      Buffer="{Binding RunPanelViewModel.OutputBuffer}" />
         </Expander>
     </Grid>
 </UserControl>

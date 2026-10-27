@@ -19,17 +19,23 @@ public partial class TerminalView : UserControl
         DataContext = ViewModel;
         InitializeComponent();
 
-        // T16.1.3: a plain TextBox doesn't auto-scroll as bound text grows - moving the caret to
-        // the end on every OutputText change keeps the latest streamed output visible, the same
-        // "always show the tail" behavior a real terminal has.
+        // specs/terminal-emulation T7: OutputTerminal stays ignorant of IPtyProcessManager, same
+        // shape ShellView.axaml.cs already uses for RunPanelViewModel's TerminalControl.
+        OutputTerminal.InputReceived += ViewModel.WriteInput;
+        OutputTerminal.Resized += ViewModel.Resize;
+
+        // Same follow-up fix ShellView.axaml.cs already applies to its own output terminal:
+        // nothing moves keyboard focus into OutputTerminal on its own, so keystrokes would keep
+        // going wherever focus already was unless the user happened to click into the output area
+        // first.
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(TerminalViewModel.OutputText))
+        if (e.PropertyName == nameof(TerminalViewModel.IsRunning) && ViewModel.IsRunning)
         {
-            OutputTextBox.CaretIndex = OutputTextBox.Text?.Length ?? 0;
+            OutputTerminal.Focus();
         }
     }
 }

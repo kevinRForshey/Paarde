@@ -1,3 +1,5 @@
+using System.Text;
+
 using Avalonia.Threading;
 
 using Paarde.Avalonia.Contracts.Services;
@@ -5,28 +7,36 @@ using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
+using Paarde.Core.Services;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Avalonia.ViewModels;
 
-// T16.1.2: the integrated terminal - a "run a command, stream its output" panel rather than a
-// real PTY (see ROADMAP.md's F16.1 for why), reusing the working directory last picked on the
-// Prompt page the same way ExplorerViewModel does (T8.1.1), via WorkingDirectorySettingsKeys.
+// T16.1.2: the integrated terminal - a "run a command, stream its output" panel, reusing the
+// working directory last picked on the Prompt page the same way ExplorerViewModel does (T8.1.1),
+// via WorkingDirectorySettingsKeys.
+// specs/terminal-emulation T7: runs the typed command through IPtyProcessManager instead of
+// ITerminalCommandRunner's line-oriented streaming overload, so full-screen TUI apps typed here
+// render correctly too, not just plain line-oriented commands. This is a *separate* PTY-backed
+// process slot from RunPanelViewModel's (App.axaml.cs registers one keyed by
+// PtyProcessManagerKey) - Run's persistent toolbar and this page are independent features, same
+// as the pre-epic IRunProcessManager/ITerminalCommandRunner split; sharing RunPanelViewModel's
+// singleton would mean typing a command here stops whatever Run has going, and vice versa.
 public partial class TerminalViewModel : ObservableObject, INavigationAware
 {
-    private readonly ITerminalCommandRunner _terminalCommandRunner;
+    public const string PtyProcessManagerKey = "Terminal";
+
+    private static readonly byte[] ClearScreenSequence = Encoding.ASCII.GetBytes("\x1b[2J\x1b[H");
+
+    private readonly IPtyProcessManager _ptyProcessManager;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ILogger<TerminalViewModel> _logger;
-
-    // T16.1.1: lives only for the duration of one RunCommandAsync call, same lifetime pattern as
-    // PromptViewModel._runCancellationTokenSource - CancelCommandCommand's CanExecute guard is
-    // whether one currently exists.
-    private CancellationTokenSource? _runCancellationTokenSource;
 
     [ObservableProperty]
     private string workingDirectoryPath = string.Empty;
@@ -34,8 +44,7 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
     [ObservableProperty]
     private string commandText = string.Empty;
 
-    [ObservableProperty]
-    private string outputText = string.Empty;
+    public TerminalBuffer OutputBuffer { get; } = new(cols: 80, rows: 24);
 
     [ObservableProperty]
     private bool isRunning;
@@ -44,13 +53,16 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
     private string statusMessage = string.Empty;
 
     public TerminalViewModel(
-        ITerminalCommandRunner terminalCommandRunner,
+        [FromKeyedServices(PtyProcessManagerKey)] IPtyProcessManager ptyProcessManager,
         ILocalSettingsService localSettingsService,
         ILogger<TerminalViewModel>? logger = null)
     {
-        _terminalCommandRunner = terminalCommandRunner;
+        _ptyProcessManager = ptyProcessManager;
         _localSettingsService = localSettingsService;
         _logger = logger ?? NullLogger<TerminalViewModel>.Instance;
+
+        _ptyProcessManager.OutputReceived += OnProcessOutputReceived;
+        _ptyProcessManager.Exited += OnProcessExited;
     }
 
     // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void, same reasoning as
@@ -68,8 +80,15 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         }
     }
 
+    // Same subscribe-in-constructor/unsubscribe-here pattern ExplorerViewModel already uses for
+    // ILanguageServerSessionManager.DiagnosticsPublished - IPtyProcessManager is a singleton but
+    // this ViewModel is transient (a fresh instance per navigation to the Terminal page), so
+    // leaving the subscription live past this page would pile up abandoned handlers on every
+    // revisit.
     public void OnNavigatedFrom()
     {
+        _ptyProcessManager.OutputReceived -= OnProcessOutputReceived;
+        _ptyProcessManager.Exited -= OnProcessExited;
     }
 
     [RelayCommand(CanExecute = nameof(CanRunCommand))]
@@ -81,40 +100,21 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
             return;
         }
 
-        IsRunning = true;
-        OutputText = string.Empty;
-        StatusMessage = string.Empty;
-        _runCancellationTokenSource = new CancellationTokenSource();
-        CancelCommandCommand.NotifyCanExecuteChanged();
+        OutputBuffer.Feed(ClearScreenSequence);
+        StatusMessage = string.Format("Terminal_Running".Resolve(), CommandText);
 
         try
         {
-            // T16.1.3: fires on a background thread as the process streams output, so UI state is
-            // only ever touched after marshaling onto the UI thread - same requirement as
-            // PromptViewModel.OnTextDelta.
-            void OnOutputLine(string line) => Dispatcher.UIThread.Post(() => OutputText += line + Environment.NewLine);
-
-            var result = await _terminalCommandRunner.RunAsync(CommandText, WorkingDirectoryPath, OnOutputLine, _runCancellationTokenSource.Token);
-
-            StatusMessage = result.Succeeded
-                ? string.Format("Terminal_CommandSucceeded".Resolve(), result.Duration.TotalSeconds)
-                : string.Format("Terminal_CommandFailed".Resolve(), result.ExitCode, result.Duration.TotalSeconds);
-        }
-        catch (OperationCanceledException)
-        {
-            StatusMessage = "Terminal_CommandCancelled".Resolve();
+            // R4.5-equivalent semantics: StartAsync() stops whatever's already active on this
+            // shared PTY slot first, so re-pressing Run while a previous command is live restarts
+            // it rather than erroring.
+            await _ptyProcessManager.StartAsync(CommandText, WorkingDirectoryPath, OutputBuffer.Cols, OutputBuffer.Rows);
+            IsRunning = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             _logger.LogWarning(ex, "Failed to run a terminal command in {WorkingDirectory}.", WorkingDirectoryPath);
-            StatusMessage = string.Format("Terminal_CommandRunError".Resolve(), ex.Message);
-        }
-        finally
-        {
-            IsRunning = false;
-            _runCancellationTokenSource?.Dispose();
-            _runCancellationTokenSource = null;
-            CancelCommandCommand.NotifyCanExecuteChanged();
+            StatusMessage = string.Format("Terminal_RunStartError".Resolve(), ex.Message);
         }
     }
 
@@ -122,13 +122,37 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
 
     partial void OnCommandTextChanged(string value) => RunCommandCommand.NotifyCanExecuteChanged();
 
-    partial void OnIsRunningChanged(bool value) => RunCommandCommand.NotifyCanExecuteChanged();
+    partial void OnIsRunningChanged(bool value)
+    {
+        RunCommandCommand.NotifyCanExecuteChanged();
+        CancelCommandCommand.NotifyCanExecuteChanged();
+    }
 
     [RelayCommand(CanExecute = nameof(CanCancelCommand))]
-    private void CancelCommand() => _runCancellationTokenSource?.Cancel();
+    private void CancelCommand() => _ptyProcessManager.Stop();
 
-    private bool CanCancelCommand() => _runCancellationTokenSource is not null;
+    private bool CanCancelCommand() => IsRunning;
 
     [RelayCommand]
-    private void ClearOutput() => OutputText = string.Empty;
+    private void ClearOutput() => OutputBuffer.Feed(ClearScreenSequence);
+
+    // specs/terminal-emulation T6/T7: thin passthroughs so TerminalView.axaml.cs can wire
+    // OutputTerminal.InputReceived/.Resized directly, same shape RunPanelViewModel already
+    // exposes for ShellView.axaml.cs.
+    public void WriteInput(byte[] input) => _ptyProcessManager.WriteInput(input);
+
+    public void Resize(int cols, int rows) => _ptyProcessManager.Resize(cols, rows);
+
+    // T16.1.3-style: fires on a background thread as the process streams output, so UI state is
+    // only ever touched after marshaling onto the UI thread - same requirement as
+    // PromptViewModel.OnTextDelta.
+    private void OnProcessOutputReceived(byte[] bytes) =>
+        Dispatcher.UIThread.Post(() => OutputBuffer.Feed(bytes));
+
+    private void OnProcessExited(int? exitCode) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            IsRunning = false;
+            StatusMessage = exitCode is null ? "Terminal_Stopped".Resolve() : string.Format("Terminal_Exited".Resolve(), exitCode);
+        });
 }

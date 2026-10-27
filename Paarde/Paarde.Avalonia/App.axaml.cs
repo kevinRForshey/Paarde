@@ -43,6 +43,17 @@ public partial class App : Application
         return service;
     }
 
+    public static T GetKeyedService<T>(object key)
+        where T : class
+    {
+        if ((Current as App)!.Host.Services.GetKeyedService(typeof(T), key) is not T service)
+        {
+            throw new ArgumentException($"{typeof(T)} needs to be registered with key '{key}' in ConfigureServices within App.axaml.cs.");
+        }
+
+        return service;
+    }
+
     public static Window? MainWindow
     {
         get; private set;
@@ -122,7 +133,6 @@ public partial class App : Application
 
             services.AddTransient<IGitStatusService, GitStatusService>();
             services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
-            services.AddTransient<ITerminalCommandRunner, ProcessCommandRunner>();
 
             // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
             // prompts in the same session instead of re-tokenizing the whole project on every
@@ -142,17 +152,22 @@ public partial class App : Application
 
             // Epic 20 (specs/build-and-run): RunConfigurationsProvider/RunPanelViewModel are
             // singletons for the same reason ILanguageServerSessionManager above is - they back
-            // ShellView's persistent toolbar (R5.1), not any one page. IRunProcessManager is a
-            // singleton because it owns at most one long-lived child process at a time across the
-            // whole app, the same ownership shape ILanguageServerSessionManager has for its
-            // per-language server processes.
+            // ShellView's persistent toolbar (R5.1), not any one page.
             services.AddSingleton<IRunConfigurationDetector, RunConfigurationDetector>();
             services.AddSingleton<RunConfigurationsProvider>();
-            services.AddSingleton<IRunProcessManager, RunProcessManager>();
 
-            // Epic 21 (specs/terminal-emulation): singleton for the same reason IRunProcessManager
-            // above is - at most one long-lived PTY-backed process at a time across the whole app.
+            // Epic 21 (specs/terminal-emulation T6): RunPanelViewModel starts processes through
+            // this instead of the retired IRunProcessManager - singleton because it owns at most
+            // one long-lived PTY-backed process at a time, the same ownership shape
+            // ILanguageServerSessionManager has for its per-language server processes.
             services.AddSingleton<IPtyProcessManager, PtyProcessManager>();
+
+            // specs/terminal-emulation T7: TerminalViewModel gets its own, separately keyed
+            // PtyProcessManager instance rather than sharing RunPanelViewModel's - Run's
+            // persistent toolbar and the Terminal page are independent features (same as the
+            // pre-epic IRunProcessManager/ITerminalCommandRunner split), so a command typed into
+            // one must not stop or report status for whatever's running in the other.
+            services.AddKeyedSingleton<IPtyProcessManager, PtyProcessManager>(TerminalViewModel.PtyProcessManagerKey);
             services.AddSingleton<IWorkingDirectoryContext, WorkingDirectoryContext>();
             services.AddSingleton<RunPanelViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
@@ -265,14 +280,13 @@ public partial class App : Application
                 // the way out.
                 GetService<ILanguageServerSessionManager>().StopAllAsync().GetAwaiter().GetResult();
 
-                // Epic 20 (specs/build-and-run R4.6): a Run session is the same kind of
-                // app-owned, otherwise-orphaned child process - Stop() is synchronous and
-                // already bounded by Process.Kill, so no extra waiting is needed here.
-                GetService<IRunProcessManager>().Stop();
-
-                // Epic 21 (specs/terminal-emulation R1.2): same orphaned-process concern, same
-                // fix shape, for a PTY-backed run.
+                // Epic 20 (specs/build-and-run R4.6)/Epic 21 (specs/terminal-emulation R1.2, T6,
+                // T7): a Run or Terminal session is the same kind of app-owned, otherwise-orphaned
+                // child process - Stop() is synchronous and already bounded by killing the process
+                // tree, so no extra waiting is needed here. Two separately keyed instances (T7),
+                // so both need stopping independently.
                 GetService<IPtyProcessManager>().Stop();
+                GetKeyedService<IPtyProcessManager>(TerminalViewModel.PtyProcessManagerKey).Stop();
 
                 Environment.Exit(0);
             };

@@ -61,36 +61,4 @@ public class ProcessCommandRunnerTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             _runner.RunAsync("sleep 30", _workingDirectory, cancellationTokenSource.Token));
     }
-
-    // T16.1.3: the streaming overload (ITerminalCommandRunner) reports each line as it arrives,
-    // not just the buffered result once the process exits.
-    [Fact]
-    public async Task RunAsync_WithOnOutputLineCallback_ReportsEachLineAsItArrives()
-    {
-        var reportedLines = new List<string>();
-
-        var result = await _runner.RunAsync("printf 'one\\ntwo\\n'", _workingDirectory, reportedLines.Add);
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal(new[] { "one", "two" }, reportedLines);
-    }
-
-    [Fact]
-    public async Task RunAsync_WithOnOutputLineCallback_AlsoReportsStandardErrorLines()
-    {
-        var reportedLines = new List<string>();
-
-        await _runner.RunAsync("echo failure-detail >&2 && exit 1", _workingDirectory, reportedLines.Add);
-
-        Assert.Contains("failure-detail", reportedLines);
-    }
-
-    [Fact]
-    public async Task RunAsync_WithOnOutputLineCallback_Cancelled_ThrowsOperationCanceledAndKillsTheChildProcess()
-    {
-        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            _runner.RunAsync("sleep 30", _workingDirectory, _ => { }, cancellationTokenSource.Token));
-    }
 }

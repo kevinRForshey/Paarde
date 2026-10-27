@@ -12,7 +12,7 @@ public class RunPanelViewModelTests
     private readonly FakeProjectTypeDetector _projectTypeDetector = new();
     private readonly FakeRunConfigurationDetector _runConfigurationDetector = new();
     private readonly FakeBuildTestRunner _buildTestRunner = new();
-    private readonly FakeRunProcessManager _runProcessManager = new();
+    private readonly FakePtyProcessManager _ptyProcessManager = new();
     private readonly FakeWorkingDirectoryContext _workingDirectoryContext = new();
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
 
@@ -22,7 +22,7 @@ public class RunPanelViewModelTests
     }
 
     private RunPanelViewModel CreateSut() =>
-        new(_runConfigurationsProvider, _buildTestRunner, _runProcessManager, _localSettingsService, _workingDirectoryContext);
+        new(_runConfigurationsProvider, _buildTestRunner, _ptyProcessManager, _localSettingsService, _workingDirectoryContext);
 
     private async Task SetSavedWorkingDirectoryAsync(string path)
     {
@@ -66,9 +66,9 @@ public class RunPanelViewModelTests
 
         await sut.RunCommand.ExecuteAsync(null);
 
-        Assert.Single(_runProcessManager.StartCalls);
-        Assert.Equal("dotnet run", _runProcessManager.StartCalls[0].Command);
-        Assert.Equal("/repo/src/MyApp", _runProcessManager.StartCalls[0].WorkingDirectoryPath);
+        Assert.Single(_ptyProcessManager.StartCalls);
+        Assert.Equal("dotnet run", _ptyProcessManager.StartCalls[0].Command);
+        Assert.Equal("/repo/src/MyApp", _ptyProcessManager.StartCalls[0].WorkingDirectoryPath);
         Assert.True(sut.IsRunning);
     }
 
@@ -83,7 +83,7 @@ public class RunPanelViewModelTests
 
         await sut.RunCommand.ExecuteAsync(null);
 
-        Assert.Empty(_runProcessManager.StartCalls);
+        Assert.Empty(_ptyProcessManager.StartCalls);
         Assert.False(sut.IsRunning);
     }
 
@@ -98,7 +98,7 @@ public class RunPanelViewModelTests
         await sut.RunCommand.ExecuteAsync(null);
 
         Assert.Equal(0, _buildTestRunner.RunAsyncCallCount);
-        Assert.Single(_runProcessManager.StartCalls);
+        Assert.Single(_ptyProcessManager.StartCalls);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class RunPanelViewModelTests
         await sut.RunCommand.ExecuteAsync(null);
 
         Assert.Equal(1, _buildTestRunner.RunAsyncCallCount);
-        Assert.Empty(_runProcessManager.StartCalls);
+        Assert.Empty(_ptyProcessManager.StartCalls);
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class RunPanelViewModelTests
 
         Assert.Equal(1, _buildTestRunner.RunAsyncCallCount);
         Assert.Equal("dotnet build", _buildTestRunner.CommandsRun[0]);
-        Assert.Empty(_runProcessManager.StartCalls);
+        Assert.Empty(_ptyProcessManager.StartCalls);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class RunPanelViewModelTests
         Assert.True(sut.StopCommand.CanExecute(null));
         sut.StopCommand.Execute(null);
 
-        Assert.Equal(1, _runProcessManager.StopCallCount);
+        Assert.Equal(1, _ptyProcessManager.StopCallCount);
     }
 
     [Fact]
@@ -187,5 +187,6 @@ public class RunPanelViewModelTests
     // RunPanelViewModel.OnProcessOutputReceived/OnProcessExited marshal through
     // Dispatcher.UIThread.Post the same way TerminalViewModel's onOutputLine does (see
     // TerminalViewModelTests' comment on that) - not exercised here since nothing pumps
-    // Dispatcher.UIThread in this plain xunit host.
+    // Dispatcher.UIThread in this plain xunit host. OutputBuffer (specs/terminal-emulation T6)
+    // is likewise not asserted against directly here for the same reason.
 }
