@@ -18,9 +18,10 @@ public class PromptViewModelTests
     private readonly PromptTemplateProvider _promptTemplateProvider = new();
     private readonly FakeRunSessionStore _runSessionStore = new();
     private readonly FakeCodebaseIndexService _codebaseIndexService = new();
+    private readonly FakeWorkingDirectoryContext _workingDirectoryContext = new();
 
     private PromptViewModel CreateSut() =>
-        new(_llmRunner, _localSettingsService, _folderPickerService, _filePickerService, _promptResultStore, _promptTemplateProvider, _runSessionStore, _codebaseIndexService);
+        new(_llmRunner, _localSettingsService, _folderPickerService, _filePickerService, _promptResultStore, _promptTemplateProvider, _runSessionStore, _codebaseIndexService, _workingDirectoryContext);
 
     [Fact]
     public async Task RunPromptAsync_SuccessWithNoFiles_StoresTutorialAndReportsCompletion()

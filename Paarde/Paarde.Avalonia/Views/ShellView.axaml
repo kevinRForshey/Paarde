@@ -6,50 +6,95 @@
              x:Class="Paarde.Avalonia.Views.ShellView"
              x:DataType="vm:ShellViewModel">
 
-    <ui:NavigationView x:Name="NavigationViewControl"
-                        IsBackButtonVisible="True"
-                        IsBackEnabled="{Binding IsBackEnabled}"
-                        SelectedItem="{Binding Selected}"
-                        IsSettingsVisible="True"
-                        PaneDisplayMode="Left"
-                        Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
-        <ui:NavigationView.MenuItems>
-            <ui:NavigationViewItem Content="Main" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.MainViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Home" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Prompt" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.PromptViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Send" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.ExplorerViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Folder" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Play" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Diffs" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.DiffsViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Code" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Tutorial" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TutorialViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Document" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Clock" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-        </ui:NavigationView.MenuItems>
-        <ui:Frame x:Name="NavigationFrame" />
-    </ui:NavigationView>
+    <!-- Epic 20 (specs/build-and-run F20.3, design.md "Shell placement"): the NavigationView is
+         now row 1 of a 3-row grid instead of the whole control, so the Build/Run/Stop toolbar
+         (row 0) and output strip (row 2) are visible no matter which page is navigated to -
+         R5.1/R5.2, the one piece of the broader "wizard -> IDE" problem this epic can't defer. -->
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Grid Grid.Row="0"
+              ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+              Margin="8"
+              DataContext="{Binding RunPanelViewModel}">
+            <ComboBox Grid.Column="0"
+                      ItemsSource="{Binding Configurations}"
+                      SelectedItem="{Binding SelectedConfiguration}"
+                      PlaceholderText="No run configuration found - add one on the Settings page"
+                      HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button Grid.Column="1" Margin="8,0,0,0" Content="Build" Command="{Binding BuildCommand}" />
+            <Button Grid.Column="2" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommand}" Classes="accent" />
+            <Button Grid.Column="3" Margin="8,0,0,0" Content="Stop" Command="{Binding StopCommand}" />
+            <TextBlock Grid.Column="4"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       Text="{Binding StatusMessage}" />
+        </Grid>
+
+        <ui:NavigationView Grid.Row="1"
+                            x:Name="NavigationViewControl"
+                            IsBackButtonVisible="True"
+                            IsBackEnabled="{Binding IsBackEnabled}"
+                            SelectedItem="{Binding Selected}"
+                            IsSettingsVisible="True"
+                            PaneDisplayMode="Left"
+                            Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="Main" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.MainViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Home" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Prompt" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.PromptViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Send" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.ExplorerViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Folder" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Play" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Diffs" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.DiffsViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Code" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Tutorial" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TutorialViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Document" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Clock" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.MenuItems>
+            <ui:Frame x:Name="NavigationFrame" />
+        </ui:NavigationView>
+
+        <Expander Grid.Row="2"
+                  Margin="8,0,8,8"
+                  Header="Output"
+                  IsExpanded="{Binding RunPanelViewModel.IsOutputExpanded}"
+                  MaxHeight="220">
+            <TextBox Text="{Binding RunPanelViewModel.OutputText}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="NoWrap"
+                     FontFamily="Cascadia Mono,Consolas,monospace"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+        </Expander>
+    </Grid>
 </UserControl>

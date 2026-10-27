@@ -107,6 +107,16 @@ public static class Resources
         ["Terminal_CommandFailed"] = "Command exited with code {0} ({1:F1}s).",
         ["Terminal_CommandCancelled"] = "Cancelled.",
         ["Terminal_CommandRunError"] = "Failed to run the command: {0}",
+        ["RunPanel_NoWorkingDirectory"] = "No working directory selected yet. Pick one on the Prompt page.",
+        ["RunPanel_NoConfiguration"] = "No run configuration found. Add one on the Settings page.",
+        ["RunPanel_Building"] = "Building {0}...",
+        ["RunPanel_BuildSucceeded"] = "Build succeeded ({0:F1}s).",
+        ["RunPanel_BuildFailed"] = "Build failed with exit code {0} ({1:F1}s).",
+        ["RunPanel_BuildError"] = "Failed to run the build command: {0}",
+        ["RunPanel_Running"] = "Running {0}...",
+        ["RunPanel_RunStartError"] = "Failed to start the run command: {0}",
+        ["RunPanel_Stopped"] = "Stopped.",
+        ["RunPanel_Exited"] = "Process exited (code {0}).",
     };
 
     public static string Resolve(this string resourceKey) =>

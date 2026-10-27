@@ -40,8 +40,9 @@ then pick up multi-language routing for free once that spec's session manager ex
   2026-10-23, see `ROADMAP.md` T19.4.1. The `StdioLanguageServerClientTests` half landed under T1/T2;
   the coexistence gating has no automated test (same `CodeEditor`-level sandbox limitation as T3) -
   covered by code inspection plus T8's manual verification instead.
-- [ ] T8 Manual verification in a real C# project: typing `.` after a known symbol shows a
+- [x] T8 Manual verification in a real C# project: typing `.` after a known symbol shows a
   populated dropdown; Tab/Enter/click accept; Escape dismisses; a ghost-text suggestion visible at
   trigger time disappears when the dropdown opens; typing past all matches auto-closes the window.
-  Repeat once [[multi-language-support]] ships for a Python and a TypeScript file. — not done: no
-  display/running `Application` available in this sandbox.
+  Repeat once [[multi-language-support]] ships for a Python and a TypeScript file. — done
+  2026-10-26: visually verified by Kevin on a machine with a display (this sandbox has none).
+  Confirmed working.

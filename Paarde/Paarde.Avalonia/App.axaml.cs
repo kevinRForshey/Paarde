@@ -139,6 +139,22 @@ public partial class App : Application
                 sp.GetRequiredService<IProjectTypeDetector>(),
                 sp.GetRequiredService<LanguageServerOptionsProvider>().GetOptionsAsync,
                 logger: sp.GetRequiredService<ILogger<LanguageServerSessionManager>>()));
+
+            // Epic 20 (specs/build-and-run): RunConfigurationsProvider/RunPanelViewModel are
+            // singletons for the same reason ILanguageServerSessionManager above is - they back
+            // ShellView's persistent toolbar (R5.1), not any one page. IRunProcessManager is a
+            // singleton because it owns at most one long-lived child process at a time across the
+            // whole app, the same ownership shape ILanguageServerSessionManager has for its
+            // per-language server processes.
+            services.AddSingleton<IRunConfigurationDetector, RunConfigurationDetector>();
+            services.AddSingleton<RunConfigurationsProvider>();
+            services.AddSingleton<IRunProcessManager, RunProcessManager>();
+
+            // Epic 21 (specs/terminal-emulation): singleton for the same reason IRunProcessManager
+            // above is - at most one long-lived PTY-backed process at a time across the whole app.
+            services.AddSingleton<IPtyProcessManager, PtyProcessManager>();
+            services.AddSingleton<IWorkingDirectoryContext, WorkingDirectoryContext>();
+            services.AddSingleton<RunPanelViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
@@ -248,6 +264,16 @@ public partial class App : Application
                 // bounded (a couple of seconds at most), so blocking briefly here is acceptable on
                 // the way out.
                 GetService<ILanguageServerSessionManager>().StopAllAsync().GetAwaiter().GetResult();
+
+                // Epic 20 (specs/build-and-run R4.6): a Run session is the same kind of
+                // app-owned, otherwise-orphaned child process - Stop() is synchronous and
+                // already bounded by Process.Kill, so no extra waiting is needed here.
+                GetService<IRunProcessManager>().Stop();
+
+                // Epic 21 (specs/terminal-emulation R1.2): same orphaned-process concern, same
+                // fix shape, for a PTY-backed run.
+                GetService<IPtyProcessManager>().Stop();
+
                 Environment.Exit(0);
             };
 

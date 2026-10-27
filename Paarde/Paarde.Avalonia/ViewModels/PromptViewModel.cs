@@ -54,6 +54,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
     private readonly IPromptTemplateProvider _promptTemplateProvider;
     private readonly IRunSessionStore _runSessionStore;
     private readonly ICodebaseIndexService _codebaseIndexService;
+    private readonly IWorkingDirectoryContext _workingDirectoryContext;
     private readonly ILogger<PromptViewModel> _logger;
 
     [ObservableProperty]
@@ -195,7 +196,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
 
     private Stopwatch? _runStopwatch;
 
-    public PromptViewModel(ILlmRunner llmRunner, ILocalSettingsService localSettingsService, IFolderPickerService folderPickerService, IFilePickerService filePickerService, IPromptResultStore promptResultStore, IPromptTemplateProvider promptTemplateProvider, IRunSessionStore runSessionStore, ICodebaseIndexService codebaseIndexService, ILogger<PromptViewModel>? logger = null)
+    public PromptViewModel(ILlmRunner llmRunner, ILocalSettingsService localSettingsService, IFolderPickerService folderPickerService, IFilePickerService filePickerService, IPromptResultStore promptResultStore, IPromptTemplateProvider promptTemplateProvider, IRunSessionStore runSessionStore, ICodebaseIndexService codebaseIndexService, IWorkingDirectoryContext workingDirectoryContext, ILogger<PromptViewModel>? logger = null)
     {
         _llmRunner = llmRunner;
         _localSettingsService = localSettingsService;
@@ -205,6 +206,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         _promptTemplateProvider = promptTemplateProvider;
         _runSessionStore = runSessionStore;
         _codebaseIndexService = codebaseIndexService;
+        _workingDirectoryContext = workingDirectoryContext;
         _logger = logger ?? NullLogger<PromptViewModel>.Instance;
 
         // T5.4.2: ObservableCollection<T> doesn't go through an [ObservableProperty]'s On*Changed
@@ -724,6 +726,13 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         SuggestedRelevantFiles.Clear();
         SuggestRelevantFilesCommand.NotifyCanExecuteChanged();
         UpdateEstimatedTokenCountDisplay();
+
+        // Epic 20 (specs/build-and-run): tells RunPanelViewModel's toolbar/output strip - a DI
+        // singleton with no page-navigation lifecycle of its own - which working directory to
+        // detect Run configurations for. Fires on every change, including the initial load from
+        // settings in OnNavigatedTo below, which is also how the toolbar learns the saved working
+        // directory on first launch without needing to visit this page.
+        _workingDirectoryContext.SetCurrent(value);
     }
 
     partial void OnSelectedPresetChanged(PromptPreset value)

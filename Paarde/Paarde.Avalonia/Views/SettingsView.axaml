@@ -129,6 +129,44 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <TextBlock Margin="0,16,0,0" Text="Run configurations" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Powers the Build/Run/Stop toolbar - detected automatically for the working directory picked on the Prompt page, or add one by hand for anything detection misses."
+                   FontSize="12"
+                   Opacity="0.7"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Margin="0,8,0,0"
+                   Text="No working directory selected yet. Pick one on the Prompt page."
+                   FontSize="12"
+                   Opacity="0.7"
+                   IsVisible="{Binding !HasRunConfigurationsWorkingDirectory}" />
+
+        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding RunConfigurationRows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,0,8" Padding="12" CornerRadius="6" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Auto-detected" Foreground="Green" IsVisible="{Binding IsAutoDetected}" FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock Text="Hand-edited" Opacity="0.7" IsVisible="{Binding !IsAutoDetected}" FontSize="12" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Delete" Command="{Binding DeleteCommand}" />
+                            </Grid>
+                            <TextBox Text="{Binding Name}" Watermark="name" />
+                            <TextBox Text="{Binding LanguageId}" Watermark="language id (csharp/python/typescript)" />
+                            <TextBox Text="{Binding WorkingDirectoryPath}" Watermark="directory the commands below run in" />
+                            <TextBox Text="{Binding ProjectRelativePath}" Watermark="project/script path (for your reference)" />
+                            <TextBox Text="{Binding BuildCommand}" Watermark="build command (leave blank to skip)" />
+                            <TextBox Text="{Binding RunCommand}" Watermark="run command" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Button Margin="0,8,0,0" Content="Add run configuration" Command="{Binding AddRunConfigurationCommand}" HorizontalAlignment="Left" />
+
         <TextBlock Margin="0,16,0,0" Text="Prompt template" FontSize="20" FontWeight="SemiBold" />
 
         <StackPanel Margin="0,8,0,0" Spacing="4">

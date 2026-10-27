@@ -25,7 +25,14 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ISecureStorageService _secureStorageService;
     private readonly LanguageServerOptionsProvider _languageServerOptionsProvider;
+    private readonly RunConfigurationsProvider _runConfigurationsProvider;
     private readonly ILogger<SettingsViewModel> _logger;
+
+    // Epic 20 (specs/build-and-run R2.6): the working directory Run configurations below belong
+    // to - read once in OnNavigatedTo the same way TerminalViewModel reads it, not re-exposed as
+    // its own editable field here since this page doesn't change the working directory, only
+    // edits what's configured for whichever one is currently selected on the Prompt page.
+    private string _runConfigurationsWorkingDirectoryPath = string.Empty;
 
     [ObservableProperty]
     private ThemeVariant _themeVariant;
@@ -59,6 +66,14 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     // LspExecutablePath/LspArguments pair - populated from LanguageServerOptionsProvider in
     // OnNavigatedTo, saved back as a whole collection on any row's edit.
     public ObservableCollection<LanguageServerOptionsRowViewModel> LanguageServerRows { get; } = [];
+
+    // Epic 20 (specs/build-and-run R2.6): one row per Run configuration for the current working
+    // directory - populated from RunConfigurationsProvider in OnNavigatedTo, saved back as a
+    // whole collection on any row's edit/delete, same shape as LanguageServerRows above.
+    public ObservableCollection<RunConfigurationRowViewModel> RunConfigurationRows { get; } = [];
+
+    [ObservableProperty]
+    private bool hasRunConfigurationsWorkingDirectory;
 
     // T6.3.2/T6.3.3: which ILlmRunner implementation LlmRunnerSelector should delegate to.
     [ObservableProperty]
@@ -107,12 +122,13 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
         get;
     }
 
-    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, ILogger<SettingsViewModel>? logger = null)
+    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, RunConfigurationsProvider runConfigurationsProvider, ILogger<SettingsViewModel>? logger = null)
     {
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
         _secureStorageService = secureStorageService;
         _languageServerOptionsProvider = languageServerOptionsProvider;
+        _runConfigurationsProvider = runConfigurationsProvider;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _themeVariant = _themeSelectorService.Theme;
         _versionDescription = GetVersionDescription();
@@ -159,6 +175,19 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
                 LanguageServerRows.Add(new LanguageServerOptionsRowViewModel(options, OnLanguageServerRowChanged));
             }
 
+            _runConfigurationsWorkingDirectoryPath = await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory) ?? string.Empty;
+            HasRunConfigurationsWorkingDirectory = !string.IsNullOrWhiteSpace(_runConfigurationsWorkingDirectoryPath);
+
+            RunConfigurationRows.Clear();
+            if (HasRunConfigurationsWorkingDirectory)
+            {
+                var runConfigurationsSnapshot = await _runConfigurationsProvider.GetConfigurationsAsync(_runConfigurationsWorkingDirectoryPath);
+                foreach (var configuration in runConfigurationsSnapshot.Configurations)
+                {
+                    RunConfigurationRows.Add(new RunConfigurationRowViewModel(configuration, OnRunConfigurationRowChanged, OnRunConfigurationRowDeleteRequested));
+                }
+            }
+
             PromptTemplateOverride = await _localSettingsService.ReadSettingAsync<string>(PromptTemplateSettingsKeys.Override) ?? string.Empty;
 
             var savedRunnerKind = await _localSettingsService.ReadSettingAsync<string>(LlmRunnerSettingsKeys.SelectedRunner);
@@ -196,6 +225,43 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
     private void OnLanguageServerRowChanged(LanguageServerOptionsRowViewModel row) =>
         _languageServerOptionsProvider.SaveOptionsAsync(LanguageServerRows.Select(r => r.ToOptions()).ToList());
+
+    partial void OnHasRunConfigurationsWorkingDirectoryChanged(bool value) => AddRunConfigurationCommand.NotifyCanExecuteChanged();
+
+    [RelayCommand(CanExecute = nameof(HasRunConfigurationsWorkingDirectory))]
+    private void AddRunConfiguration()
+    {
+        var configuration = new RunConfiguration(
+            Id: Guid.NewGuid().ToString(),
+            Name: "New configuration",
+            LanguageId: "csharp",
+            WorkingDirectoryPath: _runConfigurationsWorkingDirectoryPath,
+            ProjectRelativePath: string.Empty,
+            BuildCommand: string.Empty,
+            RunCommand: string.Empty,
+            IsAutoDetected: false);
+
+        RunConfigurationRows.Add(new RunConfigurationRowViewModel(configuration, OnRunConfigurationRowChanged, OnRunConfigurationRowDeleteRequested));
+        SaveRunConfigurationRows();
+    }
+
+    private void OnRunConfigurationRowChanged(RunConfigurationRowViewModel row) => SaveRunConfigurationRows();
+
+    private void OnRunConfigurationRowDeleteRequested(RunConfigurationRowViewModel row)
+    {
+        RunConfigurationRows.Remove(row);
+        SaveRunConfigurationRows();
+    }
+
+    private void SaveRunConfigurationRows()
+    {
+        if (!HasRunConfigurationsWorkingDirectory)
+        {
+            return;
+        }
+
+        _runConfigurationsProvider.SaveConfigurationsAsync(_runConfigurationsWorkingDirectoryPath, RunConfigurationRows.Select(r => r.ToConfiguration()).ToList());
+    }
 
     partial void OnSelectedRunnerKindChanged(LlmRunnerKind value) => _localSettingsService.SaveSettingAsync(LlmRunnerSettingsKeys.SelectedRunner, value.ToString());
 
