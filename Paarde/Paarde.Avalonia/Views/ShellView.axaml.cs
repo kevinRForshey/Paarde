@@ -1,6 +1,7 @@
 using System.ComponentModel;
 
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 using Paarde.Avalonia.ViewModels;
 
@@ -41,7 +42,20 @@ public partial class ShellView : UserControl
     {
         if (e.PropertyName == nameof(RunPanelViewModel.IsRunning) && ViewModel.RunPanelViewModel.IsRunning)
         {
-            OutputTerminal.Focus();
+            // Bug found via a headless harness reproducing this exact PropertyChanged sequence
+            // (reported as "the app clearly runs and shows output, but it won't take any
+            // input"): Porta.Pty's Linux StartTerminalAsync is fully synchronous (forkpty via a
+            // native call, wrapped in Task.FromResult), so `await _ptyProcessManager.StartAsync`
+            // in RunPanelViewModel.RunAsync never actually yields - IsOutputExpanded = true and
+            // IsRunning = true both fire within the same synchronous call stack as the Run button
+            // click, before Avalonia's layout pass ever expands the (collapsed-by-default)
+            // Expander. Calling Focus() here directly targets a still-0x0 OutputTerminal and
+            // silently fails - confirmed via the harness: Focus() returns false and IsFocused
+            // stays false, even though the Expander visibly finishes expanding moments later.
+            // Deferring to DispatcherPriority.Loaded - confirmed via the same harness to run after
+            // the pending layout/render pass - lets the Expander's layout settle first, so
+            // OutputTerminal has real bounds by the time Focus() actually runs.
+            Dispatcher.UIThread.Post(() => OutputTerminal.Focus(), DispatcherPriority.Loaded);
         }
     }
 }

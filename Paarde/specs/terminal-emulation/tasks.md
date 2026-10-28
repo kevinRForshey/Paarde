@@ -187,10 +187,69 @@ Each task references the requirement(s) it satisfies.
   sandboxed environment - the click/focus/type mechanics were confirmed via headless harness and
   the fix follows an established, already-proven pattern, but a live click-to-run -> type round
   trip through a real PTY-backed TUI app is something only a real display can fully confirm.)_
-- [ ] T7 Wire Terminal (Epic 16): same swap for `TerminalViewModel`/`TerminalView.axaml` — output
+- [x] T7 Wire Terminal (Epic 16): same swap for `TerminalViewModel`/`TerminalView.axaml` — output
   `TextBox` replaced by a `TerminalControl`, command input box and history unchanged.
   `ITerminalCommandRunner`'s existing wait-for-exit overload (used elsewhere, if any) stays; only
   the streaming path moves onto `IPtyProcessManager`. _(R3.3, R5.1)_
+  _(Done 2026-10-27: `TerminalViewModel` now takes a **keyed** `IPtyProcessManager`
+  (`[FromKeyedServices(TerminalViewModel.PtyProcessManagerKey)]`, key `"Terminal"`) instead of
+  `ITerminalCommandRunner`, and exposes `public TerminalBuffer OutputBuffer { get; }` in place of
+  the old `OutputText` string property - same shape as T6's `RunPanelViewModel`, but deliberately a
+  *separate* `IPtyProcessManager` instance registered via `services.AddKeyedSingleton<
+  IPtyProcessManager, PtyProcessManager>(TerminalViewModel.PtyProcessManagerKey)` in
+  `App.axaml.cs`, rather than sharing Run's singleton: Run's persistent toolbar and the Terminal
+  page are independent features (same split `IRunProcessManager`/`ITerminalCommandRunner` used to
+  enforce pre-epic), so a command typed into one must not stop or report status for whatever's
+  running in the other. `App.axaml.cs`'s exit handler now stops both
+  (`GetService<IPtyProcessManager>().Stop(); GetKeyedService<IPtyProcessManager>(
+  TerminalViewModel.PtyProcessManagerKey).Stop();`), via a new `GetKeyedService<T>(object key)`
+  helper alongside the existing `GetService<T>`.
+
+  `RunCommandAsync` starts via `await _ptyProcessManager.StartAsync(CommandText,
+  WorkingDirectoryPath, OutputBuffer.Cols, OutputBuffer.Rows)`; `CancelCommand`/`WriteInput(byte[])`
+  /`Resize(int,int)` passthrough to it; `OnProcessOutputReceived(byte[])` feeds `OutputBuffer`
+  directly (marshaled via `Dispatcher.UIThread.Post`, same as T6). `TerminalView.axaml`'s output
+  `TextBox` is replaced by `<controls:TerminalControl Name="OutputTerminal"
+  Buffer="{Binding OutputBuffer}" />`; `TerminalView.axaml.cs` wires
+  `OutputTerminal.InputReceived += ViewModel.WriteInput;` / `.Resized += ViewModel.Resize;` in
+  code-behind and focuses `OutputTerminal` when `IsRunning` becomes `true` (same
+  `PropertyChanged`-driven fix as T6's follow-up). Because `TerminalViewModel` is `Transient`
+  (a fresh instance per navigation) while the keyed `IPtyProcessManager` is a singleton, its
+  constructor-subscribed `OutputReceived`/`Exited` handlers are now unsubscribed in
+  `OnNavigatedFrom` - the same subscribe-in-constructor/unsubscribe-in-`OnNavigatedFrom` pattern
+  `ExplorerViewModel` already uses for `ILanguageServerSessionManager.DiagnosticsPublished` -
+  otherwise every revisit to the Terminal page would pile up another abandoned handler on the
+  shared singleton.
+
+  Confirmed via grep that `TerminalViewModel` was the only real consumer of
+  `ITerminalCommandRunner` (besides DI registration and its own test fake); once it moved to
+  `IPtyProcessManager`, `Paarde.Core/Contracts/Services/ITerminalCommandRunner.cs` and
+  `Paarde.Avalonia.Tests/Fakes/FakeTerminalCommandRunner.cs` were deleted outright, along with the
+  `ITerminalCommandRunner` DI registration in `App.axaml.cs`. `ProcessCommandRunner` (which had
+  implemented both `IBuildTestRunner` and `ITerminalCommandRunner`) keeps only the
+  `IBuildTestRunner` wait-for-exit method; its now-dead streaming `RunAsync(..., Action<string>
+  onOutputLine, ...)` overload and the three `ProcessCommandRunnerTests` exercising it were removed
+  too. `TerminalViewModelTests` was rewritten against the existing `FakePtyProcessManager` (no new
+  fake needed - reused T6's). Resource strings `Terminal_CommandSucceeded`/`_CommandFailed`/
+  `_CommandCancelled`/`_CommandRunError` were replaced with `Terminal_NoWorkingDirectory`/
+  `_Running`/`_RunStartError`/`_Stopped`/`_Exited`, matching `RunPanel_*`'s event-driven shape
+  (running/start-error/stopped-or-exited) now that status comes from `IPtyProcessManager.Exited`
+  instead of a `Task`'s own completion. Full 517/517 Core (520 minus the 3 deleted
+  `ProcessCommandRunnerTests`) + 364/364 Avalonia suites pass; both the test projects and
+  `Paarde.Avalonia` itself build with 0 warnings/errors.
+
+  Not exercised against a real display/window manager in this sandboxed environment: the app was
+  confirmed to launch with no DI-resolution exception (keyed `IPtyProcessManager` resolves
+  correctly for both Run and Terminal) and the Main page renders correctly, but driving the
+  Terminal page itself (navigating to it, typing a command, clicking Run) could not be completed
+  here - this sandbox runs under Xwayland, which was confirmed to swallow *both* synthetic mouse
+  input (`xdotool mousemove` never moved the pointer, confirmed via `xdotool getmouselocation`
+  reporting a fixed position regardless of command) and synthetic keyboard input (`xdotool key`/
+  `type` had no visible effect on focus or on a focused text box) aimed at the app's actual window,
+  even once correctly targeted (a first attempt mistakenly targeted a `mutter-x11-frames` window-
+  decoration process sharing the same title). A live click-to-run -> type -> render round trip is
+  something only a real display can confirm, same limitation T6's manual-verification note already
+  flagged for Run.)_
 - [ ] T8 Tests: `PtyProcessManagerTests`, `TerminalBufferTests` per design.md's "Testing approach" —
   include the regression case using the actual escape-sequence blob captured from the `TODOTUI1`
   repro that originally surfaced this bug. _(validates R1, R2)_
