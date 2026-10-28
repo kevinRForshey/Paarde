@@ -4,6 +4,7 @@
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
              x:Class="Paarde.Avalonia.Views.ShellView"
              x:DataType="vm:ShellViewModel">
 
@@ -11,7 +12,7 @@
          now row 1 of a 3-row grid instead of the whole control, so the Build/Run/Stop toolbar
          (row 0) and output strip (row 2) are visible no matter which page is navigated to -
          R5.1/R5.2, the one piece of the broader "wizard -> IDE" problem this epic can't defer. -->
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
         <Grid Grid.Row="0"
               ColumnDefinitions="*,Auto,Auto,Auto,Auto"
               Margin="8"
@@ -84,23 +85,80 @@
             <ui:Frame x:Name="NavigationFrame" />
         </ui:NavigationView>
 
-        <!-- specs/terminal-emulation T6: the plain-text TextBox is replaced by TerminalControl,
-             bound to the TerminalBuffer RunPanelViewModel feeds from IPtyProcessManager.
-             InputReceived/Resized are wired in code-behind (ShellView.axaml.cs) rather than bound
-             here, since they need to reach RunPanelViewModel's IPtyProcessManager, not just set a
-             property. -->
-        <!-- MaxHeight caps how much of the window the strip can claim when expanded; the
+        <!-- specs/ide-workbench-shell R1: Epic 20/21's single Build/Run strip is now a four-tab
+             dock (Build, Run, Problems, Terminal) inside the same Expander - one shared
+             IsExpanded still covers the whole dock (design.md's decision against per-tab
+             expand/collapse state). InputReceived/Resized/the tab<->ActiveTabKey sync are wired
+             in code-behind (ShellView.axaml.cs), same reasoning Epic 20/21 already established for
+             reaching past a property into RunPanelViewModel's/TerminalViewModel's PTY services. -->
+        <!-- MaxHeight caps how much of the window the dock can claim when expanded; the
              terminal's own natural size is a standard 80x24 grid, so this is what decides how
              many rows are actually usable (~22 at FontSize 14). FontSize is set here rather than
              left to the control's default so legibility is tunable without a recompile. -->
         <Expander Grid.Row="2"
                   Margin="8,0,8,8"
                   Header="Output"
-                  IsExpanded="{Binding RunPanelViewModel.IsOutputExpanded}"
-                  MaxHeight="360">
-            <controls:TerminalControl Name="OutputTerminal"
-                                      FontSize="14"
-                                      Buffer="{Binding RunPanelViewModel.OutputBuffer}" />
+                  MaxHeight="360"
+                  DataContext="{Binding WorkbenchDockViewModel}"
+                  IsExpanded="{Binding IsExpanded}">
+            <TabControl Name="DockTabControl">
+                <TabItem Header="Build">
+                    <controls:TerminalControl FontSize="14" Buffer="{Binding RunPanelViewModel.BuildOutputBuffer}" />
+                </TabItem>
+                <TabItem Header="Run">
+                    <controls:TerminalControl Name="OutputTerminal"
+                                              FontSize="14"
+                                              Buffer="{Binding RunPanelViewModel.RunOutputBuffer}" />
+                </TabItem>
+                <TabItem Header="Problems">
+                    <ListBox Name="ProblemsList">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProblemRow">
+                                <TextBlock Text="{Binding Summary}" FontFamily="Cascadia Mono,Consolas,monospace" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+                <TabItem Header="Terminal">
+                    <!-- Same content TerminalView.axaml has, bound to the shared
+                         WorkbenchDockViewModel.TerminalViewModel instance - InputReceived/Resized
+                         wired in code-behind the same way as OutputTerminal above. -->
+                    <Grid Margin="0,8,0,0" RowDefinitions="Auto,*,Auto" DataContext="{Binding TerminalViewModel}">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto">
+                            <TextBox Grid.Column="0"
+                                      Text="{Binding CommandText}"
+                                      Watermark="Type a command to run in the current working directory..."
+                                      FontFamily="Cascadia Mono,Consolas,monospace" />
+                            <Button Grid.Column="1" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommandCommand}" Classes="accent" />
+                            <Button Grid.Column="2" Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelCommandCommand}" IsVisible="{Binding IsRunning}" />
+                            <Button Grid.Column="3" Margin="8,0,0,0" Content="Clear" Command="{Binding ClearOutputCommand}" />
+                        </Grid>
+                        <controls:TerminalControl Name="DockTerminal"
+                                                  Grid.Row="1"
+                                                  Margin="0,8,0,0"
+                                                  FontSize="14"
+                                                  Buffer="{Binding OutputBuffer}" />
+                        <TextBlock Grid.Row="2" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
+                    </Grid>
+                </TabItem>
+            </TabControl>
         </Expander>
+
+        <!-- specs/ide-workbench-shell, R3: a thin status bar anchored below everything else -
+             git branch/dirty count, the active run configuration, per-language LSP state, and
+             (only when a CodeEditor has focus) the caret's line:column. -->
+        <Border Grid.Row="3"
+                Padding="8,4"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                DataContext="{Binding StatusBarViewModel}">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <TextBlock Text="{Binding GitBranchName}" IsVisible="{Binding GitBranchName, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding DirtyFileCount, StringFormat='{}{0} dirty'}" IsVisible="{Binding GitBranchName, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding RunConfigurationName}" />
+                <TextBlock Text="{Binding LanguageServerStatus}" />
+                <TextBlock Text="{Binding CaretPositionText}" IsVisible="{Binding CaretPositionText, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

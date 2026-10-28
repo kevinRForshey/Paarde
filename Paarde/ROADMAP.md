@@ -2989,10 +2989,12 @@ control instead of adopting the third-party widget.*
 specifically. This epic generalizes that pattern into the thing that actually makes the app stop
 feeling like a wizard: a real output **dock** (tabs, not one strip) and a **status bar** — the two
 pieces every IDE has that a page-based wizard doesn't. Nothing here requires touching any
-individual page's content; it's additive to `ShellView` only, same scope discipline Epic 20 used.*
+individual page's content; it's additive to `ShellView` only, same scope discipline Epic 20 used.
+Full spec: [`specs/ide-workbench-shell/`](specs/ide-workbench-shell/requirements.md).*
 
-**F21.1 — Generalize Epic 20's output strip into a multi-tab dock** — Not started
-- [ ] T21.1.1 Replace the single Build/Run output strip with a small tabbed dock (Build, Run,
+**F22.1 — Generalize Epic 20's output strip into a multi-tab dock** — T22.1.1, T22.1.2 done
+2026-10-27
+- [x] T22.1.1 Replace the single Build/Run output strip with a small tabbed dock (Build, Run,
   Problems, Terminal) living in the same `ShellView` location. "Terminal" absorbs Epic 16's
   `TerminalView` page's content (the page itself can be removed from the `NavigationView` once its
   functionality lives in the dock, or kept as a deep-link for muscle memory - decide at
@@ -3000,27 +3002,40 @@ individual page's content; it's additive to `ShellView` only, same scope discipl
   not just the one currently shown in Explorer, aggregated via a new small
   `IDiagnosticsAggregator` that both Explorer and the dock subscribe to instead of Explorer owning
   the only copy of `Diagnostics`.
-- [ ] T21.1.2 The dock remembers which tab was last active and whether it was expanded/collapsed
+  _(Done: four-tab `TabControl` (Build/Run/Problems/Terminal) inside `ShellView`'s existing
+  `Expander`, fed by `WorkbenchDockViewModel`. `TerminalViewModel` promoted to a DI singleton so
+  the Terminal page and the dock's Terminal tab share one live PTY session, kept as a deep-link
+  per `specs/ide-workbench-shell/design.md`'s decision.)_
+- [x] T22.1.2 The dock remembers which tab was last active and whether it was expanded/collapsed
   across navigation (and ideally across app restarts, same persisted-UI-state convention this
   app already uses for working directory/theme/window size).
+  _(Done: `WorkbenchDockSettingsKeys` (`Dock.ActiveTab`, `Dock.IsExpanded`) persisted via
+  `ILocalSettingsService`, restored on construction.)_
 
-**F21.2 — A status bar** — Not started
-- [ ] T21.2.1 A thin bar anchored at the very bottom of `ShellView` (below the dock, below
+**F22.2 — A status bar** — T22.2.1, T22.2.2 done 2026-10-27
+- [x] T22.2.1 A thin bar anchored at the very bottom of `ShellView` (below the dock, below
   everything): current git branch + dirty-file count (`IGitStatusService.GetStatus` already
   computes `IsDirty`/`DirtyFiles`; branch name itself needs a small addition - `git branch
   --show-current` - since `GitStatus` doesn't carry it today), the active `RunConfiguration`'s
   name, and a per-language code-intelligence connection indicator (reusing
   `ILanguageServerSessionManager`'s per-language state from Epic 18, surfaced instead of staying
   internal).
-- [ ] T21.2.2 When `CodeEditor` has focus (Explorer, Tutorial's proposal editor), the status bar
+  _(Done: `StatusBarViewModel` (DI singleton) backs a new status bar row in `ShellView.axaml`.)_
+- [x] T22.2.2 When `CodeEditor` has focus (Explorer, Tutorial's proposal editor), the status bar
   also shows caret line:column - needs a new bindable `CodeEditor.CaretPosition` property pushed
   up from AvaloniaEdit's own `TextArea.Caret.PositionChanged`, then threaded up through whichever
   view currently hosts the focused editor to `ShellViewModel`.
+  _(Done: `CodeEditor.CaretPositionProperty` + `IActiveEditorContext`, wired from `ExplorerView`/
+  `TutorialDetailControl`.)_
 
-**F21.3 — Tests** — Not started
-- [ ] T21.3.1 `IDiagnosticsAggregator` tests (aggregates across files, clears on file close);
+**F22.3 — Tests** — T22.3.1 done 2026-10-27
+- [x] T22.3.1 `IDiagnosticsAggregator` tests (aggregates across files, clears on file close);
   status bar branch-name parsing tests for `IGitStatusService`'s extension; dock tab-persistence
   tests.
+  _(Done: `DiagnosticsAggregatorTests`, `GitStatusServiceTests`/`LanguageServerSessionManagerTests`
+  extensions, `StatusBarViewModelTests`, `WorkbenchDockViewModelTests`. Manual verification of the
+  rendered dock/status bar (`specs/ide-workbench-shell/tasks.md` T8) remains deferred - same
+  sandboxed-environment limitation as every other Avalonia-rendering task in this roadmap.)_
 
 ---
 
@@ -3035,8 +3050,8 @@ T8.2.2 already built exactly this pattern for the Tutorial page's proposed-file 
 applying that same, already-proven pattern to Explorer's arbitrary-file browsing, not inventing
 tabs for the first time.*
 
-**F22.1 — Open files as tabs, not a single slot** — Not started
-- [ ] T22.1.1 `ExplorerViewModel` grows an `ObservableCollection<OpenFileTabViewModel>` (each
+**F23.1 — Open files as tabs, not a single slot** — Not started
+- [ ] T23.1.1 `ExplorerViewModel` grows an `ObservableCollection<OpenFileTabViewModel>` (each
   wrapping the per-file state `SelectedFilePath`/`SelectedFileContent`/`IsFileDirty`/
   `_originalFileContentOnDisk` already track for the single-file case today) plus a
   `SelectedTab` - same `OpenTabs`/`Selected` shape `TutorialViewModel` already established, not a
@@ -3044,17 +3059,17 @@ tabs for the first time.*
   path, VS Code's convention - `TutorialViewModel.OnSelectedChanged`'s "add to `OpenTabs` if not
   already there" is the closer precedent than a brand-new dedupe rule) rather than replacing the
   current single file.
-- [ ] T22.1.2 `ExplorerView.axaml` gains a `TabControl`/tab strip above the `CodeEditor`, styled
+- [ ] T23.1.2 `ExplorerView.axaml` gains a `TabControl`/tab strip above the `CodeEditor`, styled
   the same as `TutorialView.axaml`'s (dirty `*` marker, close-selects-neighbor on
   `CloseSelectedTabCommand`); closing a dirty tab reuses the existing discard-confirmation dialog
   (T10.2.5) rather than a new one.
-- [ ] T22.1.3 Per-tab language-server document lifecycle: every open tab needs its own `didOpen`/
+- [ ] T23.1.3 Per-tab language-server document lifecycle: every open tab needs its own `didOpen`/
   `didClose` pair with `ILanguageServerSessionManager` (today there's exactly one open document at
   a time, tied to the single-slot model) - closing a tab must send `didClose` for *that* file, not
   whichever file happens to be selected when the close happens.
 
-**F22.2 — Tests** — Not started
-- [ ] T22.2.1 `ExplorerViewModelTests` extended for: opening a second file doesn't discard the
+**F23.2 — Tests** — Not started
+- [ ] T23.2.1 `ExplorerViewModelTests` extended for: opening a second file doesn't discard the
   first's unsaved edits; closing a tab prompts for a dirty file and not a clean one; switching tabs
   swaps which file's diagnostics/overview are shown; `didOpen`/`didClose` fire per tab correctly.
 
@@ -3068,22 +3083,22 @@ VS Code/Sublime/every modern IDE's convention) and a Quick Open (`Ctrl+P`, fuzzy
 replace "navigate to the right page" with "type what you want" from anywhere - the single biggest
 per-action speed difference between a wizard and a tool people live in all day.*
 
-**F23.1 — Quick Open** — Not started
-- [ ] T23.1.1 `Ctrl+P` anywhere in the app opens a lightweight popup (same `Avalonia.Controls.
+**F24.1 — Quick Open** — Not started
+- [ ] T24.1.1 `Ctrl+P` anywhere in the app opens a lightweight popup (same `Avalonia.Controls.
   Flyout`/`ListBox`-over-caret shape Epic 14's `@file`-mention picker already built,
   `MentionTriggerDetector`'s sibling for a global shortcut instead of an in-textbox trigger) fuzzy-
   matching file names from `FileTreeBuilder`'s existing gitignore-aware walk; selecting a result
   navigates to Explorer with that file opened as a tab (Epic 23).
 
-**F23.2 — Command palette** — Not started
-- [ ] T23.2.1 `Ctrl+Shift+P` opens a similar popup listing a small, explicit registry of named
+**F24.2 — Command palette** — Not started
+- [ ] T24.2.1 `Ctrl+Shift+P` opens a similar popup listing a small, explicit registry of named
   commands (`"Build"`, `"Run"`, `"Stop"`, `"Go to Settings"`, `"New Prompt"`, one entry per
   `NavigationView` page) rather than introspecting every `[RelayCommand]` in the app - an explicit
   allowlist keeps this from surfacing half-finished or page-context-dependent commands that would
   do nothing (or throw) if invoked from the wrong place.
 
-**F23.3 — Tests** — Not started
-- [ ] T23.3.1 Fuzzy-match ranking tests (reusing whatever matching Epic 14's mention picker already
+**F24.3 — Tests** — Not started
+- [ ] T24.3.1 Fuzzy-match ranking tests (reusing whatever matching Epic 14's mention picker already
   has rather than a second implementation); command-registry dispatch tests.
 
 ---

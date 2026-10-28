@@ -28,6 +28,10 @@ namespace Paarde.Avalonia.ViewModels;
 // PtyProcessManagerKey) - Run's persistent toolbar and this page are independent features, same
 // as the pre-epic IRunProcessManager/ITerminalCommandRunner split; sharing RunPanelViewModel's
 // singleton would mean typing a command here stops whatever Run has going, and vice versa.
+// specs/ide-workbench-shell R1.3: promoted from AddTransient to AddSingleton - the Terminal page
+// and the workbench dock's Terminal tab now bind to the exact same instance/session rather than
+// each getting an independent PTY, per design.md's decision against two terminals racing to claim
+// the same tab's content.
 public partial class TerminalViewModel : ObservableObject, INavigationAware
 {
     public const string PtyProcessManagerKey = "Terminal";
@@ -80,15 +84,14 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         }
     }
 
-    // Same subscribe-in-constructor/unsubscribe-here pattern ExplorerViewModel already uses for
-    // ILanguageServerSessionManager.DiagnosticsPublished - IPtyProcessManager is a singleton but
-    // this ViewModel is transient (a fresh instance per navigation to the Terminal page), so
-    // leaving the subscription live past this page would pile up abandoned handlers on every
-    // revisit.
+    // specs/ide-workbench-shell R1.3: a no-op now that this ViewModel is a DI singleton shared
+    // with the workbench dock's Terminal tab - unlike the old per-page-transient lifetime this
+    // subscribe-in-constructor/unsubscribe-here pattern was written for, leaving this page no
+    // longer means nobody is watching: the dock tab may still be visible, and even if it isn't,
+    // the running process's own output needs to keep buffering so it's there when the user comes
+    // back. INavigationAware still requires the method.
     public void OnNavigatedFrom()
     {
-        _ptyProcessManager.OutputReceived -= OnProcessOutputReceived;
-        _ptyProcessManager.Exited -= OnProcessExited;
     }
 
     [RelayCommand(CanExecute = nameof(CanRunCommand))]

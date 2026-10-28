@@ -47,7 +47,13 @@ public class GitStatusService : IGitStatusService
             .Select(ParsePorcelainPath)
             .ToList();
 
-        return new GitStatus(IsRepository: true, DirtyFiles: dirtyFiles);
+        // R3.2: a failed branch lookup never blocks the dirty-file result above - same fail-open
+        // posture as the rest of this class - it just leaves BranchName null.
+        var branchName = RunGit(workingDirectoryPath, new List<string> { "branch", "--show-current" }, out var branchOutput, "run `git branch --show-current`")
+            ? branchOutput.Trim()
+            : string.Empty;
+
+        return new GitStatus(IsRepository: true, BranchName: string.IsNullOrEmpty(branchName) ? null : branchName, DirtyFiles: dirtyFiles);
     }
 
     // Each porcelain line is "XY <path>", or "XY <path> -> <newPath>" for a rename; the path starts

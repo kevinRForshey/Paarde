@@ -1,3 +1,5 @@
+using System.Linq;
+
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
 using Paarde.Core.Models;
@@ -36,6 +38,10 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
     }
 
     public event Action<string, IReadOnlyList<LspDiagnostic>>? DiagnosticsPublished;
+
+    public IReadOnlyCollection<string> RunningLanguageIds => _clientsByServerGroup.Keys.ToArray();
+
+    public event Action? RunningLanguageIdsChanged;
 
     // R3.1/R4: evaluates every configured language independently - detected-or-force-enabled and
     // executable-available - so a repo with only some of the configured languages' markers starts
@@ -90,10 +96,17 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
                 _logger.LogWarning(ex, "Failed to start the {LanguageId} language server for {WorkingDirectoryPath}.", options.LanguageId, workingDirectoryPath);
             }
         }
+
+        RunningLanguageIdsChanged?.Invoke();
     }
 
     public async Task StopAllAsync()
     {
+        if (_clientsByServerGroup.Count == 0)
+        {
+            return;
+        }
+
         foreach (var client in _clientsByServerGroup.Values)
         {
             client.DiagnosticsPublished -= OnClientDiagnosticsPublished;
@@ -109,6 +122,7 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
         }
 
         _clientsByServerGroup.Clear();
+        RunningLanguageIdsChanged?.Invoke();
     }
 
     public Task NotifyDocumentOpenedAsync(string filePath, string text)

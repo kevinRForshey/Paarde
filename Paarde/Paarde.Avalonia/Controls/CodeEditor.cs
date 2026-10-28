@@ -86,6 +86,12 @@ public class CodeEditor : TextEditor
     public static readonly StyledProperty<IReadOnlyList<LspCompletionItem>?> CompletionItemsProperty =
         AvaloniaProperty.Register<CodeEditor, IReadOnlyList<LspCompletionItem>?>(nameof(CompletionItems));
 
+    // specs/ide-workbench-shell, R3.5: set only from the existing TextArea.Caret.PositionChanged
+    // subscription below - no host ever sets this itself, so the setter stays private and this is
+    // purely an outward-facing readout for IActiveEditorContext/the status bar.
+    public static readonly StyledProperty<LspPosition?> CaretPositionProperty =
+        AvaloniaProperty.Register<CodeEditor, LspPosition?>(nameof(CaretPosition));
+
     private readonly TextMate.Installation _textMateInstallation;
     private readonly BracketHighlightRenderer _bracketHighlightRenderer;
     private readonly DiffBackgroundRenderer _diffBackgroundRenderer;
@@ -148,6 +154,12 @@ public class CodeEditor : TextEditor
         set => SetValue(CompletionItemsProperty, value);
     }
 
+    public LspPosition? CaretPosition
+    {
+        get => GetValue(CaretPositionProperty);
+        private set => SetValue(CaretPositionProperty, value);
+    }
+
     // T13.1.3: raised when the gutter's Accept/Reject button for a hunk is clicked; the host
     // (TutorialDetailControl) is the one that knows which ProposedFileChangeViewModel owns that
     // hunk's selection, so this control just forwards which DiffHunk and which action.
@@ -190,7 +202,11 @@ public class CodeEditor : TextEditor
 
         _textMateInstallation = this.InstallTextMate(RegistryOptions);
         _bracketHighlightRenderer = new BracketHighlightRenderer(TextArea.TextView);
-        TextArea.Caret.PositionChanged += (_, _) => _bracketHighlightRenderer.UpdateHighlight(Document, CaretOffset);
+        TextArea.Caret.PositionChanged += (_, _) =>
+        {
+            _bracketHighlightRenderer.UpdateHighlight(Document, CaretOffset);
+            CaretPosition = ToLspPosition(CaretOffset);
+        };
 
         _diffBackgroundRenderer = new DiffBackgroundRenderer(TextArea.TextView);
 

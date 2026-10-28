@@ -40,11 +40,12 @@ public partial class RunPanelViewModel : ObservableObject
 
     public ObservableCollection<RunConfiguration> Configurations { get; } = [];
 
-    // specs/terminal-emulation T6 (R3.3): the strip's single TerminalBuffer, fed by both Run (via
-    // IPtyProcessManager.OutputReceived) and Build (via IBuildTestRunner's plain-text result,
-    // normalized through EncodeForTerminal) - ShellView.axaml binds a TerminalControl to this
-    // instead of the old OutputText TextBox.
-    public TerminalBuffer OutputBuffer { get; } = new(cols: 80, rows: 24);
+    // specs/ide-workbench-shell R1.2: Build and Run get independent TerminalBuffers (previously
+    // one shared OutputBuffer, specs/terminal-emulation T6) so the workbench dock's Build and Run
+    // tabs each keep their own scroll-back instead of one clobbering the other's output.
+    public TerminalBuffer BuildOutputBuffer { get; } = new(cols: 80, rows: 24);
+
+    public TerminalBuffer RunOutputBuffer { get; } = new(cols: 80, rows: 24);
 
     [ObservableProperty]
     private RunConfiguration? selectedConfiguration;
@@ -57,12 +58,6 @@ public partial class RunPanelViewModel : ObservableObject
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
-
-    // R5.2: the output strip starts collapsed (ShellView.axaml) and expands itself the moment
-    // there's something worth showing (a build starting/failing, or a run starting) - design.md
-    // "Shell placement".
-    [ObservableProperty]
-    private bool isOutputExpanded;
 
     public RunPanelViewModel(
         RunConfigurationsProvider runConfigurationsProvider,
@@ -182,15 +177,14 @@ public partial class RunPanelViewModel : ObservableObject
             return;
         }
 
-        OutputBuffer.Feed(ClearScreenSequence);
-        IsOutputExpanded = true;
+        RunOutputBuffer.Feed(ClearScreenSequence);
         StatusMessage = string.Format("RunPanel_Running".Resolve(), configuration.Name);
 
         try
         {
             // R4.5: StartAsync() stops whatever's already active first, so re-pressing Run while a
             // previous session is live restarts it rather than erroring.
-            await _ptyProcessManager.StartAsync(configuration.RunCommand, configuration.WorkingDirectoryPath, OutputBuffer.Cols, OutputBuffer.Rows);
+            await _ptyProcessManager.StartAsync(configuration.RunCommand, configuration.WorkingDirectoryPath, RunOutputBuffer.Cols, RunOutputBuffer.Rows);
             IsRunning = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -219,15 +213,14 @@ public partial class RunPanelViewModel : ObservableObject
         }
 
         IsBuilding = true;
-        IsOutputExpanded = true;
-        OutputBuffer.Feed(ClearScreenSequence);
+        BuildOutputBuffer.Feed(ClearScreenSequence);
         StatusMessage = string.Format("RunPanel_Building".Resolve(), configuration.Name);
 
         try
         {
             var result = await _buildTestRunner.RunAsync(configuration.BuildCommand, configuration.WorkingDirectoryPath);
 
-            OutputBuffer.Feed(EncodeForTerminal(CombineOutput(result.StandardOutput, result.StandardError)));
+            BuildOutputBuffer.Feed(EncodeForTerminal(CombineOutput(result.StandardOutput, result.StandardError)));
             StatusMessage = result.Succeeded
                 ? string.Format("RunPanel_BuildSucceeded".Resolve(), result.Duration.TotalSeconds)
                 : string.Format("RunPanel_BuildFailed".Resolve(), result.ExitCode, result.Duration.TotalSeconds);
@@ -275,7 +268,7 @@ public partial class RunPanelViewModel : ObservableObject
     // T16.1.3-style: fires on a background thread as the process streams output, so UI state is
     // only ever touched after marshaling onto the UI thread.
     private void OnProcessOutputReceived(byte[] bytes) =>
-        Dispatcher.UIThread.Post(() => OutputBuffer.Feed(bytes));
+        Dispatcher.UIThread.Post(() => RunOutputBuffer.Feed(bytes));
 
     private void OnProcessExited(int? exitCode) =>
         Dispatcher.UIThread.Post(() =>

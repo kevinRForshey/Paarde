@@ -63,6 +63,20 @@ public partial class TutorialDetailControl : UserControl
 
             Editor.GhostTextSuggestion = await tutorialViewModel.RequestGhostTextCompletionAsync(e.TextBeforeCaret, e.TextAfterCaret);
         };
+
+        // specs/ide-workbench-shell, R3.5: same ExplorerView convention - only forwards while
+        // Editor actually has focus, and clears on LostFocus so the status bar doesn't show a
+        // stale position from whichever editor had focus last.
+        var activeEditorContext = App.GetService<IActiveEditorContext>();
+        Editor.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == CodeEditor.CaretPositionProperty && Editor.IsFocused)
+            {
+                activeEditorContext.SetCaretPosition(Editor.CaretPosition);
+            }
+        };
+        Editor.GotFocus += (_, _) => activeEditorContext.SetCaretPosition(Editor.CaretPosition);
+        Editor.LostFocus += (_, _) => activeEditorContext.SetCaretPosition(null);
     }
 
     // T13.1.3/T13.2.2: the gutter's Accept/Reject buttons are an alternate entry point into the

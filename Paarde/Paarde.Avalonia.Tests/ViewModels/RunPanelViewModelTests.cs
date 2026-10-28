@@ -187,6 +187,7 @@ public class RunPanelViewModelTests
     // RunPanelViewModel.OnProcessOutputReceived/OnProcessExited marshal through
     // Dispatcher.UIThread.Post the same way TerminalViewModel's onOutputLine does (see
     // TerminalViewModelTests' comment on that) - not exercised here since nothing pumps
-    // Dispatcher.UIThread in this plain xunit host. OutputBuffer (specs/terminal-emulation T6)
-    // is likewise not asserted against directly here for the same reason.
+    // Dispatcher.UIThread in this plain xunit host. BuildOutputBuffer/RunOutputBuffer
+    // (specs/terminal-emulation T6, split in specs/ide-workbench-shell R1.2) are likewise not
+    // asserted against directly here for the same reason.
 }

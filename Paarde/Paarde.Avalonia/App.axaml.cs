@@ -150,6 +150,13 @@ public partial class App : Application
                 sp.GetRequiredService<LanguageServerOptionsProvider>().GetOptionsAsync,
                 logger: sp.GetRequiredService<ILogger<LanguageServerSessionManager>>()));
 
+            // specs/ide-workbench-shell, R4: subscribes to ILanguageServerSessionManager directly
+            // (not relayed through ExplorerViewModel), so it has to be a singleton constructed
+            // before any page navigates anywhere - WorkbenchDockViewModel's own eager construction
+            // (via ShellViewModel) is what actually guarantees that, the same way RunPanelViewModel
+            // already guarantees it for Build/Run.
+            services.AddSingleton<IDiagnosticsAggregator, DiagnosticsAggregator>();
+
             // Epic 20 (specs/build-and-run): RunConfigurationsProvider/RunPanelViewModel are
             // singletons for the same reason ILanguageServerSessionManager above is - they back
             // ShellView's persistent toolbar (R5.1), not any one page.
@@ -169,7 +176,15 @@ public partial class App : Application
             // one must not stop or report status for whatever's running in the other.
             services.AddKeyedSingleton<IPtyProcessManager, PtyProcessManager>(TerminalViewModel.PtyProcessManagerKey);
             services.AddSingleton<IWorkingDirectoryContext, WorkingDirectoryContext>();
+            services.AddSingleton<IActiveEditorContext, ActiveEditorContext>();
             services.AddSingleton<RunPanelViewModel>();
+            services.AddSingleton<StatusBarViewModel>();
+
+            // specs/ide-workbench-shell R1.3: promoted from AddTransient so the Terminal page and
+            // the workbench dock's Terminal tab share the exact same instance/session - see this
+            // class's own remark.
+            services.AddSingleton<TerminalViewModel>();
+            services.AddSingleton<WorkbenchDockViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
@@ -189,7 +204,6 @@ public partial class App : Application
             services.AddTransient<HistoryView>();
             services.AddTransient<ExplorerViewModel>();
             services.AddTransient<ExplorerView>();
-            services.AddTransient<TerminalViewModel>();
             services.AddTransient<TerminalView>();
             services.AddTransient<DiffsViewModel>();
             services.AddTransient<DiffsView>();

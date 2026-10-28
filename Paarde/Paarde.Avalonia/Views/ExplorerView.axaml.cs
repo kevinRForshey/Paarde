@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 
 using Paarde.Avalonia.Contracts.Services;
+using Paarde.Avalonia.Controls;
 using Paarde.Avalonia.Helpers;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.ViewModels;
@@ -71,6 +72,22 @@ public partial class ExplorerView : UserControl
             await ViewModel.RequestCompletionAsync(e.Position);
             Editor.CompletionItems = ViewModel.CompletionItems;
         };
+
+        // specs/ide-workbench-shell, R3.5: only the editor that currently has focus should drive
+        // the status bar's caret readout - ExplorerView and TutorialDetailControl share the same
+        // IActiveEditorContext singleton, so each only reports while its own Editor is focused and
+        // clears on LostFocus rather than leaving a stale position from whichever view had focus
+        // last.
+        var activeEditorContext = App.GetService<IActiveEditorContext>();
+        Editor.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == CodeEditor.CaretPositionProperty && Editor.IsFocused)
+            {
+                activeEditorContext.SetCaretPosition(Editor.CaretPosition);
+            }
+        };
+        Editor.GotFocus += (_, _) => activeEditorContext.SetCaretPosition(Editor.CaretPosition);
+        Editor.LostFocus += (_, _) => activeEditorContext.SetCaretPosition(null);
     }
 
     private void ShowReferencesFlyout(IReadOnlyList<LspLocation> locations)

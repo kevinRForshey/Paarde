@@ -203,4 +203,57 @@ public class LanguageServerSessionManagerTests
 
         Assert.DoesNotContain("python", _clientsByLanguageId.Keys);
     }
+
+    [Fact]
+    public async Task RunningLanguageIds_AfterStartAllAsync_ReflectsOnlyTheLanguagesThatActuallyStarted()
+    {
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo", ["python"] = "/repo" };
+        var sut = CreateSut([
+            new LanguageServerOptions("csharp", "csharp-ls", string.Empty),
+            new LanguageServerOptions("typescript", "typescript-language-server", "--stdio"),
+        ]);
+
+        await sut.StartAllAsync("/repo");
+
+        Assert.Equal(new[] { "csharp" }, sut.RunningLanguageIds);
+    }
+
+    [Fact]
+    public async Task RunningLanguageIds_AfterStopAllAsync_IsEmpty()
+    {
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo" };
+        var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
+        await sut.StartAllAsync("/repo");
+
+        await sut.StopAllAsync();
+
+        Assert.Empty(sut.RunningLanguageIds);
+    }
+
+    [Fact]
+    public async Task RunningLanguageIdsChanged_StartAllAsyncStartsAClient_Raised()
+    {
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo" };
+        var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
+        var raisedCount = 0;
+        sut.RunningLanguageIdsChanged += () => raisedCount++;
+
+        await sut.StartAllAsync("/repo");
+
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
+    public async Task RunningLanguageIdsChanged_StopAllAsync_Raised()
+    {
+        _projectTypeDetector.LanguageRootsToReturn = new Dictionary<string, string> { ["csharp"] = "/repo" };
+        var sut = CreateSut([new LanguageServerOptions("csharp", "csharp-ls", string.Empty)]);
+        await sut.StartAllAsync("/repo");
+        var raisedCount = 0;
+        sut.RunningLanguageIdsChanged += () => raisedCount++;
+
+        await sut.StopAllAsync();
+
+        Assert.Equal(1, raisedCount);
+    }
 }

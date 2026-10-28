@@ -25,7 +25,7 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
-    // Epic 20 (specs/build-and-run F20.3): the persistent Build/Run/Stop toolbar and output strip
+    // Epic 20 (specs/build-and-run F20.3): the persistent Build/Run/Stop toolbar
     // (design.md "Shell placement") - a singleton handed in here rather than created by this
     // ViewModel, so it's the same instance regardless of how many times ShellView/ShellViewModel
     // themselves get recreated.
@@ -34,12 +34,33 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
-    public ShellViewModel(INavigationService navigationService, INavigationViewService navigationViewService, RunPanelViewModel runPanelViewModel)
+    // specs/ide-workbench-shell, R3: the status bar - same "singleton handed in, not created here"
+    // shape as RunPanelViewModel above, for the same reason.
+    public StatusBarViewModel StatusBarViewModel
+    {
+        get;
+    }
+
+    // specs/ide-workbench-shell, R1: the output dock (Build/Run/Problems/Terminal tabs) - same
+    // "singleton handed in, not created here" shape as RunPanelViewModel/StatusBarViewModel above.
+    public WorkbenchDockViewModel WorkbenchDockViewModel
+    {
+        get;
+    }
+
+    public ShellViewModel(
+        INavigationService navigationService,
+        INavigationViewService navigationViewService,
+        RunPanelViewModel runPanelViewModel,
+        StatusBarViewModel statusBarViewModel,
+        WorkbenchDockViewModel workbenchDockViewModel)
     {
         NavigationService = navigationService;
         NavigationService.Navigated += OnNavigated;
         NavigationViewService = navigationViewService;
         RunPanelViewModel = runPanelViewModel;
+        StatusBarViewModel = statusBarViewModel;
+        WorkbenchDockViewModel = workbenchDockViewModel;
     }
 
     private void OnNavigated(object sender, NavigationEventArgs e)
