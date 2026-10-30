@@ -109,8 +109,14 @@ public partial class StatusBarViewModel : ObservableObject
         var workingDirectoryPath = _workingDirectoryPath;
         var status = await Task.Run(() => _gitStatusService.GetStatus(workingDirectoryPath));
 
-        GitBranchName = status.BranchName;
+        // Without a barrier, a Release-build poller on another thread (e.g. StatusBarViewModelTests'
+        // WaitUntilAsync) can observe GitBranchName change before DirtyFileCount does, since these are
+        // two independent non-volatile writes with no happens-before edge between them. Setting
+        // DirtyFileCount first and fencing before GitBranchName - the property callers poll on to know
+        // a refresh completed - makes that impossible to observe out of order.
         DirtyFileCount = status.DirtyFiles.Count;
+        Thread.MemoryBarrier();
+        GitBranchName = status.BranchName;
     }
 
     private void OnRunPanelViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
