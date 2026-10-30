@@ -3120,31 +3120,47 @@ tabs for the first time.*
 
 ---
 
-### EPIC 24 — Command palette & Quick Open *(P2)*
+### EPIC 24 — Command palette & Quick Open *(P2)* — Implementation done 2026-10-30, manual verification pending
 
 *Why: right now, "run a build," "open a file," "jump to Settings," and "search the codebase" each
 require first knowing which of seven pages that lives on. A command palette (`Ctrl+Shift+P`,
 VS Code/Sublime/every modern IDE's convention) and a Quick Open (`Ctrl+P`, fuzzy file-name search)
 replace "navigate to the right page" with "type what you want" from anywhere - the single biggest
-per-action speed difference between a wizard and a tool people live in all day.*
+per-action speed difference between a wizard and a tool people live in all day.
+Full spec: [`specs/command-palette/`](specs/command-palette/requirements.md).*
 
-**F24.1 — Quick Open** — Not started
-- [ ] T24.1.1 `Ctrl+P` anywhere in the app opens a lightweight popup (same `Avalonia.Controls.
-  Flyout`/`ListBox`-over-caret shape Epic 14's `@file`-mention picker already built,
-  `MentionTriggerDetector`'s sibling for a global shortcut instead of an in-textbox trigger) fuzzy-
-  matching file names from `FileTreeBuilder`'s existing gitignore-aware walk; selecting a result
-  navigates to Explorer with that file opened as a tab (Epic 23).
+**F24.1 — Quick Open** — Done 2026-10-30
+- [x] T24.1.1 `Ctrl+P` anywhere in the app opens a lightweight popup (same `Popup`/`ListBox` shape
+  Epic 14's `@file`-mention picker already built) substring-matching file names from
+  `FileTreeBuilder`'s existing gitignore-aware walk (via the existing `FileMentionMatcher`);
+  selecting a result navigates to Explorer with that file opened as a tab (Epic 23).
+  _(Done: new `QuickOpenViewModel` (DI singleton) + a global `Ctrl+P` `KeyBinding` on the `Window`
+  in `ShellView.axaml.cs`. `ExplorerViewModel.OnNavigatedTo` grew a `parameter is string filePath`
+  branch that calls the existing `OpenOrActivateTab`, so Quick Open reaches the already-running
+  Explorer page instance without promoting it to a singleton.)_
 
-**F24.2 — Command palette** — Not started
-- [ ] T24.2.1 `Ctrl+Shift+P` opens a similar popup listing a small, explicit registry of named
-  commands (`"Build"`, `"Run"`, `"Stop"`, `"Go to Settings"`, `"New Prompt"`, one entry per
-  `NavigationView` page) rather than introspecting every `[RelayCommand]` in the app - an explicit
-  allowlist keeps this from surfacing half-finished or page-context-dependent commands that would
-  do nothing (or throw) if invoked from the wrong place.
+**F24.2 — Command palette** — Done 2026-10-30
+- [x] T24.2.1 `Ctrl+Shift+P` opens a similar popup listing a small, explicit registry of named
+  commands (`"Build"`, `"Run"`, `"Stop"`, one `"Go to <Page>"` entry per `NavigationView` page)
+  rather than introspecting every `[RelayCommand]` in the app - an explicit allowlist keeps this
+  from surfacing half-finished or page-context-dependent commands that would do nothing (or throw)
+  if invoked from the wrong place.
+  _(Done: new `CommandPaletteViewModel` (DI singleton) with a hand-written `PaletteCommand`
+  registry (11 entries) delegating Build/Run/Stop to `RunPanelViewModel`'s existing commands.
+  Disabled entries (R2.4) stay in the list via a computed `PaletteCommand.IsEnabled`. At most one
+  of Quick Open/the command palette is ever open at a time (R3.2), wired via an
+  `AttachCommandPalette`/`AttachQuickOpen` reference set once by `ShellViewModel`'s constructor
+  rather than circular DI constructor injection between the two singletons.)_
 
-**F24.3 — Tests** — Not started
-- [ ] T24.3.1 Fuzzy-match ranking tests (reusing whatever matching Epic 14's mention picker already
-  has rather than a second implementation); command-registry dispatch tests.
+**F24.3 — Tests** — Done 2026-10-30
+- [x] T24.3.1 Substring-filter and registry-dispatch tests (reusing the existing
+  `FileMentionMatcher` rather than a second implementation); command-registry dispatch tests.
+  _(Done: new `QuickOpenViewModelTests`, `CommandPaletteViewModelTests`, plus
+  `ExplorerViewModelTests` extensions for the new `OnNavigatedTo` branch (including a regression
+  guard for non-`string`/`null` parameters). `dotnet build Paarde.slnx`: 0 warnings/0 errors. Full
+  solution test run: 928/928 passed. Manual verification of the rendered popups/global keybindings
+  (`specs/command-palette/tasks.md` T9) remains deferred - same sandboxed-environment limitation as
+  every other Avalonia-rendering task in this roadmap.)_
 
 ---
 

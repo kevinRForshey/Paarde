@@ -185,6 +185,12 @@ public partial class App : Application
             // class's own remark.
             services.AddSingleton<TerminalViewModel>();
             services.AddSingleton<WorkbenchDockViewModel>();
+
+            // Epic 24, R1/R2/R3: Quick Open and the command palette - reachable from anywhere via
+            // ShellViewModel-owned global KeyBindings, so each must be one instance, not one per
+            // page navigation.
+            services.AddSingleton<QuickOpenViewModel>();
+            services.AddSingleton<CommandPaletteViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();

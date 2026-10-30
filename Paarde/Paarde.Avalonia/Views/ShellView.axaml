@@ -85,6 +85,74 @@
             <ui:Frame x:Name="NavigationFrame" />
         </ui:NavigationView>
 
+        <!-- Epic 24, R1/R3: Quick Open - reachable via Ctrl+P regardless of the currently
+             navigated page (ShellView.axaml.cs's global KeyBinding), same Popup+ListBox shape as
+             Epic 14's @mention picker (PromptView.axaml). Anchored to NavigationFrame/Center for
+             the same "no X server to verify caret-relative placement against" reason Epic 14's
+             own remark already gives. -->
+        <Popup Name="QuickOpenPopup"
+               Grid.Row="1"
+               PlacementTarget="NavigationFrame"
+               Placement="Center"
+               IsLightDismissEnabled="True"
+               DataContext="{Binding QuickOpenViewModel}"
+               IsOpen="{Binding IsOpen}">
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    MinWidth="420">
+                <StackPanel Spacing="4">
+                    <TextBox Name="QuickOpenQueryBox"
+                             Text="{Binding Query}"
+                             Watermark="Go to file..."
+                             KeyDown="OnQuickOpenQueryBoxKeyDown" />
+                    <TextBlock Text="{Binding EmptyStateMessage}"
+                               IsVisible="{Binding EmptyStateMessage, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                    <ListBox Name="QuickOpenResultsList"
+                             MaxHeight="240"
+                             ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedResult}"
+                             DoubleTapped="OnQuickOpenResultDoubleTapped" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Epic 24, R2/R3: the command palette - same shape as QuickOpenPopup above. Disabled
+             entries (PaletteCommand.IsEnabled) stay in the list rather than being filtered out,
+             per R2.4. -->
+        <Popup Name="CommandPalettePopup"
+               Grid.Row="1"
+               PlacementTarget="NavigationFrame"
+               Placement="Center"
+               IsLightDismissEnabled="True"
+               DataContext="{Binding CommandPaletteViewModel}"
+               IsOpen="{Binding IsOpen}">
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    MinWidth="420">
+                <StackPanel Spacing="4">
+                    <TextBox Name="CommandPaletteQueryBox"
+                             Text="{Binding Query}"
+                             Watermark="Type a command..."
+                             KeyDown="OnCommandPaletteQueryBoxKeyDown" />
+                    <ListBox Name="CommandPaletteResultsList"
+                             MaxHeight="240"
+                             ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedResult}"
+                             DoubleTapped="OnCommandPaletteResultDoubleTapped">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PaletteCommand">
+                                <TextBlock Text="{Binding Name}" IsEnabled="{Binding IsEnabled}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+        </Popup>
+
         <!-- specs/ide-workbench-shell R1: Epic 20/21's single Build/Run strip is now a four-tab
              dock (Build, Run, Problems, Terminal) inside the same Expander - one shared
              IsExpanded still covers the whole dock (design.md's decision against per-tab

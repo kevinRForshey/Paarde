@@ -117,6 +117,7 @@ public static class Resources
         ["RunPanel_RunStartError"] = "Failed to start the run command: {0}",
         ["RunPanel_Stopped"] = "Stopped.",
         ["RunPanel_Exited"] = "Process exited (code {0}).",
+        ["QuickOpen_NoWorkingDirectory"] = "No working directory selected yet. Pick one on the Prompt page.",
     };
 
     public static string Resolve(this string resourceKey) =>

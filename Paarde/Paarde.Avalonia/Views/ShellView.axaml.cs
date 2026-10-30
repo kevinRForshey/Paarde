@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 
 using Paarde.Avalonia.ViewModels;
@@ -67,6 +69,127 @@ public partial class ShellView : UserControl
         ProblemsList.ItemsSource = _problemRows;
         RefreshProblemRows();
         ViewModel.WorkbenchDockViewModel.DiagnosticsAggregator.Changed += OnDiagnosticsAggregatorChanged;
+
+        // Epic 24, R1.3/R2.5/R3.3: move keyboard focus into the popup's own query box the moment
+        // it opens - neither popup has anything else to give it, and without this the global
+        // Ctrl+P/Ctrl+Shift+P KeyBinding would leave focus wherever it already was.
+        ViewModel.QuickOpenViewModel.PropertyChanged += OnQuickOpenViewModelPropertyChanged;
+        ViewModel.CommandPaletteViewModel.PropertyChanged += OnCommandPaletteViewModelPropertyChanged;
+
+        AttachedToVisualTree += OnAttachedToVisualTree;
+    }
+
+    // Epic 24, R3.1: Ctrl+P/Ctrl+Shift+P must work regardless of which control has focus - the
+    // only place that's true app-wide is the Window's own KeyBindings (TopLevel.KeyBindings);
+    // ShellView itself is a UserControl, which has no such collection. App.axaml.cs's F12
+    // DevTools gesture is the one existing precedent for attaching a KeyGesture this way.
+    private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window window)
+        {
+            return;
+        }
+
+        window.KeyBindings.Add(new KeyBinding
+        {
+            Gesture = new KeyGesture(Key.P, KeyModifiers.Control),
+            Command = ViewModel.QuickOpenViewModel.OpenCommand,
+        });
+
+        window.KeyBindings.Add(new KeyBinding
+        {
+            Gesture = new KeyGesture(Key.P, KeyModifiers.Control | KeyModifiers.Shift),
+            Command = ViewModel.CommandPaletteViewModel.OpenCommand,
+        });
+    }
+
+    private void OnQuickOpenViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(QuickOpenViewModel.IsOpen) && ViewModel.QuickOpenViewModel.IsOpen)
+        {
+            Dispatcher.UIThread.Post(() => QuickOpenQueryBox.Focus());
+        }
+    }
+
+    private void OnCommandPaletteViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && ViewModel.CommandPaletteViewModel.IsOpen)
+        {
+            Dispatcher.UIThread.Post(() => CommandPaletteQueryBox.Focus());
+        }
+    }
+
+    // R1.3: Up/Down move QuickOpenResultsList's own selection (which SelectedResult is two-way
+    // bound to) rather than touching the view model directly - same "code-behind moves the
+    // ListBox, not the VM property" shape PromptView.axaml.cs's MoveMentionSelection already uses.
+    private void OnQuickOpenQueryBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Escape:
+                ViewModel.QuickOpenViewModel.CloseCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                ViewModel.QuickOpenViewModel.ActivateSelectedCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Down:
+                MoveListBoxSelection(QuickOpenResultsList, 1);
+                e.Handled = true;
+                break;
+
+            case Key.Up:
+                MoveListBoxSelection(QuickOpenResultsList, -1);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnQuickOpenResultDoubleTapped(object? sender, TappedEventArgs e) =>
+        ViewModel.QuickOpenViewModel.ActivateSelectedCommand.Execute(null);
+
+    private void OnCommandPaletteQueryBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Escape:
+                ViewModel.CommandPaletteViewModel.CloseCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                ViewModel.CommandPaletteViewModel.ExecuteSelectedCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Down:
+                MoveListBoxSelection(CommandPaletteResultsList, 1);
+                e.Handled = true;
+                break;
+
+            case Key.Up:
+                MoveListBoxSelection(CommandPaletteResultsList, -1);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnCommandPaletteResultDoubleTapped(object? sender, TappedEventArgs e) =>
+        ViewModel.CommandPaletteViewModel.ExecuteSelectedCommand.Execute(null);
+
+    private static void MoveListBoxSelection(ListBox listBox, int delta)
+    {
+        var count = listBox.ItemCount;
+        if (count == 0)
+        {
+            return;
+        }
+
+        var currentIndex = listBox.SelectedIndex < 0 ? -1 : listBox.SelectedIndex;
+        listBox.SelectedIndex = ((currentIndex + delta) % count + count) % count;
     }
 
     private void OnRunPanelViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -103,6 +226,8 @@ public partial class ShellView : UserControl
         {
             DockTabControl.SelectedIndex = index;
         }
+
+        FocusDockTerminalIfActive();
     }
 
     private void OnDockTabControlSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -111,6 +236,22 @@ public partial class ShellView : UserControl
         if (index >= 0 && index < TabKeysByIndex.Length)
         {
             ViewModel.WorkbenchDockViewModel.ActiveTabKey = TabKeysByIndex[index];
+        }
+
+        FocusDockTerminalIfActive();
+    }
+
+    // Bug reported as "the console built into the IDE doesn't show my input": unlike OutputTerminal
+    // above (focused via OnRunPanelViewModelPropertyChanged whenever a run starts), nothing ever
+    // moved keyboard focus into DockTerminal - clicking the Terminal tab just changed which
+    // TabItem's content was visible, so keystrokes kept going wherever focus already was. Called
+    // from both directions ActiveTabKey can change (user clicking the tab, or code setting
+    // ActiveTabKey directly) so the dock terminal always ends up focused once it's the visible tab.
+    private void FocusDockTerminalIfActive()
+    {
+        if (ViewModel.WorkbenchDockViewModel.ActiveTabKey == "Terminal")
+        {
+            DockTerminal.Focus();
         }
     }
 

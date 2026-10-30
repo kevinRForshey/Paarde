@@ -184,6 +184,12 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
             {
                 await _languageServerSessionManager.StartAllAsync(WorkingDirectoryPath);
             }
+
+            // Epic 24, R1.4: Quick Open navigates here with the absolute path of the file to open.
+            if (parameter is string filePath && File.Exists(filePath))
+            {
+                OpenOrActivateTab(filePath);
+            }
         }
         catch (Exception ex)
         {

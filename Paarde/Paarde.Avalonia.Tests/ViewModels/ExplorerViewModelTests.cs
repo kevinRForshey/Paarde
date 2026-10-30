@@ -70,6 +70,50 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Empty(sut.StatusMessage);
     }
 
+    // Epic 24, R1.4: Quick Open navigates here with the absolute path of the file to open.
+    [Fact]
+    public async Task OnNavigatedTo_StringParameterPointingAtAnExistingFile_OpensItAsATab()
+    {
+        var filePath = Path.Combine(_workingDirectory, "a.txt");
+        File.WriteAllText(filePath, "file content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(filePath);
+
+        var tab = Assert.Single(sut.OpenTabs);
+        Assert.Same(tab, sut.SelectedTab);
+        Assert.Equal(filePath, tab.FilePath);
+        Assert.Equal("file content", tab.Content);
+    }
+
+    // Regression guard: every other OnNavigatedTo test in this class passes null (or a type that
+    // isn't a string), and must keep behaving exactly as before this epic's change - no tab opened,
+    // no exception.
+    [Fact]
+    public async Task OnNavigatedTo_StringParameterPointingAtAFileThatDoesNotExist_DoesNotOpenATab()
+    {
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(Path.Combine(_workingDirectory, "does-not-exist.txt"));
+
+        Assert.Empty(sut.OpenTabs);
+        Assert.Null(sut.SelectedTab);
+    }
+
+    [Fact]
+    public async Task OnNavigatedTo_NonStringParameter_DoesNotOpenATab()
+    {
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(new object());
+
+        Assert.Empty(sut.OpenTabs);
+        Assert.Null(sut.SelectedTab);
+    }
+
     [Fact]
     public async Task RefreshTreeCommand_AfterAFileIsAdded_PicksUpTheNewFile()
     {

@@ -48,12 +48,28 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
+    // Epic 24, R1/R3: the Quick Open popup - same "singleton handed in, not created here" shape
+    // as RunPanelViewModel/StatusBarViewModel/WorkbenchDockViewModel above.
+    public QuickOpenViewModel QuickOpenViewModel
+    {
+        get;
+    }
+
+    // Epic 24, R2/R3: the command palette popup - same "singleton handed in, not created here"
+    // shape as the other ShellViewModel-owned singletons above.
+    public CommandPaletteViewModel CommandPaletteViewModel
+    {
+        get;
+    }
+
     public ShellViewModel(
         INavigationService navigationService,
         INavigationViewService navigationViewService,
         RunPanelViewModel runPanelViewModel,
         StatusBarViewModel statusBarViewModel,
-        WorkbenchDockViewModel workbenchDockViewModel)
+        WorkbenchDockViewModel workbenchDockViewModel,
+        QuickOpenViewModel quickOpenViewModel,
+        CommandPaletteViewModel commandPaletteViewModel)
     {
         NavigationService = navigationService;
         NavigationService.Navigated += OnNavigated;
@@ -61,6 +77,13 @@ public partial class ShellViewModel : ObservableRecipient
         RunPanelViewModel = runPanelViewModel;
         StatusBarViewModel = statusBarViewModel;
         WorkbenchDockViewModel = workbenchDockViewModel;
+        QuickOpenViewModel = quickOpenViewModel;
+        CommandPaletteViewModel = commandPaletteViewModel;
+
+        // Epic 24, R3.2: wired here, not through DI constructor injection between the two
+        // singletons, since that would be a circular dependency the container can't resolve.
+        quickOpenViewModel.AttachCommandPalette(commandPaletteViewModel);
+        commandPaletteViewModel.AttachQuickOpen(quickOpenViewModel);
     }
 
     private void OnNavigated(object sender, NavigationEventArgs e)
