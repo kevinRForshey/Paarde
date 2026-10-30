@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:controls="using:Paarde.Avalonia.Controls"
+             xmlns:helpers="using:Paarde.Avalonia.Helpers"
+             x:Class="Paarde.Avalonia.Views.ExplorerFileTabControl"
+             x:DataType="vm:OpenFileTabViewModel">
+
+    <!-- Epic 23, T23.1.1: one instance of this control per open Explorer tab (ExplorerView.axaml's
+         TabControl.ContentTemplate), same "separate control instance per tab" shape
+         TutorialDetailControl already established for TutorialView's tab strip - each instance
+         gets its own CodeEditor, rather than one shared editor whose binding path gets swapped. -->
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4" VerticalAlignment="Center">
+            <Button Content="Explain this file"
+                     Command="{Binding ExplainCommand}"
+                     ToolTip.Tip="Ask the AI for a tutorial-style explanation of this file." />
+            <ui:ProgressRing Width="18" Height="18" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsLoadingOverview}" />
+            <!-- T10.2.2/T10.2.6: Save/Revert both gate on IsDirty, so there's nothing to
+                 accidentally click before an edit actually diverges from disk. -->
+            <Button Content="Save"
+                     Command="{Binding SaveCommand}"
+                     ToolTip.Tip="Write this file's edits to disk." />
+            <Button Content="Revert to disk"
+                     Command="{Binding RevertToDiskCommand}"
+                     ToolTip.Tip="Discard every edit and reload this file's current content from disk." />
+            <TextBlock Text="Edited" IsVisible="{Binding IsDirty}" VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1"
+                   Margin="0,0,0,4"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Opacity="0.7"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+        <!-- T10.2.1: editable - BindableText is TwoWay by default (T2.2.2), so edits flow straight
+             back into Content, where OnContentChanged derives IsDirty. -->
+        <!-- Epic 17, T17.1.2/T17.1.3: Diagnostics feeds the underline renderer/hover tooltip;
+             GoToDefinitionRequested/FindReferencesRequested (F12/Shift+F12) and the references
+             flyout below are wired up in ExplorerFileTabControl.axaml.cs. -->
+        <controls:CodeEditor Name="Editor"
+                              Grid.Row="2"
+                              helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"
+                              FilePath="{Binding FilePath}"
+                              GhostTextSuggestion="{Binding GhostTextSuggestion}"
+                              CompletionItems="{Binding CompletionItems}"
+                              Diagnostics="{Binding Diagnostics}"
+                              IsReadOnly="False"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto">
+            <FlyoutBase.AttachedFlyout>
+                <Flyout Placement="Bottom">
+                    <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
+                </Flyout>
+            </FlyoutBase.AttachedFlyout>
+        </controls:CodeEditor>
+
+        <!-- T10.1.4: collapsed until there's something to show, so the editor keeps its full
+             height while browsing and only gives up space once an explanation has actually been
+             requested. -->
+        <Expander Grid.Row="3"
+                   Margin="0,8,0,0"
+                   Header="Overview"
+                   IsExpanded="True"
+                   MaxHeight="260"
+                   IsVisible="{Binding FileOverview, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <controls:MarkdownTextBlock Margin="4" Text="{Binding FileOverview}" />
+            </ScrollViewer>
+        </Expander>
+    </Grid>
+</UserControl>

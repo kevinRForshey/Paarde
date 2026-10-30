@@ -129,7 +129,7 @@ public class ExplorerViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task SelectedNode_SetToAFile_LoadsItsContentForPreview()
+    public async Task SelectedNode_SetToAFile_OpensItAsATab()
     {
         File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "file content");
         await SetSavedWorkingDirectoryAsync(_workingDirectory);
@@ -139,12 +139,14 @@ public class ExplorerViewModelTests : IDisposable
 
         sut.SelectedNode = fileNode;
 
-        Assert.Equal(fileNode.FullPath, sut.SelectedFilePath);
-        Assert.Equal("file content", sut.SelectedFileContent);
+        var tab = Assert.Single(sut.OpenTabs);
+        Assert.Same(tab, sut.SelectedTab);
+        Assert.Equal(fileNode.FullPath, tab.FilePath);
+        Assert.Equal("file content", tab.Content);
     }
 
     [Fact]
-    public async Task SelectedNode_SetToADirectory_ClearsThePreview()
+    public async Task SelectedNode_SetToADirectory_DoesNotOpenATab()
     {
         Directory.CreateDirectory(Path.Combine(_workingDirectory, "src"));
         File.WriteAllText(Path.Combine(_workingDirectory, "src", "a.txt"), "content");
@@ -155,12 +157,12 @@ public class ExplorerViewModelTests : IDisposable
 
         sut.SelectedNode = folderNode;
 
-        Assert.Empty(sut.SelectedFilePath);
-        Assert.Empty(sut.SelectedFileContent);
+        Assert.Empty(sut.OpenTabs);
+        Assert.Null(sut.SelectedTab);
     }
 
     [Fact]
-    public async Task SelectedNode_SetToNull_ClearsThePreview()
+    public async Task SelectedNode_SetToNull_DoesNotCloseAnyOpenTabs()
     {
         File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
         await SetSavedWorkingDirectoryAsync(_workingDirectory);
@@ -170,12 +172,33 @@ public class ExplorerViewModelTests : IDisposable
 
         sut.SelectedNode = null;
 
-        Assert.Empty(sut.SelectedFilePath);
-        Assert.Empty(sut.SelectedFileContent);
+        Assert.Single(sut.OpenTabs);
     }
 
     [Fact]
-    public async Task RefreshTreeCommand_AFileWasSelected_ClearsTheStaleSelectionAndPreview()
+    public async Task SelectedNode_SelectingAnAlreadyOpenFile_ActivatesTheExistingTabInsteadOfOpeningADuplicate()
+    {
+        Directory.CreateDirectory(Path.Combine(_workingDirectory, "src"));
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "src", "b.txt"), "content b");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        var fileNodeA = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        var srcFolder = sut.Root!.Children.Single(node => node.Name == "src");
+        var fileNodeB = srcFolder.Children.Single();
+        sut.SelectedNode = fileNodeA;
+        sut.SelectedTab!.Content = "edited a";
+        sut.SelectedNode = fileNodeB;
+
+        sut.SelectedNode = fileNodeA;
+
+        Assert.Equal(2, sut.OpenTabs.Count);
+        Assert.Equal("edited a", sut.SelectedTab!.Content);
+    }
+
+    [Fact]
+    public async Task RefreshTreeCommand_AFileWasSelected_ClearsTheStaleTreeSelectionButKeepsTheTabOpen()
     {
         File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
         await SetSavedWorkingDirectoryAsync(_workingDirectory);
@@ -186,262 +209,17 @@ public class ExplorerViewModelTests : IDisposable
         sut.RefreshTreeCommand.Execute(null);
 
         Assert.Null(sut.SelectedNode);
-        Assert.Empty(sut.SelectedFilePath);
-        Assert.Empty(sut.SelectedFileContent);
+        Assert.Single(sut.OpenTabs);
     }
 
+    // Epic 23, T23.1.1: every open tab keeps its own content now, so switching the tree selection
+    // can no longer discard anything - the T10.2.5 discard-confirmation this page used to show on
+    // SelectedNode changing while dirty (SelectedNode_ChangedWhileDirty_PromptsAndDiscardsWhenConfirmed/
+    // RevertsSelectionWhenDeclined) no longer applies. This replaces those two tests: selecting a
+    // second file while the first tab is dirty just opens a second tab, without prompting or
+    // touching the first tab's edits.
     [Fact]
-    public void ExplainSelectedFileCommand_NoFileSelected_CannotExecute()
-    {
-        var sut = CreateSut();
-
-        Assert.False(sut.ExplainSelectedFileCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task ExplainSelectedFileCommand_FileSelected_CanExecute()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-
-        Assert.True(sut.ExplainSelectedFileCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task ExplainSelectedFileCommand_AlreadyLoading_CannotExecute()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-
-        sut.IsLoadingOverview = true;
-
-        Assert.False(sut.ExplainSelectedFileCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task ExplainSelectedFileAsync_Succeeds_PopulatesFileOverviewAndSendsFilePathAndContent()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "file content");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-        _llmRunner.ResultToReturn = new() { Success = true, Output = "  This file does X.  " };
-
-        await sut.ExplainSelectedFileCommand.ExecuteAsync(null);
-
-        Assert.Equal("This file does X.", sut.FileOverview);
-        Assert.False(sut.IsLoadingOverview);
-        Assert.Contains(sut.SelectedFilePath, _llmRunner.LastPrompt);
-        Assert.Contains("file content", _llmRunner.LastPrompt);
-        Assert.Null(_llmRunner.LastResumeSessionId);
-    }
-
-    [Fact]
-    public async Task ExplainSelectedFileAsync_Fails_PopulatesFileOverviewWithFormattedError()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-        _llmRunner.ResultToReturn = new() { Success = false, ErrorMessage = "boom" };
-
-        await sut.ExplainSelectedFileCommand.ExecuteAsync(null);
-
-        Assert.Equal("Failed to explain this file: boom", sut.FileOverview);
-        Assert.False(sut.IsLoadingOverview);
-    }
-
-    [Fact]
-    public async Task SelectedNode_ChangedAfterExplaining_ClearsThePreviousOverview()
-    {
-        Directory.CreateDirectory(Path.Combine(_workingDirectory, "src"));
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
-        File.WriteAllText(Path.Combine(_workingDirectory, "src", "b.txt"), "content");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
-        _llmRunner.ResultToReturn = new() { Success = true, Output = "Explanation of a.txt" };
-        await sut.ExplainSelectedFileCommand.ExecuteAsync(null);
-        Assert.NotEmpty(sut.FileOverview);
-
-        var srcFolder = sut.Root!.Children.Single(node => node.Name == "src");
-        sut.SelectedNode = srcFolder.Children.Single();
-
-        Assert.Empty(sut.FileOverview);
-    }
-
-    [Fact]
-    public async Task SelectedFileContent_Edited_MarksTheFileDirty()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-
-        sut.SelectedFileContent = "edited";
-
-        Assert.True(sut.IsFileDirty);
-        Assert.True(sut.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public async Task SelectedFileContent_EditedBackToOriginal_ClearsDirty()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-        sut.SelectedFileContent = "edited";
-
-        sut.SelectedFileContent = "original";
-
-        Assert.False(sut.IsFileDirty);
-    }
-
-    [Fact]
-    public void SaveSelectedFileCommand_NotDirty_CannotExecute()
-    {
-        var sut = CreateSut();
-
-        Assert.False(sut.SaveSelectedFileCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task SaveSelectedFileCommand_Dirty_Succeeds_WritesAndClearsDirty()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-        sut.SelectedFileContent = "edited";
-
-        Assert.True(sut.SaveSelectedFileCommand.CanExecute(null));
-        sut.SaveSelectedFileCommand.Execute(null);
-
-        Assert.False(sut.IsFileDirty);
-        Assert.Equal(1, _fileChangeApplyService.WriteRawCallCount);
-        Assert.Equal("a.txt", _fileChangeApplyService.LastWriteRawFilePath);
-        Assert.Equal("edited", _fileChangeApplyService.LastWriteRawContent);
-        Assert.NotEmpty(sut.StatusMessage);
-    }
-
-    [Fact]
-    public async Task SaveSelectedFileCommand_ProtectedPath_IsBlockedAndDoesNotWrite()
-    {
-        Directory.CreateDirectory(Path.Combine(_workingDirectory, "bin"));
-        File.WriteAllText(Path.Combine(_workingDirectory, "bin", "a.txt"), "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        var binFolder = sut.Root!.Children.Single(node => node.Name == "bin");
-        sut.SelectedNode = binFolder.Children.Single();
-        sut.SelectedFileContent = "edited";
-
-        sut.SaveSelectedFileCommand.Execute(null);
-
-        Assert.Equal(0, _fileChangeApplyService.WriteRawCallCount);
-        Assert.True(sut.IsFileDirty);
-        Assert.NotEmpty(sut.StatusMessage);
-    }
-
-    [Fact]
-    public async Task SaveSelectedFileCommand_FileChangedOnDiskSinceOpened_IsBlockedAndDoesNotWrite()
-    {
-        var filePath = Path.Combine(_workingDirectory, "a.txt");
-        File.WriteAllText(filePath, "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-        sut.SelectedFileContent = "edited";
-        File.WriteAllText(filePath, "changed externally");
-
-        sut.SaveSelectedFileCommand.Execute(null);
-
-        Assert.Equal(0, _fileChangeApplyService.WriteRawCallCount);
-        Assert.True(sut.IsFileDirty);
-        Assert.NotEmpty(sut.StatusMessage);
-    }
-
-    [Fact]
-    public void RevertSelectedFileToDiskCommand_NotDirty_CannotExecute()
-    {
-        var sut = CreateSut();
-
-        Assert.False(sut.RevertSelectedFileToDiskCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task RevertSelectedFileToDiskCommand_Dirty_ReloadsFromDiskAndClearsDirty()
-    {
-        var filePath = Path.Combine(_workingDirectory, "a.txt");
-        File.WriteAllText(filePath, "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single();
-        sut.SelectedFileContent = "edited";
-        File.WriteAllText(filePath, "changed externally");
-
-        sut.RevertSelectedFileToDiskCommand.Execute(null);
-
-        Assert.Equal("changed externally", sut.SelectedFileContent);
-        Assert.False(sut.IsFileDirty);
-    }
-
-    [Fact]
-    public async Task SelectedNode_ReselectingTheSameFile_DoesNotDiscardEditsOrReload()
-    {
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        var fileNode = sut.Root!.Children.Single();
-        sut.SelectedNode = fileNode;
-        sut.SelectedFileContent = "edited";
-
-        sut.SelectedNode = fileNode;
-
-        Assert.Equal("edited", sut.SelectedFileContent);
-        Assert.True(sut.IsFileDirty);
-        Assert.Equal(0, _dialogService.ConfirmCallCount);
-    }
-
-    [Fact]
-    public async Task SelectedNode_ChangedWhileDirty_PromptsAndDiscardsWhenConfirmed()
-    {
-        Directory.CreateDirectory(Path.Combine(_workingDirectory, "src"));
-        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original a");
-        File.WriteAllText(Path.Combine(_workingDirectory, "src", "b.txt"), "original b");
-        await SetSavedWorkingDirectoryAsync(_workingDirectory);
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
-        sut.SelectedFileContent = "edited a";
-        _dialogService.ConfirmResultToReturn = true;
-
-        var srcFolder = sut.Root!.Children.Single(node => node.Name == "src");
-        sut.SelectedNode = srcFolder.Children.Single();
-
-        Assert.Equal(1, _dialogService.ConfirmCallCount);
-        Assert.Equal("original b", sut.SelectedFileContent);
-        Assert.False(sut.IsFileDirty);
-    }
-
-    [Fact]
-    public async Task SelectedNode_ChangedWhileDirty_RevertsSelectionWhenDeclined()
+    public async Task SelectedNode_ChangedWhileAnotherTabIsDirty_OpensTheNewTabWithoutPromptingOrDiscardingTheOther()
     {
         Directory.CreateDirectory(Path.Combine(_workingDirectory, "src"));
         File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original a");
@@ -451,15 +229,112 @@ public class ExplorerViewModelTests : IDisposable
         sut.OnNavigatedTo(null!);
         var fileNodeA = sut.Root!.Children.Single(node => node.Name == "a.txt");
         sut.SelectedNode = fileNodeA;
-        sut.SelectedFileContent = "edited a";
-        _dialogService.ConfirmResultToReturn = false;
+        var tabA = sut.SelectedTab!;
+        tabA.Content = "edited a";
 
         var srcFolder = sut.Root!.Children.Single(node => node.Name == "src");
         sut.SelectedNode = srcFolder.Children.Single();
 
+        Assert.Equal(0, _dialogService.ConfirmCallCount);
+        Assert.Equal(2, sut.OpenTabs.Count);
+        Assert.Equal("edited a", tabA.Content);
+        Assert.True(tabA.IsDirty);
+        Assert.Equal("original b", sut.SelectedTab!.Content);
+    }
+
+    [Fact]
+    public async Task OpenTab_ContentEdited_MarksHasUnsavedChanges()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "original");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single();
+
+        sut.SelectedTab!.Content = "edited";
+
+        Assert.True(sut.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void CloseSelectedTabCommand_NoTabOpen_CannotExecute()
+    {
+        var sut = CreateSut();
+
+        Assert.False(sut.CloseSelectedTabCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task CloseSelectedTabCommand_NotDirty_ClosesWithoutPrompting()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single();
+
+        await sut.CloseSelectedTabCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, _dialogService.ConfirmCallCount);
+        Assert.Empty(sut.OpenTabs);
+        Assert.Null(sut.SelectedTab);
+    }
+
+    [Fact]
+    public async Task CloseSelectedTabCommand_Dirty_PromptsAndClosesWhenConfirmed()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single();
+        sut.SelectedTab!.Content = "edited";
+        _dialogService.ConfirmResultToReturn = true;
+
+        await sut.CloseSelectedTabCommand.ExecuteAsync(null);
+
         Assert.Equal(1, _dialogService.ConfirmCallCount);
-        Assert.Equal(fileNodeA, sut.SelectedNode);
-        Assert.Equal("edited a", sut.SelectedFileContent);
-        Assert.True(sut.IsFileDirty);
+        Assert.Empty(sut.OpenTabs);
+    }
+
+    [Fact]
+    public async Task CloseSelectedTabCommand_Dirty_KeepsTheTabOpenWhenDeclined()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single();
+        var tab = sut.SelectedTab!;
+        tab.Content = "edited";
+        _dialogService.ConfirmResultToReturn = false;
+
+        await sut.CloseSelectedTabCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, _dialogService.ConfirmCallCount);
+        Assert.Same(tab, Assert.Single(sut.OpenTabs));
+        Assert.Same(tab, sut.SelectedTab);
+    }
+
+    [Fact]
+    public async Task CloseSelectedTabCommand_ClosingTheMiddleTab_SelectsItsNeighbor()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        File.WriteAllText(Path.Combine(_workingDirectory, "c.txt"), "content c");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "c.txt");
+        var tabC = sut.SelectedTab;
+        var tabB = sut.OpenTabs[1];
+        sut.SelectedTab = tabB;
+
+        await sut.CloseSelectedTabCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, sut.OpenTabs.Count);
+        Assert.Same(tabC, sut.SelectedTab);
     }
 }

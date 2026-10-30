@@ -3050,8 +3050,8 @@ T8.2.2 already built exactly this pattern for the Tutorial page's proposed-file 
 applying that same, already-proven pattern to Explorer's arbitrary-file browsing, not inventing
 tabs for the first time.*
 
-**F23.1 — Open files as tabs, not a single slot** — Not started
-- [ ] T23.1.1 `ExplorerViewModel` grows an `ObservableCollection<OpenFileTabViewModel>` (each
+**F23.1 — Open files as tabs, not a single slot** — T23.1.1, T23.1.2, T23.1.3 done 2026-10-27
+- [x] T23.1.1 `ExplorerViewModel` grows an `ObservableCollection<OpenFileTabViewModel>` (each
   wrapping the per-file state `SelectedFilePath`/`SelectedFileContent`/`IsFileDirty`/
   `_originalFileContentOnDisk` already track for the single-file case today) plus a
   `SelectedTab` - same `OpenTabs`/`Selected` shape `TutorialViewModel` already established, not a
@@ -3059,19 +3059,64 @@ tabs for the first time.*
   path, VS Code's convention - `TutorialViewModel.OnSelectedChanged`'s "add to `OpenTabs` if not
   already there" is the closer precedent than a brand-new dedupe rule) rather than replacing the
   current single file.
-- [ ] T23.1.2 `ExplorerView.axaml` gains a `TabControl`/tab strip above the `CodeEditor`, styled
+  _(Done 2026-10-27: added `OpenFileTabViewModel` (new, `Paarde.Avalonia/ViewModels/`) - one
+  instance per open tab, self-contained the same way `ProposedFileChangeViewModel` already is for
+  Tutorial's tabs, owning `Content`/`IsDirty`/`StatusMessage`/`FileOverview`/`IsLoadingOverview`/
+  `Diagnostics`/`GhostTextSuggestion`/`CompletionItems` plus `Save`/`RevertToDisk`/`Explain`
+  commands and the ghost-text/completion round trips directly (including its own per-tab
+  `CancellationTokenSource`, since a request in one tab must no longer cancel one in another).
+  `ExplorerViewModel` gained `OpenTabs`/`SelectedTab`/`HasOpenTabs` and an `OpenOrActivateTab`
+  helper; tree-node selection (not double-click specifically - matching `OnSelectedChanged`'s own
+  precedent more closely) opens or activates a tab via that helper. `GoToDefinitionAsync`/
+  `FindReferencesAsync` now take an explicit `filePath` parameter instead of reading a removed
+  `SelectedFilePath`, and `NavigateToLocation` opens/activates the target's tab before leaving a
+  pending caret target for the newly-active tab's editor to apply.)_
+- [x] T23.1.2 `ExplorerView.axaml` gains a `TabControl`/tab strip above the `CodeEditor`, styled
   the same as `TutorialView.axaml`'s (dirty `*` marker, close-selects-neighbor on
   `CloseSelectedTabCommand`); closing a dirty tab reuses the existing discard-confirmation dialog
   (T10.2.5) rather than a new one.
-- [ ] T23.1.3 Per-tab language-server document lifecycle: every open tab needs its own `didOpen`/
+  _(Done 2026-10-27: `ExplorerView.axaml`'s single embedded `CodeEditor` became a
+  `TabControl ItemsSource="{Binding OpenTabs}"`/`SelectedItem="{Binding SelectedTab}"` with a
+  `ContentTemplate` instantiating a new `ExplorerFileTabControl` (new `UserControl`,
+  `Paarde.Avalonia/Views/`) per open tab - same "separate control instance per tab" shape
+  `TutorialDetailControl` already established, so each tab gets its own `CodeEditor` instance
+  rather than one shared editor whose binding path gets swapped. `ExplorerFileTabControl` houses
+  the per-tab toolbar (Save/Revert/Explain, dirty marker), editor, references flyout, and Overview
+  expander that used to live directly in `ExplorerView.axaml`; its code-behind reaches the
+  page-level `ExplorerViewModel` for cross-file navigation via `this.FindAncestorOfType<ExplorerView>()`,
+  the same ancestor-lookup pattern `TutorialDetailControl` uses for `ILlmRunner`.
+  `CloseSelectedTabCommand` (parameterless, matching `TutorialViewModel`'s own naming/shape exactly)
+  prompts via the existing `IDialogService.ConfirmAsync` only when the tab being closed is dirty,
+  with new `Explorer_CloseDirtyTabConfirm*` string resources replacing the old
+  `Explorer_DiscardEditsConfirm*` ones (switching tabs can no longer discard anything now that every
+  tab keeps its own content, so only closing a dirty tab still needs to ask). `ExplorerView.axaml.cs`
+  is now trimmed down to just the tree-pane-width (`ResizablePaneHelper`) logic.)_
+- [x] T23.1.3 Per-tab language-server document lifecycle: every open tab needs its own `didOpen`/
   `didClose` pair with `ILanguageServerSessionManager` (today there's exactly one open document at
   a time, tied to the single-slot model) - closing a tab must send `didClose` for *that* file, not
   whichever file happens to be selected when the close happens.
+  _(Done 2026-10-27: `OpenOrActivateTab` calls `NotifyDocumentOpenedAsync` once per newly-created
+  tab (a no-op if the tab already exists and is just being activated); `CloseSelectedTabAsync`
+  calls `NotifyDocumentClosedAsync(tab.FilePath)` for the specific tab being closed, read from the
+  tab itself rather than from any shared "currently selected" state, before removing it from
+  `OpenTabs`. `OnDiagnosticsPublished` now looks up the matching tab by `FilePath` across
+  `OpenTabs` instead of assuming a single active file.)_
 
-**F23.2 — Tests** — Not started
-- [ ] T23.2.1 `ExplorerViewModelTests` extended for: opening a second file doesn't discard the
+**F23.2 — Tests** — T23.2.1 done 2026-10-27
+- [x] T23.2.1 `ExplorerViewModelTests` extended for: opening a second file doesn't discard the
   first's unsaved edits; closing a tab prompts for a dirty file and not a clean one; switching tabs
   swaps which file's diagnostics/overview are shown; `didOpen`/`didClose` fire per tab correctly.
+  _(Done 2026-10-27: rewrote `ExplorerViewModelTests` against the new `OpenTabs`/`SelectedTab` API -
+  selecting a file opens/activates a tab, selecting a directory or null leaves tabs untouched,
+  re-selecting an already-open file activates the existing tab rather than duplicating it, and
+  `RefreshTreeCommand` clears the stale tree selection without closing any tabs. The three
+  discard-confirmation-on-switch tests no longer have a behavior to test (switching tabs can't
+  discard anything once every tab keeps its own content) and were replaced with one test plus an
+  explanatory comment confirming the new "open a second tab without prompting or touching the
+  first" behavior, and `CloseSelectedTabCommand` got its own not-dirty/dirty-confirmed/
+  dirty-declined/close-selects-neighbor tests. Save/Revert/Explain's tests moved onto a new
+  `OpenFileTabViewModelTests` alongside the logic they cover. `dotnet build Paarde.slnx
+  --no-incremental`: 0 warnings/0 errors. Full solution test run: 911/911 passed.)_
 
 ---
 

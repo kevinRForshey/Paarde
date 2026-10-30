@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 using Avalonia.Threading;
 
 using Paarde.Avalonia.Contracts.Services;
@@ -30,22 +32,12 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     private readonly ILanguageServerSessionManager _languageServerSessionManager;
     private readonly ILogger<ExplorerViewModel> _logger;
 
-    // Epic 17, T17.1.3: set by NavigateToLocation, consumed once by ExplorerView.axaml.cs's
-    // Editor.TextChanged handler - same "take once, after the target content has already loaded"
-    // pull pattern TutorialViewModel.TakePendingStepTarget() already established, needed because a
-    // cross-file jump only reflects into Editor.Text after SelectedFileContent's binding runs.
+    // Epic 17, T17.1.3: set by NavigateToLocation, consumed once by the active tab's
+    // ExplorerFileTabControl.axaml.cs's Editor.TextChanged handler - same "take once, after the
+    // target content has already loaded" pull pattern TutorialViewModel.TakePendingStepTarget()
+    // already established, needed because a cross-file jump only reflects into Editor.Text after
+    // the new tab's Content binding runs.
     private LspPosition? _pendingCaretTarget;
-
-    // T10.2.1: what's actually on disk as of the last successful load/save, compared against
-    // SelectedFileContent to derive IsFileDirty - same IsDirty-via-divergence shape
-    // ProposedFileChangeViewModel already uses, just without a third (proposed) baseline since
-    // there's no LLM proposal in this flow.
-    private string _originalFileContentOnDisk = string.Empty;
-
-    // T10.2.5: captured by OnSelectedNodeChanging (fires before SelectedNode's backing field is
-    // updated) so a declined "discard unsaved edits?" prompt can put the tree's selection back
-    // where it was.
-    private FileTreeNodeViewModel? _nodeBeforeSelectionChange;
 
     [ObservableProperty]
     private string workingDirectoryPath = string.Empty;
@@ -59,47 +51,19 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     [ObservableProperty]
     private FileTreeNodeViewModel? selectedNode;
 
-    [ObservableProperty]
-    private string selectedFilePath = string.Empty;
+    // Epic 23, T23.1.1: every file opened from the tree this visit, each with its own content/
+    // dirty/overview/diagnostics state (OpenFileTabViewModel) - replaces the single
+    // SelectedFilePath/SelectedFileContent slot this page used to have, same OpenTabs/Selected
+    // shape TutorialViewModel already established for its own tabbed detail pane.
+    public ObservableCollection<OpenFileTabViewModel> OpenTabs { get; } = new();
 
     [ObservableProperty]
-    private string selectedFileContent = string.Empty;
+    private OpenFileTabViewModel? selectedTab;
 
-    // T10.1.1: the AI-generated tutorial-style explanation of SelectedFilePath, requested on demand
-    // via ExplainSelectedFileCommand rather than automatically on every selection - running a prompt
-    // on every tree click would be surprising cost/latency, same reasoning
-    // TutorialViewModel.RefineSelectedFileCommand/TutorialStepViewModel.ExplainFurtherCommand are
-    // both explicit actions rather than eager.
-    [ObservableProperty]
-    private string fileOverview = string.Empty;
-
-    [ObservableProperty]
-    private bool isLoadingOverview;
-
-    // Epic 15, T15.2: the most recent ghost-text completion CodeEditor asked for - set to null then
-    // immediately to the new value (rather than straight to the new value) so a repeat suggestion
-    // (same text twice in a row) still raises PropertyChanged; Avalonia's property system otherwise
-    // short-circuits a set that equals the current value, and CodeEditor would never redisplay it.
-    [ObservableProperty]
-    private string? ghostTextSuggestion;
-
-    private CancellationTokenSource? _ghostTextCancellationTokenSource;
-
-    // T10.2.1: whether SelectedFileContent has diverged from _originalFileContentOnDisk.
-    [ObservableProperty]
-    private bool isFileDirty;
-
-    // Epic 17, T17.1.2: the active file's diagnostics, pushed by the language server and filtered
-    // in OnDiagnosticsPublished to whichever file is actually open right now - null (not empty)
-    // distinguishes "no diagnostics received yet for this file" from "server reported zero".
-    [ObservableProperty]
-    private IReadOnlyList<LspDiagnostic>? diagnostics;
-
-    // specs/editor-autocomplete T4: the most recent completion list CodeEditor asked for - same
-    // null-then-value double assignment GhostTextSuggestion above uses, for the same reason (a
-    // repeat trigger at the same offset would otherwise short-circuit and never redisplay).
-    [ObservableProperty]
-    private IReadOnlyList<LspCompletionItem>? completionItems;
+    // Epic 23, T23.1.1: drives ExplorerView.axaml's choice between the tab strip and the "select a
+    // file" placeholder, same OpenTabs.CollectionChanged -> HasOpenTabs shape TutorialViewModel
+    // already uses for its own tab strip.
+    public bool HasOpenTabs => OpenTabs.Count > 0;
 
     public ExplorerViewModel(
         ILocalSettingsService localSettingsService,
@@ -119,247 +83,86 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         _logger = logger ?? NullLogger<ExplorerViewModel>.Instance;
 
         _languageServerSessionManager.DiagnosticsPublished += OnDiagnosticsPublished;
+        OpenTabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasOpenTabs));
     }
 
     // T10.2.5: IConfirmNavigationAway - checked by NavigationService.OnNavigating before leaving
     // this page, same mechanism TutorialViewModel already uses for its own unsaved edits.
-    public bool HasUnsavedChanges => IsFileDirty;
+    public bool HasUnsavedChanges => OpenTabs.Any(tab => tab.IsDirty);
 
-    partial void OnSelectedNodeChanging(FileTreeNodeViewModel? oldValue, FileTreeNodeViewModel? newValue) =>
-        _nodeBeforeSelectionChange = oldValue;
-
-    // T8.1.3: open any file in the editor, proposed or not - a read-only preview, deliberately not
-    // wired into ProposedFileChangeViewModel.EditedContent for touched files, so Explorer stays a
-    // browse/view surface and editing a proposal stays the Tutorial page's job.
-    //
-    // T10.2.5: switching the tree selection is not a page navigation, so IConfirmNavigationAway's
-    // guard above never sees it - this needs its own unsaved-edits check. Re-entrancy guard first:
-    // reselecting the node that's already loaded (including the revert this method itself performs
-    // below when the user declines to discard) must not re-read from disk and wipe out the very
-    // edits being protected.
+    // Epic 23, T23.1.1: selecting a tree node opens that file as a tab (or activates its existing
+    // tab if it's already open) rather than replacing a single slot - VS Code's convention, and
+    // the closer precedent to TutorialViewModel.OnSelectedChanged's "add to OpenTabs if not
+    // already there" than inventing a double-click-only rule for this app's TreeView. Because
+    // every open tab keeps its own content, switching the tree selection can no longer discard
+    // anything - the T10.2.5 discard-confirmation this used to need is gone; closing a dirty tab
+    // (CloseSelectedTabCommand below) is the one place that still needs to ask.
     partial void OnSelectedNodeChanged(FileTreeNodeViewModel? value)
     {
-        var newPath = value is { IsDirectory: false } ? value.FullPath : string.Empty;
-
-        if (newPath == SelectedFilePath)
-        {
-            return;
-        }
-
-        if (IsFileDirty)
-        {
-            ConfirmDiscardDirtyFileThenLoad(value);
-            return;
-        }
-
-        LoadNode(value);
-    }
-
-    private async void ConfirmDiscardDirtyFileThenLoad(FileTreeNodeViewModel? value)
-    {
-        try
-        {
-            var discard = await _dialogService.ConfirmAsync(
-                "Explorer_DiscardEditsConfirmTitle".Resolve(),
-                "Explorer_DiscardEditsConfirmMessage".Resolve(),
-                "Explorer_DiscardEditsConfirmButton".Resolve(),
-                "Explorer_DiscardEditsCancelButton".Resolve());
-
-            if (discard)
-            {
-                LoadNode(value);
-            }
-            else
-            {
-                SelectedNode = _nodeBeforeSelectionChange;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to confirm discarding unsaved Explorer edits.");
-        }
-    }
-
-    private void LoadNode(FileTreeNodeViewModel? value)
-    {
-        // T10.1.3: a previous selection's explanation would otherwise linger and read as if it
-        // described whatever's selected now.
-        FileOverview = string.Empty;
-
-        // Epic 17, T17.2.1: tells the server the previously open file is gone before (potentially)
-        // opening a new one - a no-op if nothing was open or the server isn't running.
-        if (!string.IsNullOrEmpty(SelectedFilePath))
-        {
-            _ = _languageServerSessionManager.NotifyDocumentClosedAsync(SelectedFilePath);
-        }
-
-        Diagnostics = null;
-
         if (value is null || value.IsDirectory)
         {
-            SelectedFilePath = string.Empty;
-            _originalFileContentOnDisk = string.Empty;
-            SelectedFileContent = string.Empty;
             return;
         }
 
-        SelectedFilePath = value.FullPath;
-        _originalFileContentOnDisk = FileContentReader.ReadOrEmpty(value.FullPath);
-        SelectedFileContent = _originalFileContentOnDisk;
-
-        _ = _languageServerSessionManager.NotifyDocumentOpenedAsync(SelectedFilePath, SelectedFileContent);
+        OpenOrActivateTab(value.FullPath);
     }
 
-    partial void OnSelectedFilePathChanged(string value) => ExplainSelectedFileCommand.NotifyCanExecuteChanged();
-
-    partial void OnSelectedFileContentChanged(string value)
+    private void OpenOrActivateTab(string filePath)
     {
-        IsFileDirty = value != _originalFileContentOnDisk;
+        var existingTab = OpenTabs.FirstOrDefault(tab => string.Equals(tab.FilePath, filePath, StringComparison.Ordinal));
 
-        if (!string.IsNullOrEmpty(SelectedFilePath))
+        if (existingTab is not null)
         {
-            _ = _languageServerSessionManager.NotifyDocumentChangedAsync(SelectedFilePath, value);
-        }
-    }
-
-    partial void OnIsLoadingOverviewChanged(bool value) => ExplainSelectedFileCommand.NotifyCanExecuteChanged();
-
-    partial void OnIsFileDirtyChanged(bool value)
-    {
-        SaveSelectedFileCommand.NotifyCanExecuteChanged();
-        RevertSelectedFileToDiskCommand.NotifyCanExecuteChanged();
-    }
-
-    // T10.2.2: writes through IFileChangeApplyService.WriteRaw rather than a raw File.WriteAllText,
-    // so a manual save gets the same path-containment check (FilePathContainment.Resolve, T4.1.1)
-    // and encoding/line-ending preservation (FileEncodingDetector, T4.1.3) every other write in this
-    // app already gets.
-    [RelayCommand(CanExecute = nameof(CanSaveSelectedFile))]
-    private void SaveSelectedFile()
-    {
-        var relativePath = Path.GetRelativePath(WorkingDirectoryPath, SelectedFilePath).Replace(Path.DirectorySeparatorChar, '/');
-
-        // T10.2.3: refuses outright rather than offering an "apply anyway" override - unlike the
-        // batch apply flow (which already has a confirm-dialog service wired for exactly that),
-        // this is a single ad-hoc edit and a narrower write path that doesn't need to reuse
-        // allowProtectedPaths' override semantics on day one.
-        if (ProtectedPathChecker.IsProtected(WorkingDirectoryPath, relativePath))
-        {
-            StatusMessage = string.Format("Explorer_SaveBlockedProtectedPath".Resolve(), relativePath);
+            SelectedTab = existingTab;
             return;
         }
 
-        // T10.2.4: the same check ApplyOrchestrationService.ApplyOne does before an LLM apply
-        // (currentDiskContent != file.OriginalContent, T3.3.3) - if the file changed on disk since
-        // it was opened here, refuse rather than silently clobbering whatever wrote it.
-        var currentDiskContent = FileContentReader.ReadOrEmpty(SelectedFilePath);
+        var content = FileContentReader.ReadOrEmpty(filePath);
+        var tab = new OpenFileTabViewModel(filePath, content, WorkingDirectoryPath, _fileChangeApplyService, _llmRunner, _languageServerSessionManager);
+        OpenTabs.Add(tab);
+        SelectedTab = tab;
 
-        if (currentDiskContent != _originalFileContentOnDisk)
+        _ = _languageServerSessionManager.NotifyDocumentOpenedAsync(filePath, content);
+    }
+
+    // Epic 23, T23.1.2: close-selects-neighbor, same shape as TutorialViewModel.CloseSelectedTab -
+    // confirms first if the tab being closed has unsaved edits, since closing (unlike switching
+    // tabs now) really does discard them.
+    [RelayCommand(CanExecute = nameof(CanCloseSelectedTab))]
+    private async Task CloseSelectedTabAsync()
+    {
+        if (SelectedTab is not { } tab)
         {
-            StatusMessage = string.Format("Explorer_SaveConflict".Resolve(), relativePath);
             return;
         }
 
-        try
+        if (tab.IsDirty)
         {
-            _fileChangeApplyService.WriteRaw(relativePath, SelectedFileContent, WorkingDirectoryPath);
-            _originalFileContentOnDisk = SelectedFileContent;
-            IsFileDirty = false;
-            StatusMessage = string.Format("Explorer_SaveSucceeded".Resolve(), relativePath);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-        {
-            _logger.LogWarning(ex, "Failed to save {FilePath} in {WorkingDirectory}.", relativePath, WorkingDirectoryPath);
-            StatusMessage = string.Format("Explorer_SaveFailed".Resolve(), relativePath, ex.Message);
-        }
-    }
+            var discard = await _dialogService.ConfirmAsync(
+                "Explorer_CloseDirtyTabConfirmTitle".Resolve(),
+                "Explorer_CloseDirtyTabConfirmMessage".Resolve(),
+                "Explorer_CloseDirtyTabConfirmButton".Resolve(),
+                "Explorer_CloseDirtyTabCancelButton".Resolve());
 
-    private bool CanSaveSelectedFile() => IsFileDirty;
-
-    // T10.2.6: Undo/Redo themselves are free once CodeEditor stops being read-only (AvaloniaEdit's
-    // TextAreaDefaultInputHandler already wires Ctrl+Z/Ctrl+Y) - this covers the case undo history
-    // doesn't: discarding every edit at once and going back to what's on disk right now, which may
-    // have changed since this file was opened.
-    [RelayCommand(CanExecute = nameof(CanRevertSelectedFileToDisk))]
-    private void RevertSelectedFileToDisk()
-    {
-        _originalFileContentOnDisk = FileContentReader.ReadOrEmpty(SelectedFilePath);
-        SelectedFileContent = _originalFileContentOnDisk;
-    }
-
-    private bool CanRevertSelectedFileToDisk() => IsFileDirty;
-
-    // T10.1.1/T10.1.2: reuses the plain-prose prompt pattern TutorialStepViewModel.ExplainFurtherAsync
-    // already established (no JSON, no markdown fences - this is prose for a human, not something
-    // ClaudeJsonResponseParser needs to parse). No resumeSessionId - this is a one-off lookup against
-    // whatever file is open in Explorer, not a continuation of the active tutorial's conversation.
-    [RelayCommand(CanExecute = nameof(CanExplainSelectedFile))]
-    private async Task ExplainSelectedFileAsync()
-    {
-        IsLoadingOverview = true;
-        FileOverview = string.Empty;
-
-        try
-        {
-            var prompt =
-                "Explain this file in a tutorial style - what it does, how it's structured, and " +
-                "anything a newcomer to this codebase should notice. Respond in plain prose only - " +
-                "no JSON, no markdown fences.\n\n" +
-                $"File: {SelectedFilePath}\n\n{SelectedFileContent}";
-
-            var result = await _llmRunner.RunPromptAsync(prompt, WorkingDirectoryPath);
-
-            FileOverview = result.Success
-                ? result.Output.Trim()
-                : string.Format("Explorer_ExplainFailed".Resolve(), result.ErrorMessage);
-        }
-        finally
-        {
-            IsLoadingOverview = false;
-        }
-    }
-
-    private bool CanExplainSelectedFile() => !IsLoadingOverview && !string.IsNullOrEmpty(SelectedFilePath);
-
-    // Epic 15, T15.2.1/T15.2.2: handles CodeEditor.GhostTextRequested. Deliberately reuses whichever
-    // ILlmRunner is already configured (same as ExplainSelectedFileAsync above) rather than adding a
-    // dedicated fast-model setting for completions - latency will vary with the active runner (a
-    // ClaudeCli process spawn is a lot slower than a direct API call), which is a real, currently
-    // unverified-in-this-sandbox UX risk the roadmap flagged as an open question (F15.2.2). The
-    // short per-request timeout plus CodeEditor's own staleness check (dropping a suggestion whose
-    // caret offset no longer matches) are the mitigation for now; a dedicated faster model is the
-    // follow-up if this proves too slow in practice, not something to build ahead of that evidence.
-    //
-    // No resumeSessionId - a one-off lookup against whatever's open in Explorer, not a continuation
-    // of any other conversation, same reasoning ExplainSelectedFileAsync's comment gives.
-    public async Task RequestGhostTextCompletionAsync(string textBeforeCaret, string textAfterCaret)
-    {
-        _ghostTextCancellationTokenSource?.Cancel();
-        var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        _ghostTextCancellationTokenSource = cancellationTokenSource;
-
-        try
-        {
-            var prompt =
-                "Complete the code at the <cursor/> marker below. Respond with ONLY the text that " +
-                "should be inserted at the cursor - no explanation, no markdown fences, nothing before " +
-                "or after it. If nothing reasonable completes the code there, respond with nothing.\n\n" +
-                $"File: {SelectedFilePath}\n\n{textBeforeCaret}<cursor/>{textAfterCaret}";
-
-            var result = await _llmRunner.RunPromptAsync(prompt, WorkingDirectoryPath, cancellationToken: cancellationTokenSource.Token);
-            if (cancellationTokenSource.IsCancellationRequested || !result.Success || string.IsNullOrWhiteSpace(result.Output))
+            if (!discard)
             {
                 return;
             }
+        }
 
-            GhostTextSuggestion = null;
-            GhostTextSuggestion = result.Output.Trim();
-        }
-        catch (OperationCanceledException)
-        {
-            // Superseded by a newer request, or timed out - either way, there's nothing to show.
-        }
+        var index = OpenTabs.IndexOf(tab);
+        OpenTabs.Remove(tab);
+
+        // Epic 17, T17.2.1: tells the server this file is no longer open - a no-op if the server
+        // isn't running for this language.
+        _ = _languageServerSessionManager.NotifyDocumentClosedAsync(tab.FilePath);
+
+        SelectedTab = OpenTabs.Count == 0 ? null : OpenTabs[Math.Min(index, OpenTabs.Count - 1)];
     }
+
+    private bool CanCloseSelectedTab() => SelectedTab is not null;
+
+    partial void OnSelectedTabChanged(OpenFileTabViewModel? value) => CloseSelectedTabCommand.NotifyCanExecuteChanged();
 
     // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
     // corrupt settings file (the one thing ReadSettingAsync can actually throw on) is logged
@@ -398,30 +201,28 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
     // Epic 17, T17.1.2: fires on the server's notification-read background thread - marshaled to
     // the UI thread before touching Diagnostics, same caveat ILlmRunner's onTextDelta callbacks
-    // already carry. Filtered to whichever file is open right now; a push for any other file is
-    // silently dropped since nothing in this VM surfaces anything but the active file's diagnostics.
+    // already carry. Epic 23: routed to whichever open tab matches filePath (there can be several
+    // now) rather than a single active-file slot; a push for a file that isn't open as a tab is
+    // silently dropped, same as before.
     private void OnDiagnosticsPublished(string filePath, IReadOnlyList<LspDiagnostic> publishedDiagnostics) =>
         Dispatcher.UIThread.Post(() =>
         {
-            if (string.Equals(filePath, SelectedFilePath, StringComparison.Ordinal))
+            var tab = OpenTabs.FirstOrDefault(t => string.Equals(t.FilePath, filePath, StringComparison.Ordinal));
+            if (tab is not null)
             {
-                Diagnostics = publishedDiagnostics;
+                tab.Diagnostics = publishedDiagnostics;
             }
         });
 
     // Epic 17, T17.1.3: go-to-definition - navigates straight to the first result, same "don't
     // build a disambiguation UI for the common single-result case" scope decision FindReferencesAsync
-    // below explains for its own (genuinely multi-result) case.
-    public async Task GoToDefinitionAsync(LspPosition position)
+    // below explains for its own (genuinely multi-result) case. Epic 23: takes the requesting
+    // tab's own FilePath explicitly, since there's no longer a single SelectedFilePath to assume.
+    public async Task GoToDefinitionAsync(string filePath, LspPosition position)
     {
-        if (string.IsNullOrEmpty(SelectedFilePath))
-        {
-            return;
-        }
-
         try
         {
-            var locations = await _languageServerSessionManager.GetDefinitionAsync(SelectedFilePath, position);
+            var locations = await _languageServerSessionManager.GetDefinitionAsync(filePath, position);
             if (locations.Count > 0)
             {
                 NavigateToLocation(locations[0]);
@@ -429,65 +230,37 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Go-to-definition failed for {FilePath}.", SelectedFilePath);
+            _logger.LogWarning(ex, "Go-to-definition failed for {FilePath}.", filePath);
         }
     }
 
     // Epic 17, T17.1.3: find-references - returns every result for ExplorerView's minimal flyout to
     // list, rather than jumping straight to one, since references (unlike a definition) are
     // routinely more than one and there's no single "right" result to prefer.
-    public async Task<IReadOnlyList<LspLocation>> FindReferencesAsync(LspPosition position)
+    public async Task<IReadOnlyList<LspLocation>> FindReferencesAsync(string filePath, LspPosition position)
     {
-        if (string.IsNullOrEmpty(SelectedFilePath))
-        {
-            return Array.Empty<LspLocation>();
-        }
-
         try
         {
-            return await _languageServerSessionManager.GetReferencesAsync(SelectedFilePath, position);
+            return await _languageServerSessionManager.GetReferencesAsync(filePath, position);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Find-references failed for {FilePath}.", SelectedFilePath);
+            _logger.LogWarning(ex, "Find-references failed for {FilePath}.", filePath);
             return Array.Empty<LspLocation>();
         }
     }
 
-    // specs/editor-autocomplete T4: handles CodeEditor.CompletionRequested. Unlike
-    // RequestGhostTextCompletionAsync above, this goes straight to the language server (not the
-    // LLM runner) - R2's whole point is a server-verified completion list, not a guess.
-    public async Task RequestCompletionAsync(LspPosition position)
-    {
-        if (string.IsNullOrEmpty(SelectedFilePath))
-        {
-            return;
-        }
-
-        try
-        {
-            var items = await _languageServerSessionManager.GetCompletionAsync(SelectedFilePath, position);
-            CompletionItems = null;
-            CompletionItems = items;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Completion request failed for {FilePath}.", SelectedFilePath);
-        }
-    }
-
-    // Epic 17, T17.1.3: jumps to location, switching the tree selection first if it's in a
-    // different file (reusing the existing SelectedNode -> LoadNode flow, including its dirty-file
-    // guard) before leaving the caret position for ExplorerView to apply via TakePendingCaretTarget.
+    // Epic 17, T17.1.3: jumps to location - opens or activates a tab for the target file (Epic 23:
+    // the same open-or-activate path tree selection uses) before leaving the caret position for
+    // ExplorerView to apply via TakePendingCaretTarget.
     public void NavigateToLocation(LspLocation location)
     {
         _pendingCaretTarget = location.Position;
+        OpenOrActivateTab(location.FilePath);
 
-        if (string.Equals(location.FilePath, SelectedFilePath, StringComparison.Ordinal))
-        {
-            return;
-        }
-
+        // Keeps the tree's highlighted node in sync with the tab a cross-file jump just
+        // activated - OpenOrActivateTab above already did the actual opening, so this is purely
+        // cosmetic and safe to skip if the target isn't in the currently-loaded tree.
         if (Root is not null && FileTreeNodeViewModel.FindByPath(Root, location.FilePath) is { } node)
         {
             SelectedNode = node;
