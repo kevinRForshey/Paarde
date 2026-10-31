@@ -250,9 +250,13 @@ Each task references the requirement(s) it satisfies.
   decoration process sharing the same title). A live click-to-run -> type -> render round trip is
   something only a real display can confirm, same limitation T6's manual-verification note already
   flagged for Run.)_
-- [ ] T8 Tests: `PtyProcessManagerTests`, `TerminalBufferTests` per design.md's "Testing approach" —
+- [x] T8 Tests: `PtyProcessManagerTests`, `TerminalBufferTests` per design.md's "Testing approach" —
   include the regression case using the actual escape-sequence blob captured from the `TODOTUI1`
   repro that originally surfaced this bug. _(validates R1, R2)_
+  _(Done 2026-10-30: `TerminalBufferTests` (incl. the `TODOTUI1` blob) landed with T2;
+  `PtyProcessManagerTests` added now, 10 tests. Surfaced and fixed a Windows-only bug - Porta.Pty
+  quoted `/c` and the command as separate argv entries, so cmd.exe rejected every command. Now
+  `VerbatimCommandLine` + `cmd /s /c "<command>"`. See ROADMAP.md T21.4.1 for details.)_
 - [ ] T9 Manual verification: re-run the `TODOTUI1` repro end-to-end (Run now renders the TUI app
   instead of staying blank; keyboard input drives it; Stop still leaves no orphaned process), and
   confirm an ordinary `dotnet build`/`git status` through the new path shows no visible regression

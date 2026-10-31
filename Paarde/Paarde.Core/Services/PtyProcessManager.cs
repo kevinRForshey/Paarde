@@ -46,7 +46,12 @@ public class PtyProcessManager : IPtyProcessManager
             Rows = rows,
             Cwd = workingDirectoryPath,
             App = isWindows ? "cmd.exe" : "/bin/sh",
-            CommandLine = isWindows ? ["/c", command] : ["-c", command],
+            // Porta.Pty's default Windows formatting wraps every argument in quotes, which cmd.exe
+            // misparses ('"exit 3' is not recognized...) - so on Windows the command line is passed
+            // verbatim in the standard `cmd /s /c "<command>"` form, where /s strips exactly the
+            // outer quotes and leaves any quotes inside the command itself untouched.
+            CommandLine = isWindows ? ["/s", "/c", $"\"{command}\""] : ["-c", command],
+            VerbatimCommandLine = isWindows,
         };
 
         var connection = await PtyProvider.SpawnAsync(options, cancellationToken);

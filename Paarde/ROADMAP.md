@@ -2964,22 +2964,39 @@ control instead of adopting the third-party widget.*
   Insert/Delete, Enter/Tab/Backspace/Escape, Ctrl+A-Z) is a pure `internal TryEncodeSpecialKey`
   method, unit-tested directly (19 cases in `TerminalControlTests`) without an Avalonia display.
   Full 526/526 Core + 359/359 Avalonia suites pass.)_
-- [ ] T21.3.3 Wire the control into Run's output strip (Epic 20) as the renderer when a run is
+- [x] T21.3.3 Wire the control into Run's output strip (Epic 20) as the renderer when a run is
   PTY-backed, and into Epic 16's `TerminalView` page, replacing its current plain-text
   `OutputText` append for the cases where a PTY is in use.
   _(Run half done 2026-10-27 as part of T21.1.2 above: `ShellView.axaml`'s output-strip `TextBox`
   is replaced by `<controls:TerminalControl Buffer="{Binding RunPanelViewModel.OutputBuffer}" />`
   inside the unchanged `Expander`, with `ShellView.axaml.cs` wiring `InputReceived`/`Resized` to
-  `RunPanelViewModel`'s passthroughs. Epic 16's `TerminalView`/`TerminalViewModel` half remains.)_
+  `RunPanelViewModel`'s passthroughs. Terminal half done 2026-10-27 per
+  `specs/terminal-emulation/tasks.md` T7: `TerminalView.axaml` now hosts the same `TerminalControl`.)_
 
-**F21.4 — Tests**
-- [ ] T21.4.1 `PtyProcessManagerTests` (or equivalent): a real PTY-backed process starts, streams
+**F21.4 — Tests** — ✅ Done 2026-10-30 (manual verification, spec T9, still pending)
+- [x] T21.4.1 `PtyProcessManagerTests` (or equivalent): a real PTY-backed process starts, streams
   bytes, resizes, and stops/kills its tree the same way `RunProcessManagerTests` already verifies
   for the plain-pipe path.
-- [ ] T21.4.2 Terminal-adapter tests: feeding known ANSI/VT100 sequences (cursor moves, alternate
+  _(Done 2026-10-30: `Paarde.Core.Tests/Services/PtyProcessManagerTests.cs`, 10 tests spawning real
+  commands through a real PTY with per-platform commands (cmd.exe on Windows, sh elsewhere): output
+  streaming, natural exit code, working directory, `Stop()` → `Exited(null)`, restart-stops-previous,
+  `Resize` while running, a `WriteInput` stdin round trip, inner-quotes/`&&` reaching the shell
+  intact, and the nothing-running no-ops. **Writing these found a real Windows bug:** Porta.Pty's
+  default Windows argument formatting quotes every argument (`cmd.exe "/c" "exit 3"`), which cmd.exe
+  misparses - every Run/Terminal command on Windows failed with `'"<command>' is not recognized`.
+  CI never saw it because Linux's `sh -c` gets a real argv. Fixed in `PtyProcessManager` by passing
+  `VerbatimCommandLine = true` with the standard `cmd /s /c "<command>"` form (confirmed against a
+  decompile of Porta.Pty 2.2.3's `WindowsArguments`). The echo test also asserts exit code 0, since
+  the old error message itself contained the echoed text and would otherwise mask a regression.
+  All 10 pass on Windows. Process-tree kill of grandchildren isn't asserted - there's no portable
+  way to enumerate them from a test - so that stays part of T9's manual check.)_
+- [x] T21.4.2 Terminal-adapter tests: feeding known ANSI/VT100 sequences (cursor moves, alternate
   screen enter/exit, colors) through the XTerm.NET adapter produces the expected cell-buffer state.
   Rendering-control visual verification, like every other Avalonia control in this roadmap, needs a
   real display and is manual/deferred.
+  _(Done 2026-10-27 alongside T21.2.1: `TerminalBufferTests` covers cursor positioning, 16/256/
+  true-color SGR, alternate-buffer enter/exit, resize, and the byte-for-byte `TODOTUI1` regression
+  blob.)_
 
 ---
 
