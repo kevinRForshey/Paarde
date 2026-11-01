@@ -11,6 +11,7 @@ namespace Paarde.Core.Tests.Services;
 // Stands a POSIX shell script in for the `claude` CLI (same approach GitStatusServiceTests takes with a
 // real `git` binary) so RunPromptAsync's stream-json NDJSON parsing (T6.2.1/T6.2.3) can be exercised
 // without invoking the real, paid Claude Code CLI.
+[Collection("RealProcess")]
 public class ClaudeCliRunnerTests : IDisposable
 {
     private const string FakeClaudeScript = """

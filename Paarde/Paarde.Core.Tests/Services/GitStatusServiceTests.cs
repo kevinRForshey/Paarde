@@ -4,6 +4,7 @@ using Paarde.Core.Services;
 
 namespace Paarde.Core.Tests.Services;
 
+[Collection("RealProcess")]
 public class GitStatusServiceTests : IDisposable
 {
     private readonly string _workingDirectory;

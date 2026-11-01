@@ -10,6 +10,7 @@ namespace Paarde.Core.Tests.Services;
 // Runs real, trivial shell commands (same approach ClaudeCliRunnerTests/GitStatusServiceTests take
 // with a fake script / the real git binary) rather than mocking Process - the behavior under test
 // (stdout/stderr capture, exit code, cancellation killing the child) only exists at that boundary.
+[Collection("RealProcess")]
 public class ProcessCommandRunnerTests : IDisposable
 {
     private readonly string _workingDirectory = Directory.CreateTempSubdirectory("PaardeTests_").FullName;
