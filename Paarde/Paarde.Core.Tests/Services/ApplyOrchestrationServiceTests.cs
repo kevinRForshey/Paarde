@@ -6,6 +6,10 @@ using Paarde.Core.ViewModels;
 
 namespace Paarde.Core.Tests.Services;
 
+// RunGit/RunGitCapture below spawn real `git` child processes via Process.Start - see
+// RealProcessCollection.cs for why that requires this class to be serialized against the other
+// real-process tests rather than left to xUnit's default cross-class parallelism.
+[Collection("RealProcess")]
 public class ApplyOrchestrationServiceTests : IDisposable
 {
     private readonly string _workingDirectory;
