@@ -224,12 +224,34 @@ that depend on them, deletions last.
     full suite (934 tests) passes (unchanged - no existing test touches this new, still-unreferenced-
     by-any-navigated-view control; `AssistantPanelControl`/`ComposePanelControl` aren't exercised by
     ExplorerView until T12).
-- [ ] T10 New `ReviewFileDetailControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): copy
+- [x] T10 New `ReviewFileDetailControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): copy
   `TutorialDetailControl.axaml`, delete its header row (duplicate file path - Explorer's tab header
   already shows it) and its `CodeEditor` + the `FlyoutBase.AttachedFlyout` references-list markup
   tied to it, keeping the overview `TextBlock`/`MarkdownTextBlock` and the `TutorialStepViewModel`
   step-card `ItemsControl` exactly as they are today. Code-behind trimmed to whatever (if anything)
   doesn't reference the removed editor. _(R6)_
+  - Done: removed the header row (`SymbolIcon` + file-path `TextBlock`) and the `CodeEditor`, plus
+    the Undo/Redo buttons (`Editor.CanUndo`/`CanRedo`/`.Undo()`/`.Redo()` have no meaning once the
+    editor is gone - editing now happens on the file's own Explorer tab via `EffectiveContent`,
+    T1/T5/T13). Revert-to-proposed/Revert-to-original stayed - they act on `EditedContent`
+    directly, not on an `Editor` instance. The hunk-selection row, step-navigation row, and the
+    `TutorialStepViewModel` step-card `ItemsControl` all carried over unchanged. Code-behind
+    dropped everything wired to the removed `Editor` (`RefreshUndoRedoButtons`,
+    `OnUndoButtonClick`/`OnRedoButtonClick`, `OnDiffHunkActionRequested` and the
+    `Editor.DiffHunkActionRequested`/`GhostTextRequested`/`PropertyChanged`/`GotFocus`/`LostFocus`
+    subscriptions, and the `IActiveEditorContext` caret forwarding) and kept everything else as-is,
+    including `FindAncestorOfType<TutorialView>()` in `RebuildSteps`/`ApplyPendingStepTarget` -
+    T11 retargets that to `ReviewPanelControl` once it's the control that actually hosts this one.
+  - Deviation note: neither a `FlyoutBase.AttachedFlyout` references-list nor a separate "overview"
+    `TextBlock`/`MarkdownTextBlock` actually exists in `TutorialDetailControl.axaml`/`.axaml.cs` as
+    they stand today (confirmed by reading both files in full and grepping for
+    `FlyoutBase|Overview|References` - no hits). The real "Overview" header/text lives in
+    `TutorialView.axaml` (`HasTutorialOverview`), which T11 explicitly moves into
+    `ReviewPanelControl`, not here - this task's wording appears to describe either stale or
+    misattributed content. Nothing was removed/kept on that basis beyond what's documented above.
+  - Not yet referenced by any other view (that wiring is T11); verified with a from-scratch
+    `dotnet build Paarde.slnx` (0 errors) and `dotnet test Paarde.slnx` (934/934 passing, unchanged
+    counts since nothing exercises this new control yet).
 - [ ] T11 New `ReviewPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): move `TutorialView.axaml`'s
   left sidebar (Apply/Export/Refine buttons, master file list with tri-state selection, apply-history
   log) and overview header into this control, with the per-file tabbed area (`TabControl` over
