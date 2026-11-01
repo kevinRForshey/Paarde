@@ -8,14 +8,10 @@ namespace Paarde.Core.Tests.Services;
 // same "test at the process boundary, don't mock it" approach ProcessCommandRunnerTests takes,
 // since streaming, exit codes, and Kill() only exist there. Commands differ per platform because
 // PtyProcessManager shells through cmd.exe /c on Windows and /bin/sh -c elsewhere.
+[Collection("RealProcess")]
 public class PtyProcessManagerTests : IDisposable
 {
-    // GitHub Actions' ubuntu-latest hosted runner spawns/services real PTYs noticeably slower
-    // than a local machine under load (see actions/runner-images#14748) - 15s was enough
-    // locally but has been timing out there, so CI gets more headroom.
-    private static readonly TimeSpan Timeout = Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true"
-        ? TimeSpan.FromSeconds(45)
-        : TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 
     private readonly string _workingDirectory = Directory.CreateTempSubdirectory("PaardeTests_").FullName;
     private readonly PtyProcessManager _manager = new();

@@ -15,6 +15,7 @@ namespace Paarde.Core.Tests.Services;
 // correlation, and diagnostics-push handling (T17.1.1/T17.1.2) can be exercised without depending
 // on csharp-ls (or any other real language server) being installed - per the roadmap's explicit
 // instruction not to test against a real one.
+[Collection("RealProcess")]
 public class StdioLanguageServerClientTests : IAsyncLifetime
 {
     private const string FakeLspServerScript = """
