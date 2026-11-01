@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             x:Class="Paarde.Avalonia.Views.AssistantPanelControl"
+             x:DataType="vm:AssistantPanelViewModel">
+
+    <!-- Epic 25, T8: the docked Assistant panel - hosted by ExplorerView once T12 wires it up.
+         Two fixed tabs (not an ItemsSource-driven TabControl) since there are always exactly
+         these two, bound to AssistantPanel.SelectedTabIndex so a finished run can switch to
+         Review automatically (AssistantPanelViewModel's own PromptResultStore subscription). -->
+    <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+        <TabItem Header="Compose">
+            <!-- T9 replaces this placeholder with ComposePanelControl bound to Compose. -->
+            <TextBlock Margin="8" Text="Compose" Opacity="0.7" />
+        </TabItem>
+        <TabItem Header="Review">
+            <!-- T11 replaces this placeholder with ReviewPanelControl bound to Review. -->
+            <TextBlock Margin="8" Text="Review" Opacity="0.7" />
+        </TabItem>
+    </TabControl>
+</UserControl>

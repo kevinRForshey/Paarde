@@ -188,9 +188,20 @@ that depend on them, deletions last.
     the old `PromptLaunchRequest` navigation-parameter assertions (removed, now unreachable since
     `Launch` no longer passes a parameter to `NavigateTo`).
   - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes.
-- [ ] T8 New `AssistantPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): a `ui:TabView`/
+- [x] T8 New `AssistantPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): a `ui:TabView`/
   `TabControl` with two items bound to `AssistantPanel.SelectedTabIndex`, "Compose" hosting a new
-  `ComposePanelControl.axaml` and "Review" hosting a new `ReviewPanelControl.axaml`. _(R2)_
+  `ComposePanelControl.axaml` and "Review" hosting a new `ReviewPanelControl.axaml`. _(R2)_ —
+  done 2026-11-01. Notes:
+  - Used a plain `TabControl` (not FluentAvalonia's `ui:TabView`) with two fixed `TabItem`s bound
+    via `SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"` - matches the existing
+    `TabControl` precedent already in `ExplorerView.axaml`/old `TutorialView.axaml`, and nothing
+    else in the codebase uses `ui:TabView` yet.
+  - Deviation (deliberate, to keep this task independently buildable): since `ComposePanelControl`
+    and `ReviewPanelControl` don't exist until T9/T11, each `TabItem`'s content is a placeholder
+    `TextBlock` for now; T9 and T11 will each replace their own tab's placeholder with the real
+    control. Not referenced by any other view yet - `ExplorerView.axaml` wiring it in is T12.
+  - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes (unchanged - no
+    existing test touches this new, unreferenced control).
 - [ ] T9 New `ComposePanelControl.axaml[.cs]`: move `PromptView.axaml`'s body (prompt textbox,
   `@mention` popup, folder/file pickers, run button/progress, streaming output) into this control
   unchanged, `DataContext`/`x:DataType` now `vm:PromptViewModel` bound via
