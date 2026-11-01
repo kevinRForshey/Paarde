@@ -173,10 +173,21 @@ that depend on them, deletions last.
   automatically). `IFolderPickerService` was already registered (`AddTransient`, pre-existing for
   `PromptViewModel`), so no new registration was needed for that parameter either. Solution builds
   with 0 warnings/0 errors; full suite (934 tests) passes.
-- [ ] T7 `HistoryViewModel`: add `AssistantPanelViewModel` constructor parameter; change `Launch`
+- [x] T7 `HistoryViewModel`: add `AssistantPanelViewModel` constructor parameter; change `Launch`
   to call `_assistantPanel.Compose.LoadLaunchRequest(...)` + `_assistantPanel.ShowCompose()` +
   `_navigationService.NavigateTo(typeof(ExplorerViewModel).FullName!)` instead of navigating to
-  `typeof(PromptViewModel)`. _(R8)_
+  `typeof(PromptViewModel)`. _(R8)_ — done 2026-11-01, exactly as specified. Notes:
+  - `PromptViewModel.LoadLaunchRequest(PromptLaunchRequest)` already existed (built ahead of
+    schedule alongside an earlier task), so T7 only needed to change the caller.
+  - `App.axaml.cs` needed no edit: `HistoryViewModel` is `AddTransient` and DI resolves the new
+    `AssistantPanelViewModel` constructor parameter (singleton, since T6) automatically.
+  - `HistoryViewModelTests`: added a `CreateAssistantPanel()` helper (same real
+    `PromptViewModel`/`TutorialViewModel`-wrapping pattern as `AssistantPanelViewModelTests`) and
+    rewrote `ForkCommand`/`RerunCommand` tests to assert on `assistantPanel.Compose.PromptText`/
+    `WorkingDirectoryPath`/`SelectedTabIndex` and navigation to `ExplorerViewModel`, instead of
+    the old `PromptLaunchRequest` navigation-parameter assertions (removed, now unreachable since
+    `Launch` no longer passes a parameter to `NavigateTo`).
+  - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes.
 - [ ] T8 New `AssistantPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): a `ui:TabView`/
   `TabControl` with two items bound to `AssistantPanel.SelectedTabIndex`, "Compose" hosting a new
   `ComposePanelControl.axaml` and "Review" hosting a new `ReviewPanelControl.axaml`. _(R2)_

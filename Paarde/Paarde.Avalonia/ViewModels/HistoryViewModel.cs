@@ -21,6 +21,7 @@ public partial class HistoryViewModel : ObservableRecipient, INavigationAware
 {
     private readonly IRunSessionStore _runSessionStore;
     private readonly INavigationService _navigationService;
+    private readonly AssistantPanelViewModel _assistantPanel;
 
     [ObservableProperty]
     private HistorySessionRow? selected;
@@ -32,10 +33,11 @@ public partial class HistoryViewModel : ObservableRecipient, INavigationAware
 
     public ObservableCollection<ProposedFileChangeViewModel> SelectedFiles { get; } = new();
 
-    public HistoryViewModel(IRunSessionStore runSessionStore, INavigationService navigationService)
+    public HistoryViewModel(IRunSessionStore runSessionStore, INavigationService navigationService, AssistantPanelViewModel assistantPanel)
     {
         _runSessionStore = runSessionStore;
         _navigationService = navigationService;
+        _assistantPanel = assistantPanel;
 
         Sessions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNoSessions));
         SelectedFiles.CollectionChanged += (_, _) =>
@@ -109,8 +111,8 @@ public partial class HistoryViewModel : ObservableRecipient, INavigationAware
             return;
         }
 
-        _navigationService.NavigateTo(
-            typeof(PromptViewModel).FullName!,
-            new PromptLaunchRequest(session.Session.UserPromptText, session.Session.WorkingDirectoryPath, autoRun));
+        _assistantPanel.Compose.LoadLaunchRequest(new PromptLaunchRequest(session.Session.UserPromptText, session.Session.WorkingDirectoryPath, autoRun));
+        _assistantPanel.ShowCompose();
+        _navigationService.NavigateTo(typeof(ExplorerViewModel).FullName!);
     }
 }
