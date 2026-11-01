@@ -18,7 +18,12 @@ public partial class TutorialDetailControl : UserControl
     private readonly IPromptResultStore _promptResultStore;
     private readonly IFileChangeApplyService _fileChangeApplyService;
     private readonly ILlmRunner _llmRunner;
-    private readonly INavigationService _navigationService;
+
+    // Epic 25: cached once this control is attached to TutorialView's visual tree (DataContext is
+    // typically assigned before that, so FindAncestorOfType in RebuildSteps itself would miss it on
+    // this control's very first materialization) and reused by every later RebuildSteps - e.g. when
+    // Selected switches to a different file and the DataTemplate recycles this same instance.
+    private TutorialViewModel? _owner;
 
     // T8.4.3: which step the Previous/Next buttons and progress indicator currently point at - reset
     // to the first step whenever Steps is rebuilt (new file selected), since there's no notion of a
@@ -32,11 +37,20 @@ public partial class TutorialDetailControl : UserControl
         _promptResultStore = App.GetService<IPromptResultStore>();
         _fileChangeApplyService = App.GetService<IFileChangeApplyService>();
         _llmRunner = App.GetService<ILlmRunner>();
-        _navigationService = App.GetService<INavigationService>();
         InitializeComponent();
 
         StepsItemsControl.ItemsSource = Steps;
         DataContextChanged += (_, _) => RebuildSteps();
+
+        // Epic 25: AttachedToVisualTree (rather than Loaded) is the earliest point FindAncestorOfType
+        // can succeed - re-running RebuildSteps here covers this control's first materialization,
+        // where DataContextChanged above already fired while it was still unattached and _owner was
+        // still null.
+        AttachedToVisualTree += (_, _) =>
+        {
+            _owner ??= this.FindAncestorOfType<TutorialView>()?.ViewModel;
+            RebuildSteps();
+        };
 
         // T8.4.5: applied once this control is attached to TutorialView's visual tree, by which
         // point RebuildSteps (above) has already populated Steps for the jump's target file.
@@ -113,13 +127,13 @@ public partial class TutorialDetailControl : UserControl
         Steps.Clear();
         _currentStepIndex = 0;
 
-        if (DataContext is ProposedFileChangeViewModel proposedFileChange)
+        if (DataContext is ProposedFileChangeViewModel proposedFileChange && _owner is { } owner)
         {
             var hunks = proposedFileChange.Hunks;
 
             for (var i = 0; i < hunks.Count; i++)
             {
-                Steps.Add(new TutorialStepViewModel(hunks[i], proposedFileChange, _promptResultStore.WorkingDirectoryPath, _promptResultStore.SessionId, _fileChangeApplyService, _llmRunner, _navigationService, stepNumber: i + 1, totalSteps: hunks.Count));
+                Steps.Add(new TutorialStepViewModel(hunks[i], proposedFileChange, _promptResultStore.WorkingDirectoryPath, _promptResultStore.SessionId, _fileChangeApplyService, _llmRunner, owner, stepNumber: i + 1, totalSteps: hunks.Count));
             }
         }
 

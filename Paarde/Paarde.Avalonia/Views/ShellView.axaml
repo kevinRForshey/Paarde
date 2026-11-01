@@ -37,13 +37,17 @@
                        Text="{Binding StatusMessage}" />
         </Grid>
 
+        <!-- UX pass: compact icon-rail pane instead of the ~320px labeled sidebar - reclaims
+             width for page content (most of all, Explorer's editor) on every page. The current
+             page's name is still shown via the Header binding below, and FluentAvalonia's own
+             hamburger toggle still lets the pane expand temporarily to show labels. -->
         <ui:NavigationView Grid.Row="1"
                             x:Name="NavigationViewControl"
                             IsBackButtonVisible="True"
                             IsBackEnabled="{Binding IsBackEnabled}"
                             SelectedItem="{Binding Selected}"
                             IsSettingsVisible="True"
-                            PaneDisplayMode="Left"
+                            PaneDisplayMode="LeftCompact"
                             Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Main" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.MainViewModel">

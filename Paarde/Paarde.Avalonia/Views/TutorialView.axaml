@@ -103,7 +103,7 @@
             <ListBox Grid.Row="1"
                      Name="FileList"
                      ItemsSource="{Binding Files}"
-                     SelectedItem="{Binding Selected, Mode=TwoWay}">
+                     SelectedItem="{Binding SelectedFileListItem, Mode=TwoWay}">
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="coreVm:ProposedFileChangeViewModel">
                         <Grid Height="48" ColumnDefinitions="Auto,Auto,*">
@@ -161,41 +161,18 @@
                                FontSize="18"
                                IsVisible="{Binding HasFilesButNoneSelected}" />
 
-                    <!-- T8.2.2: tabbed editing - every file the user has selected from the master
-                         list this visit stays open as its own tab (TutorialDetailControl instance),
-                         rather than the previous single ContentControl that threw its detail pane
-                         away and rebuilt it on every selection change. -->
-                    <Grid RowDefinitions="Auto,*" IsVisible="{Binding HasOpenTabs}">
-                        <Button Grid.Row="0"
-                                Content="Close Tab"
-                                HorizontalAlignment="Right"
-                                Margin="0,0,0,4"
-                                Command="{Binding CloseSelectedTabCommand}"
-                                ToolTip.Tip="Close the active tab." />
-                        <TabControl Grid.Row="1"
-                                    ItemsSource="{Binding OpenTabs}"
-                                    SelectedItem="{Binding Selected, Mode=TwoWay}">
-                            <TabControl.ItemTemplate>
-                                <DataTemplate x:DataType="coreVm:ProposedFileChangeViewModel">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <TextBlock Text="{Binding FilePath}"
-                                                   MaxWidth="200"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTip.Tip="{Binding FilePath}" />
-                                        <TextBlock Text="*"
-                                                   FontWeight="Bold"
-                                                   IsVisible="{Binding IsDirty}"
-                                                   ToolTip.Tip="This file has unsaved edits." />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </TabControl.ItemTemplate>
-                            <TabControl.ContentTemplate>
-                                <DataTemplate x:DataType="coreVm:ProposedFileChangeViewModel">
-                                    <views:TutorialDetailControl />
-                                </DataTemplate>
-                            </TabControl.ContentTemplate>
-                        </TabControl>
-                    </Grid>
+                    <!-- Epic 25: Explorer's own tabs are now the single place a file's detail pane
+                         lives - Selected just mirrors whichever of those tabs is currently focused
+                         (see TutorialViewModel.AttachExplorer), so this is a plain content host
+                         rather than its own tab strip. Full rework of this pane lands in T11. -->
+                    <ContentControl Content="{Binding Selected}"
+                                    IsVisible="{Binding Selected, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="coreVm:ProposedFileChangeViewModel">
+                                <views:TutorialDetailControl />
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
                 </Grid>
             </Grid>
         </Border>

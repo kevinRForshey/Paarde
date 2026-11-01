@@ -2795,7 +2795,7 @@ sequential workflow with a beginning and an end, and keeping it page-based is fi
 is a **persistent layer underneath the pages** that doesn't care which step of that workflow
 you're on. That's what Epics 20–23 build, in increasing order of how much of the shell they touch.
 
-### EPIC 20 — Build & Run *(P0 — the explicit, concrete ask)* — Implementation done 2026-10-26, manual verification pending
+### EPIC 20 — Build & Run *(P0 — the explicit, concrete ask)* — ✅ Done 2026-10-26, manually verified 2026-10-31
 
 *Why: "incorporate build and run buttons in DotNet applications (for now and also for other
 compiled languages in the future)" is the specific, immediate request this whole initiative grew
@@ -2838,7 +2838,7 @@ exact new types, merge/detection algorithm, and process-lifecycle design:
   Build/Run/Problems/Terminal dock; this ships only the Build/Run tab's worth, but it's real and
   usable from every page on day one.
 
-**F20.4 — Tests** — Implementation tests done 2026-10-26, manual verification pending
+**F20.4 — Tests** — ✅ Done 2026-10-26, manually verified 2026-10-31
 - [x] T20.4.1 `RunConfigurationDetectorTests`, `RunConfigurationsProviderTests`,
   `RunProcessManagerTests`, `RunPanelViewModelTests` per `specs/build-and-run/design.md`'s testing
   section. — done 2026-10-26: 22 new tests in `Paarde.Core.Tests`, 21 new in `Paarde.Avalonia.Tests`
@@ -2847,10 +2847,10 @@ exact new types, merge/detection algorithm, and process-lifecycle design:
   `OnProcessOutputReceived`/`OnProcessExited` since those marshal through `Dispatcher.UIThread.
   Post`, which this plain xunit host doesn't pump - same gap already documented on
   `TerminalViewModelTests`. Full suites pass: 515/515 Core, 340/340 Avalonia.
-- [ ] T20.4.2 Manual verification against this repo itself (requires a running `Application`/
-  display, unavailable in this sandbox): Build/Run/Stop actually drive `dotnet build`/`dotnet run`,
-  Stop leaves no orphaned process, switching configurations switches targets, and all of it is
-  reachable from every page.
+- [x] T20.4.2 Manual verification against this repo itself: Build/Run/Stop actually drive
+  `dotnet build`/`dotnet run`, Stop leaves no orphaned process, switching configurations switches
+  targets, and all of it is reachable from every page.
+  _(Manually verified 2026-10-31 by Kevin Forshey.)_
 
 ---
 
@@ -2973,7 +2973,7 @@ control instead of adopting the third-party widget.*
   `RunPanelViewModel`'s passthroughs. Terminal half done 2026-10-27 per
   `specs/terminal-emulation/tasks.md` T7: `TerminalView.axaml` now hosts the same `TerminalControl`.)_
 
-**F21.4 — Tests** — ✅ Done 2026-10-30 (manual verification, spec T9, still pending)
+**F21.4 — Tests** — ✅ Done 2026-10-30, manually verified 2026-10-31
 - [x] T21.4.1 `PtyProcessManagerTests` (or equivalent): a real PTY-backed process starts, streams
   bytes, resizes, and stops/kills its tree the same way `RunProcessManagerTests` already verifies
   for the plain-pipe path.
@@ -3181,21 +3181,20 @@ Full spec: [`specs/command-palette/`](specs/command-palette/requirements.md).*
 
 ---
 
-### EPIC 25 — Unify Prompt/Diffs/Tutorial into one dockable surface *(P3 — explicitly optional, not committed)*
+### EPIC 25 — Unified workbench: dock the Assistant panel beside the editor
 
-*Why flagged instead of planned: this is the one change big enough to actually question whether the
-Prompt→Diffs→Tutorial→Apply flow should stop being three separate full-page steps and become three
-panels arranged side by side in the same workbench (prompt box docked left, proposed-file tree
-center, diff/tutorial detail right) - closer to how Cursor/Windsurf present a single continuous
-surface rather than a page-to-page wizard. That is a genuinely different product shape for this
-app's core loop, not an additive shell feature like Epics 20–23, and it's not obviously a strict
-improvement: the current three-page flow has a clear beginning/middle/end that matches how a
-single prompt-review-apply cycle actually works, and collapsing it into permanently-visible panels
-could just as easily make a small screen feel more cluttered, not less wizard-like. Recommend
-revisiting this only after Epics 20–23 ship and there's a felt sense (not just a guess) of whether
-the remaining "wizard" feeling is about the shell (fixed by then) or genuinely about this flow's
-page-per-step structure. No requirements/design written yet - deliberately, since the right design
-depends on what Epics 20–23 reveal.*
+*Why: Epics 20–24 fixed the shell (persistent Build/Run toolbar, output dock, status bar, tabbed
+Explorer editing, command palette/Quick Open) but left the app's actual core loop - compose a
+prompt, review its result, apply it - as three separate full pages (Main → Prompt → Tutorial/Diffs)
+the user wizards through, with the code editor itself only appearing as one stop along the way
+instead of being the thing the whole screen is organized around. Having now lived with Epics 20–24
+for a while, the "wizard" feeling is confirmed to be about this flow's page-per-step structure, not
+the shell - so this epic commits to collapsing Main/Prompt/Diffs/Tutorial into a single dockable
+Assistant panel (Compose + Review tabs) that lives beside Explorer's editor, with Explorer promoted
+to the app's landing page. A finished run's files open automatically as Explorer tabs with Epic
+13's inline diff rendering, so there is no longer a gap between "the run finished" and "I can see
+and act on the result" - the editor is visible the entire time, not reached only after three page
+navigations. Full spec: `specs/unified-workbench/requirements.md`.*
 
 ---
 
@@ -3281,6 +3280,8 @@ depends on what Epics 20–23 reveal.*
     a command palette's value (jump to any action from anywhere) is largest once Epics 20–22 have
     actually added more "anywhere-reachable" actions (Build/Run/Stop, dock tabs, file tabs) for it
     to expose - building the palette first would mean populating it with less.
-25. **Epic 25** — unifying Prompt/Diffs/Tutorial into one dockable surface. Explicitly **not**
-    committed - see that epic's "Why" for the reasoning. Revisit only after living with Epics
-    20–24 for a while.
+25. **Epic 25** — unified workbench: dock the Assistant panel beside the editor. Sequenced last
+    because it depends on every one of Epics 20–24: the output dock/status bar (22) it sits above,
+    the tabbed Explorer editing (23) its `OpenFileTabViewModel.PendingChange` bridge extends, and
+    the command palette (24) whose "Go to `<Page>`" entries shrink once Main/Prompt/Diffs/Tutorial
+    stop being separate pages. Full spec: `specs/unified-workbench/`.

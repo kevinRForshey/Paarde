@@ -313,12 +313,11 @@ public class PromptViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_RestoresSavedTimeoutSeconds()
+    public async Task Constructor_RestoresSavedTimeoutSeconds()
     {
         await _localSettingsService.SaveSettingAsync("PromptTimeoutSeconds", 120);
         var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
         await Task.Yield();
 
         Assert.Equal(120, sut.TimeoutSeconds);
@@ -359,13 +358,12 @@ public class PromptViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_RestoresSavedPresetAndDepth()
+    public async Task Constructor_RestoresSavedPresetAndDepth()
     {
         await _localSettingsService.SaveSettingAsync("SavedPromptPreset", "Refactor");
         await _localSettingsService.SaveSettingAsync("SavedTutorialDepth", "Detailed");
         var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
         await Task.Yield();
 
         Assert.Equal(PromptPreset.Refactor, sut.SelectedPreset);
@@ -493,12 +491,11 @@ public class PromptViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_RestoresSavedContextPaths()
+    public async Task Constructor_RestoresSavedContextPaths()
     {
         await _localSettingsService.SaveSettingAsync("SavedContextPaths", new List<string> { "/tmp/a.cs", "/tmp/b.cs" });
         var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
         await Task.Yield();
 
         Assert.Equal(["/tmp/a.cs", "/tmp/b.cs"], sut.AttachedPaths);
@@ -566,20 +563,15 @@ public class PromptViewModelTests
         Assert.DoesNotContain("Additional context files:", _llmRunner.LastPrompt);
     }
 
+    // No "defaults to empty" counterpart: Epic 25, T3 moved the settings/estimate load from
+    // page-navigation time (OnNavigatedTo) to construction time, since Compose is now a singleton
+    // with no navigation event to hang it off - by the time CreateSut() returns (synchronously,
+    // under these fakes), the estimate below is already populated.
     [Fact]
-    public void EstimatedTokenCountDisplay_DefaultsToEmpty()
+    public async Task Constructor_PopulatesEstimatedTokenCountDisplay()
     {
         var sut = CreateSut();
 
-        Assert.Equal(string.Empty, sut.EstimatedTokenCountDisplay);
-    }
-
-    [Fact]
-    public async Task OnNavigatedTo_PopulatesEstimatedTokenCountDisplay()
-    {
-        var sut = CreateSut();
-
-        sut.OnNavigatedTo(null!);
         await Task.Yield();
 
         Assert.Contains("tokens", sut.EstimatedTokenCountDisplay);
@@ -1118,13 +1110,12 @@ public class PromptViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_RestoresPromptAndWorkingDirectoryFromSettings()
+    public async Task Constructor_RestoresPromptAndWorkingDirectoryFromSettings()
     {
         await _localSettingsService.SaveSettingAsync("SavedPrompt", "Saved prompt text");
         await _localSettingsService.SaveSettingAsync("SavedWorkingDirectory", "/saved/dir");
         var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
         await Task.Yield();
 
         Assert.Equal("Saved prompt text", sut.PromptText);
@@ -1143,25 +1134,21 @@ public class PromptViewModelTests
         "user prompt");
 
     [Fact]
-    public void OnNavigatedTo_NoSessions_HasNoRecentWorkingDirectories()
+    public void Constructor_NoSessions_HasNoRecentWorkingDirectories()
     {
         var sut = CreateSut();
-
-        sut.OnNavigatedTo(null!);
 
         Assert.False(sut.HasRecentWorkingDirectories);
         Assert.Empty(sut.RecentWorkingDirectories);
     }
 
     [Fact]
-    public void OnNavigatedTo_RecentWorkingDirectoriesAreDistinctAndCapped()
+    public void Constructor_RecentWorkingDirectoriesAreDistinctAndCapped()
     {
         _runSessionStore.SessionsToList = Enumerable.Range(0, 8)
             .Select(i => CreateSession($"/working/dir-{i % 6}", DateTimeOffset.UtcNow.AddMinutes(-i)))
             .ToList();
         var sut = CreateSut();
-
-        sut.OnNavigatedTo(null!);
 
         Assert.True(sut.HasRecentWorkingDirectories);
         Assert.Equal(5, sut.RecentWorkingDirectories.Count);
@@ -1173,7 +1160,6 @@ public class PromptViewModelTests
     {
         _runSessionStore.SessionsToList = new[] { CreateSession("/recent/dir", DateTimeOffset.UtcNow) };
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         sut.SelectedRecentWorkingDirectory = sut.RecentWorkingDirectories[0];
         await Task.Yield();
@@ -1184,11 +1170,11 @@ public class PromptViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_WithForkLaunchRequest_LoadsPromptAndWorkingDirectoryButDoesNotRun()
+    public async Task LoadLaunchRequest_Fork_LoadsPromptAndWorkingDirectoryButDoesNotRun()
     {
         var sut = CreateSut();
 
-        sut.OnNavigatedTo(new PromptLaunchRequest("Forked prompt text", "/forked/dir", AutoRun: false));
+        sut.LoadLaunchRequest(new PromptLaunchRequest("Forked prompt text", "/forked/dir", AutoRun: false));
         await Task.Yield();
 
         Assert.Equal("Forked prompt text", sut.PromptText);
@@ -1197,7 +1183,7 @@ public class PromptViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_WithRerunLaunchRequest_LoadsAndImmediatelyRunsThePrompt()
+    public async Task LoadLaunchRequest_Rerun_LoadsAndImmediatelyRunsThePrompt()
     {
         var sut = CreateSut();
         _llmRunner.ResultToReturn = new LlmRunResult
@@ -1206,7 +1192,7 @@ public class PromptViewModelTests
             Output = """{"responseType": "answer", "answer": "Recursion is when a function calls itself."}""",
         };
 
-        sut.OnNavigatedTo(new PromptLaunchRequest("Rerun prompt text", "/rerun/dir", AutoRun: true));
+        sut.LoadLaunchRequest(new PromptLaunchRequest("Rerun prompt text", "/rerun/dir", AutoRun: true));
         await Task.Yield();
 
         Assert.Equal("Rerun prompt text", sut.PromptText);

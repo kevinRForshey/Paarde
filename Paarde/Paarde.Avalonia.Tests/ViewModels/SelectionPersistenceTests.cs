@@ -23,7 +23,6 @@ public class SelectionPersistenceTests
 
         var tutorialViewModel = new TutorialViewModel(promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), new FakeLlmRunner(), new PromptTemplateProvider(), new FakeFileSavePickerService(), new FakeLocalSettingsService(), new FakeBuildTestRunner());
         var diffsViewModel = new DiffsViewModel(promptResultStore, new FakeNavigationService());
-        tutorialViewModel.OnNavigatedTo(null!);
         diffsViewModel.OnNavigatedTo(null!);
 
         tutorialViewModel.Files[0].Hunks[0].IsSelected = false;
@@ -43,7 +42,6 @@ public class SelectionPersistenceTests
 
         var tutorialViewModel = new TutorialViewModel(promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), new FakeLlmRunner(), new PromptTemplateProvider(), new FakeFileSavePickerService(), new FakeLocalSettingsService(), new FakeBuildTestRunner());
         var diffsViewModel = new DiffsViewModel(promptResultStore, new FakeNavigationService());
-        tutorialViewModel.OnNavigatedTo(null!);
         diffsViewModel.OnNavigatedTo(null!);
 
         diffsViewModel.Files[0].IsSelected = false;

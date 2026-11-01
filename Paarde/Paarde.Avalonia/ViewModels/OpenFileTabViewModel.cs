@@ -1,7 +1,10 @@
+using System.ComponentModel;
+
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
 using Paarde.Core.Models;
+using Paarde.Core.ViewModels;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -55,6 +58,59 @@ public partial class OpenFileTabViewModel : ObservableObject
 
     [ObservableProperty]
     private IReadOnlyList<LspCompletionItem>? completionItems;
+
+    [ObservableProperty]
+    private ProposedFileChangeViewModel? pendingChange;
+
+    // Raised by TutorialStepViewModel's "View in Diff" action (via TutorialViewModel.FileFocusRequested)
+    // once ExplorerViewModel has already opened/focused this tab - ExplorerFileTabControl.axaml.cs
+    // subscribes to scroll the CodeEditor's caret to the hunk's SourceRangeStart, the same target
+    // DiffsDetailControl.axaml.cs's ScrollToHunk already uses.
+    public event Action<DiffHunk>? ScrollToHunkRequested;
+
+    public void RequestScrollTo(DiffHunk hunk) => ScrollToHunkRequested?.Invoke(hunk);
+
+    // Epic 25, T1: the view binds this instead of Content so a tab carrying a pending LLM proposal
+    // edits the shared ProposedFileChangeViewModel (keeping Review's apply/refine flow and
+    // Explorer's own tab in sync) while a plain, non-proposal tab keeps editing Content directly.
+    public string EffectiveContent
+    {
+        get => PendingChange?.EditedContent ?? Content;
+        set
+        {
+            if (PendingChange is { } change)
+            {
+                change.EditedContent = value;
+            }
+            else
+            {
+                Content = value;
+            }
+        }
+    }
+
+    partial void OnPendingChangeChanged(ProposedFileChangeViewModel? oldValue, ProposedFileChangeViewModel? newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.PropertyChanged -= OnPendingChangePropertyChanged;
+        }
+
+        if (newValue is not null)
+        {
+            newValue.PropertyChanged += OnPendingChangePropertyChanged;
+        }
+
+        OnPropertyChanged(nameof(EffectiveContent));
+    }
+
+    private void OnPendingChangePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ProposedFileChangeViewModel.EditedContent))
+        {
+            OnPropertyChanged(nameof(EffectiveContent));
+        }
+    }
 
     public OpenFileTabViewModel(
         string filePath,

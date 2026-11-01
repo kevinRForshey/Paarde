@@ -1,5 +1,7 @@
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
+using Paarde.Core.Models;
+using Paarde.Core.ViewModels;
 
 namespace Paarde.Avalonia.Tests.ViewModels;
 
@@ -172,5 +174,57 @@ public class OpenFileTabViewModelTests : IDisposable
 
         Assert.Equal("Failed to explain this file: boom", sut.FileOverview);
         Assert.False(sut.IsLoadingOverview);
+    }
+
+    [Fact]
+    public void EffectiveContent_NoPendingChange_RoutesThroughContent()
+    {
+        var sut = CreateSut("a.txt", "original");
+
+        sut.EffectiveContent = "edited";
+
+        Assert.Equal("edited", sut.Content);
+        Assert.True(sut.IsDirty);
+    }
+
+    [Fact]
+    public void EffectiveContent_WithPendingChange_RoutesThroughEditedContentAndLeavesContentAlone()
+    {
+        var sut = CreateSut("a.txt", "original");
+        sut.PendingChange = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
+
+        sut.EffectiveContent = "edited by user";
+
+        Assert.Equal("edited by user", sut.PendingChange.EditedContent);
+        Assert.Equal("original", sut.Content);
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public void EffectiveContent_PendingChangeEditedContentChanges_RaisesPropertyChanged()
+    {
+        var sut = CreateSut("a.txt", "original");
+        var pendingChange = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
+        sut.PendingChange = pendingChange;
+        var raisedProperties = new List<string?>();
+        sut.PropertyChanged += (_, e) => raisedProperties.Add(e.PropertyName);
+
+        pendingChange.EditedContent = "refined elsewhere";
+
+        Assert.Contains(nameof(sut.EffectiveContent), raisedProperties);
+        Assert.Equal("refined elsewhere", sut.EffectiveContent);
+    }
+
+    [Fact]
+    public void RequestScrollTo_RaisesScrollToHunkRequestedWithTheSameHunk()
+    {
+        var sut = CreateSut("a.txt", "original");
+        var hunk = new DiffHunk(1, 1, 1, 1, Array.Empty<DiffLine>(), 0, 1);
+        DiffHunk? received = null;
+        sut.ScrollToHunkRequested += h => received = h;
+
+        sut.RequestScrollTo(hunk);
+
+        Assert.Same(hunk, received);
     }
 }

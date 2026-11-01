@@ -257,7 +257,8 @@ Each task references the requirement(s) it satisfies.
   `PtyProcessManagerTests` added now, 10 tests. Surfaced and fixed a Windows-only bug - Porta.Pty
   quoted `/c` and the command as separate argv entries, so cmd.exe rejected every command. Now
   `VerbatimCommandLine` + `cmd /s /c "<command>"`. See ROADMAP.md T21.4.1 for details.)_
-- [ ] T9 Manual verification: re-run the `TODOTUI1` repro end-to-end (Run now renders the TUI app
+- [x] T9 Manual verification: re-run the `TODOTUI1` repro end-to-end (Run now renders the TUI app
   instead of staying blank; keyboard input drives it; Stop still leaves no orphaned process), and
   confirm an ordinary `dotnet build`/`git status` through the new path shows no visible regression
   from today's plain-text output. _(validates R3, R4, R5, Goal 6)_
+  _(Manually verified 2026-10-31 by Kevin Forshey.)_

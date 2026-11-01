@@ -199,6 +199,13 @@ public class CodeEditor : TextEditor
     {
         ShowLineNumbers = true;
         FontFamily = new FontFamily("Cascadia Mono,Consolas,monospace");
+        FontSize = 14;
+
+        // UX pass: a low-alpha neutral gray reads correctly against both the light and dark
+        // TextMate backgrounds applied below, so this doesn't need the same TryGetThemeColor
+        // lookup those use.
+        Options.HighlightCurrentLine = true;
+        TextArea.TextView.CurrentLineBackground = new SolidColorBrush(Color.FromArgb(0x14, 0x80, 0x80, 0x80));
 
         _textMateInstallation = this.InstallTextMate(RegistryOptions);
         _bracketHighlightRenderer = new BracketHighlightRenderer(TextArea.TextView);

@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Avalonia.ViewModels;
 
-public partial class TutorialViewModel : ObservableRecipient, INavigationAware, IConfirmNavigationAway
+public partial class TutorialViewModel : ObservableRecipient
 {
     private const string StageAppliedFilesInGitSettingsKey = "Tutorial_StageAppliedFilesInGit";
 
@@ -39,14 +39,49 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
     private ProposedHunk? _pendingStepTarget;
 
     // T8.4.1: the `## Tutorial` overview PromptViewModel parses into PromptResultStore.Tutorial but
-    // no view previously read - pulled on navigation the same way Files already is, rather than a
-    // live PropertyChanged subscription, since this page already re-reads the whole store on every
-    // OnNavigatedTo.
+    // no view previously read - refreshed from the store eagerly at construction and again on every
+    // subsequent run, now that this view model is a singleton with no OnNavigatedTo to re-pull it on.
     [ObservableProperty]
     private string tutorial = string.Empty;
 
+    // Epic 25: the file list's own selection is now just a "focus this file in Explorer" trigger
+    // (see OnSelectedFileListItemChanged below) rather than the page's actual detail-pane state -
+    // Selected itself (just below) reads Explorer's currently focused tab instead.
     [ObservableProperty]
-    private ProposedFileChangeViewModel? selected;
+    private ProposedFileChangeViewModel? selectedFileListItem;
+
+    private ExplorerViewModel? _explorer;
+
+    // Epic 25: Explorer's own tabs are now the single place a file's content/diff lives (no second
+    // tab strip here - see the removed OpenTabs) - Selected just mirrors whichever of those tabs is
+    // currently focused. AttachExplorer (called once, by ExplorerViewModel's own constructor) breaks
+    // what would otherwise be a constructor-injection cycle
+    // (ExplorerViewModel -> AssistantPanelViewModel -> TutorialViewModel -> ExplorerViewModel), same
+    // shape as Epic 24's AttachCommandPalette/AttachQuickOpen.
+    public void AttachExplorer(ExplorerViewModel explorer)
+    {
+        _explorer = explorer;
+        _explorer.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ExplorerViewModel.SelectedTab))
+            {
+                OnPropertyChanged(nameof(Selected));
+                OnPropertyChanged(nameof(HasFilesButNoneSelected));
+            }
+        };
+    }
+
+    public ProposedFileChangeViewModel? Selected => _explorer?.SelectedTab?.PendingChange;
+
+    // Epic 25, R7: replaces the old DiffJumpRequest/TutorialJumpRequest navigation - raised by the
+    // file list's own selection (below, with a null hunk) and by a step card's "View in Diff" action
+    // (TutorialStepViewModel, with the hunk it resolved to) so Explorer can open/focus the right tab
+    // without either side depending on navigation.
+    public event Action<ProposedFileChangeViewModel, DiffHunk?>? FileFocusRequested;
+
+    // TutorialStepViewModel lives in a different class, so it can't raise FileFocusRequested
+    // directly (C# only allows that from within the declaring type) - this is its way in.
+    public void RequestFileFocus(ProposedFileChangeViewModel file, DiffHunk? hunk) => FileFocusRequested?.Invoke(file, hunk);
 
     [ObservableProperty]
     private string applyStatusMessage = string.Empty;
@@ -84,14 +119,6 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
 
     public ObservableCollection<ProposedFileChangeViewModel> Files { get; } = new();
 
-    // T8.2.2: files currently open as tabs in the detail pane - a subset of Files, populated as the
-    // user selects files from the master list (see OnSelectedChanged below) rather than all of Files
-    // up front, so the page opens with just the one initial tab EnsureItemSelected already picked.
-    // Reset on every OnNavigatedTo along with Files/Selected - this view model is resolved fresh
-    // (AddTransient) on every navigation to this page, so there's nothing to preserve across a
-    // navigate-away-and-back the way there would be if it were a singleton.
-    public ObservableCollection<ProposedFileChangeViewModel> OpenTabs { get; } = new();
-
     // T4.2.3: display-ready rows for the apply-history log, newest first. Populated from
     // IApplyHistoryLog rather than bound to it directly, since that store's Entries is a plain
     // IReadOnlyList<ApplyHistoryEntry> with no change notification the view could bind to.
@@ -126,16 +153,43 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
         };
 
         ApplyHistoryEntries.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasApplyHistory));
-        OpenTabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasOpenTabs));
+
+        // Epic 25: this view model is now a singleton with no OnNavigatedTo to re-pull the store on
+        // - refresh eagerly once (covers a run that finished before this was constructed) and again
+        // on every subsequent run. FakePromptResultStore.SetResult raises PropertyChanged with a
+        // null PropertyName for its own bulk-invalidation callers (see AssistantPanelViewModelTests'
+        // comment on the same convention) - treated the same as a Tutorial change here, since in
+        // both the fake and the production store Tutorial and Files always change together for the
+        // same completed run.
+        _promptResultStore.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null || e.PropertyName == nameof(IPromptResultStore.Tutorial))
+            {
+                RefreshFromPromptResultStore();
+            }
+        };
+        RefreshFromPromptResultStore();
+        RefreshApplyHistoryEntries();
+
+        LoadSavedStageAppliedFilesInGitSettingAsync();
     }
 
-    // Async void because INavigationAware.OnNavigatedTo returns void - wrapped (same as
-    // PromptViewModel.OnNavigatedTo) so a corrupt settings file is logged rather than unwound
-    // unobserved out of NavigationService.OnNavigated.
-    public async void OnNavigatedTo(object parameter)
+    private void RefreshFromPromptResultStore()
     {
         Tutorial = _promptResultStore.Tutorial;
 
+        Files.Clear();
+
+        foreach (var file in _promptResultStore.Files)
+        {
+            Files.Add(file);
+        }
+    }
+
+    // Async void because there's no caller to await - same shape PromptViewModel.LoadSavedStateAsync
+    // uses for the same reason (a constructor can't itself be async).
+    private async void LoadSavedStageAppliedFilesInGitSettingAsync()
+    {
         try
         {
             var savedStageAppliedFilesInGit = await _localSettingsService.ReadSettingAsync<bool?>(StageAppliedFilesInGitSettingsKey);
@@ -143,42 +197,9 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load saved settings while navigating to the Tutorial page.");
+            _logger.LogError(ex, "Failed to load saved settings for the Review panel.");
         }
-
-        Files.Clear();
-        OpenTabs.Clear();
-
-        foreach (var file in _promptResultStore.Files)
-        {
-            Files.Add(file);
-        }
-
-        // T8.4.5: a jump from the Diffs page's "Back to tutorial" selects its file directly and
-        // remembers which step to scroll to, rather than relying on EnsureItemSelected's first-file
-        // default below.
-        if (parameter is TutorialJumpRequest jump)
-        {
-            _pendingStepTarget = jump.TargetStep;
-            Selected = jump.File;
-        }
-
-        // The WinUI version only auto-selects the first file once the master/detail view reports it has
-        // room to show both panes side by side; the hand-built two-pane layout here always shows both,
-        // so it's safe to select eagerly instead of waiting for a ViewStateChanged-equivalent signal.
-        EnsureItemSelected();
-
-        // The log is session-scoped (same singleton across page visits), so re-read it every time
-        // this page is shown rather than only right after an apply/undo/revert - otherwise
-        // navigating away and back would show a stale list.
-        RefreshApplyHistoryEntries();
     }
-
-    public void OnNavigatedFrom()
-    {
-    }
-
-    public bool HasUnsavedChanges => Files.Any(f => f.IsDirty);
 
     // Drives the Tutorial page's empty-state messaging: with no files at all (no prompt run yet)
     // the master list is empty and there's nothing to select, which otherwise looks indistinguishable
@@ -186,10 +207,6 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
     public bool HasNoFiles => Files.Count == 0;
 
     public bool HasFilesButNoneSelected => Files.Count > 0 && Selected == null;
-
-    // Drives whether the tab strip/detail pane shows itself at all - distinct from
-    // HasFilesButNoneSelected, which is about there being files to pick from in the first place.
-    public bool HasOpenTabs => OpenTabs.Count > 0;
 
     // Drives whether the tutorial-overview header shows itself - a response with no files (or a
     // plain-text/unstructured response) can still have a non-empty overview worth showing.
@@ -202,20 +219,15 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
         ExportTutorialAsHtmlCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnSelectedChanged(ProposedFileChangeViewModel? value)
+    // Epic 25, R7: selecting a file from the master list is now just a "focus this file in
+    // Explorer" request - Explorer opening/activating the tab is what actually updates Selected
+    // (via AttachExplorer's subscription above), not this handler itself.
+    partial void OnSelectedFileListItemChanged(ProposedFileChangeViewModel? value)
     {
-        // T8.2.2: selecting a file from the master list (or a jump/refine elsewhere in this view
-        // model) opens it as a tab if it isn't one already, rather than requiring a separate
-        // "open" action - ReplaceFile already swaps a refined file into OpenTabs directly, so this
-        // is a no-op for that path.
-        if (value is not null && !OpenTabs.Contains(value))
+        if (value is not null)
         {
-            OpenTabs.Add(value);
+            RequestFileFocus(value, null);
         }
-
-        OnPropertyChanged(nameof(HasFilesButNoneSelected));
-        RefineSelectedFileCommand.NotifyCanExecuteChanged();
-        CloseSelectedTabCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnStageAppliedFilesInGitChanged(bool value) => _localSettingsService.SaveSettingAsync(StageAppliedFilesInGitSettingsKey, value);
@@ -223,11 +235,6 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
     partial void OnRefineInstructionChanged(string value) => RefineSelectedFileCommand.NotifyCanExecuteChanged();
 
     partial void OnIsRefiningChanged(bool value) => RefineSelectedFileCommand.NotifyCanExecuteChanged();
-
-    public void EnsureItemSelected()
-    {
-        Selected ??= Files.FirstOrDefault();
-    }
 
     // "Take once" accessor for the step target a TutorialJumpRequest set - called by
     // TutorialDetailControl.axaml.cs once it's materialized for the target file.
@@ -703,28 +710,6 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
         }
     }
 
-    // T8.2.2: closes the active tab - a single command acting on Selected rather than a close
-    // affordance on each tab header, consistent with how this page already drives per-row actions
-    // (ApplySelected/Fork/Rerun etc. elsewhere in this codebase act on a Selected item rather than a
-    // command bound per-row back out to this view model's DataContext from inside a DataTemplate).
-    [RelayCommand(CanExecute = nameof(CanCloseSelectedTab))]
-    private void CloseSelectedTab()
-    {
-        if (Selected is not { } file)
-        {
-            return;
-        }
-
-        var index = OpenTabs.IndexOf(file);
-        OpenTabs.Remove(file);
-
-        // Land on a neighboring tab rather than clearing the detail pane entirely while other tabs
-        // are still open; Min guards the case where the closed tab was the last one in the list.
-        Selected = OpenTabs.Count == 0 ? null : OpenTabs[Math.Min(index, OpenTabs.Count - 1)];
-    }
-
-    private bool CanCloseSelectedTab() => Selected is not null;
-
     // T8.4.4: builds a self-contained document (TutorialExporter, Core) a user can save and share
     // outside the app - Markdown and HTML share this one picker-then-write flow, differing only in
     // which exporter/file-type/extension they pass in.
@@ -759,10 +744,11 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
         }
     }
 
-    // Files/IPromptResultStore.Files both hold the same instances (see OnNavigatedTo), and
-    // ProposedFileChangeViewModel can't be mutated into a new file's shape in place (Hunks is
+    // Files/IPromptResultStore.Files both hold the same instances (see RefreshFromPromptResultStore),
+    // and ProposedFileChangeViewModel can't be mutated into a new file's shape in place (Hunks is
     // init-only, ProposedContent has no setter) - so a refined file is swapped in by index in both
-    // collections instead, keeping the Diffs page in sync without any new pub/sub wiring.
+    // collections instead, keeping Explorer's tab (reading the same instance via Selected) in sync
+    // without any new pub/sub wiring.
     private void ReplaceFile(ProposedFileChangeViewModel oldFile, ProposedFileChangeViewModel newFile)
     {
         var filesIndex = Files.IndexOf(oldFile);
@@ -778,18 +764,6 @@ public partial class TutorialViewModel : ObservableRecipient, INavigationAware, 
         {
             _promptResultStore.Files[storeIndex] = newFile;
         }
-
-        // Swaps the refined file into the same tab position rather than letting OnSelectedChanged's
-        // add-if-missing logic (below, via Selected = newFile) append it as a brand new tab while
-        // leaving oldFile's now-stale tab behind.
-        var tabIndex = OpenTabs.IndexOf(oldFile);
-
-        if (tabIndex >= 0)
-        {
-            OpenTabs[tabIndex] = newFile;
-        }
-
-        Selected = newFile;
     }
 
     private string BuildRevertStatusMessage(RevertResult result)

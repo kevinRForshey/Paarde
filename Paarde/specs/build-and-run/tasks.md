@@ -44,8 +44,9 @@ Each task references the requirement(s) it satisfies.
   (515 + 340). `RunPanelViewModelTests` doesn't exercise `OnProcessOutputReceived`/`OnProcessExited`
   since those marshal through `Dispatcher.UIThread.Post`, which this plain xunit host doesn't pump -
   same gap already documented on `TerminalViewModelTests`.)_
-- [ ] T7 Manual verification against this repo itself: Build runs `dotnet build`, Run starts the
+- [x] T7 Manual verification against this repo itself: Build runs `dotnet build`, Run starts the
   Avalonia app (or a trivial console/web target) and streams live output, Stop actually terminates
   it with no orphaned `dotnet`/child process left behind (checked via `ps`/Task Manager), switching
   the configuration picker switches which project Build/Run target, and all of the above is usable
   from every page, not just one. _(validates R4.4, R4.6, R5.1, R5.2, R6.2)_
+  _(Manually verified 2026-10-31 by Kevin Forshey.)_

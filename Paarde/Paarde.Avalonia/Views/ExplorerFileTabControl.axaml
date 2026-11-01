@@ -12,24 +12,47 @@
          TabControl.ContentTemplate), same "separate control instance per tab" shape
          TutorialDetailControl already established for TutorialView's tab strip - each instance
          gets its own CodeEditor, rather than one shared editor whose binding path gets swapped. -->
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4" VerticalAlignment="Center">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <!-- UX pass: a real title for this tab's editor, matching TutorialDetailControl's own
+             per-file header (icon + full path) instead of leaving the path as tab-strip-only
+             tooltip text. -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,8" Orientation="Horizontal" Spacing="8">
+            <ui:SymbolIcon Symbol="Document" VerticalAlignment="Center" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="{Binding FilePath}"
+                       FontSize="18"
+                       FontWeight="SemiBold" />
+        </StackPanel>
+
+        <!-- UX pass: Save/Revert lead with icons (same SaveFilled/Restore convention as
+             PromptView/TutorialDetailControl) since they're the primary file-editing actions;
+             Explain moves to the end as a plain, de-emphasized button. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4" VerticalAlignment="Center">
+            <!-- T10.2.2/T10.2.6: Save/Revert both gate on IsDirty, so there's nothing to
+                 accidentally click before an edit actually diverges from disk. -->
+            <Button Command="{Binding SaveCommand}"
+                     Classes="accent"
+                     ToolTip.Tip="Write this file's edits to disk.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="SaveFilled" FontSize="14" />
+                    <TextBlock Text="Save" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding RevertToDiskCommand}"
+                     ToolTip.Tip="Discard every edit and reload this file's current content from disk.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Restore" FontSize="14" />
+                    <TextBlock Text="Revert to disk" />
+                </StackPanel>
+            </Button>
+            <TextBlock Text="Edited" IsVisible="{Binding IsDirty}" VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" />
             <Button Content="Explain this file"
                      Command="{Binding ExplainCommand}"
                      ToolTip.Tip="Ask the AI for a tutorial-style explanation of this file." />
             <ui:ProgressRing Width="18" Height="18" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsLoadingOverview}" />
-            <!-- T10.2.2/T10.2.6: Save/Revert both gate on IsDirty, so there's nothing to
-                 accidentally click before an edit actually diverges from disk. -->
-            <Button Content="Save"
-                     Command="{Binding SaveCommand}"
-                     ToolTip.Tip="Write this file's edits to disk." />
-            <Button Content="Revert to disk"
-                     Command="{Binding RevertToDiskCommand}"
-                     ToolTip.Tip="Discard every edit and reload this file's current content from disk." />
-            <TextBlock Text="Edited" IsVisible="{Binding IsDirty}" VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" />
         </StackPanel>
 
-        <TextBlock Grid.Row="1"
+        <TextBlock Grid.Row="2"
                    Margin="0,0,0,4"
                    Text="{Binding StatusMessage}"
                    TextWrapping="Wrap"
@@ -42,7 +65,7 @@
              GoToDefinitionRequested/FindReferencesRequested (F12/Shift+F12) and the references
              flyout below are wired up in ExplorerFileTabControl.axaml.cs. -->
         <controls:CodeEditor Name="Editor"
-                              Grid.Row="2"
+                              Grid.Row="3"
                               helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"
                               FilePath="{Binding FilePath}"
                               GhostTextSuggestion="{Binding GhostTextSuggestion}"
@@ -61,7 +84,7 @@
         <!-- T10.1.4: collapsed until there's something to show, so the editor keeps its full
              height while browsing and only gives up space once an explanation has actually been
              requested. -->
-        <Expander Grid.Row="3"
+        <Expander Grid.Row="4"
                    Margin="0,8,0,0"
                    Header="Overview"
                    IsExpanded="True"

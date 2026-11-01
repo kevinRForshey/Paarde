@@ -1,7 +1,7 @@
-using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
+using Paarde.Core.Services;
 using Paarde.Core.ViewModels;
 
 namespace Paarde.Avalonia.Tests.ViewModels;
@@ -10,7 +10,20 @@ public class TutorialStepViewModelTests
 {
     private readonly FakeFileChangeApplyService _fileChangeApplyService = new();
     private readonly FakeLlmRunner _llmRunner = new();
-    private readonly FakeNavigationService _navigationService = new();
+
+    // Epic 25, R7: TutorialStepViewModel's "View in Diff" now raises FileFocusRequested on its
+    // owning TutorialViewModel instead of navigating - a real one (rather than a fake) since the
+    // tests below need its actual FileFocusRequested event, not just a constructor to satisfy.
+    private readonly TutorialViewModel _owner = new(
+        new FakePromptResultStore(),
+        new FakeApplyOrchestrationService(),
+        new FakeApplyHistoryLog(),
+        new FakeDialogService(),
+        new FakeLlmRunner(),
+        new PromptTemplateProvider(),
+        new FakeFileSavePickerService(),
+        new FakeLocalSettingsService(),
+        new FakeBuildTestRunner());
 
     private TutorialStepViewModel CreateSut(string? resumeSessionId = "session-1") =>
         new(
@@ -20,7 +33,7 @@ public class TutorialStepViewModelTests
             resumeSessionId,
             _fileChangeApplyService,
             _llmRunner,
-            _navigationService,
+            _owner,
             stepNumber: 1,
             totalSteps: 1);
 
@@ -34,7 +47,7 @@ public class TutorialStepViewModelTests
             "session-1",
             _fileChangeApplyService,
             _llmRunner,
-            _navigationService,
+            _owner,
             stepNumber: 2,
             totalSteps: 4);
 
@@ -52,19 +65,25 @@ public class TutorialStepViewModelTests
     }
 
     [Fact]
-    public void ViewInDiff_HunkWithAMatchedDiffHunk_NavigatesToDiffsWithThatHunkAndThisStep()
+    public void ViewInDiff_HunkWithAMatchedDiffHunk_RaisesFileFocusRequestedOnTheOwnerWithThatHunk()
     {
         var hunk = new ProposedHunk("Add line2", string.Empty, "line2", new HunkLocation(1, 1));
         var file = new ProposedFileChangeViewModel("a.cs", "line1\nline2", "line1") { Hunks = new[] { hunk } };
-        var sut = new TutorialStepViewModel(hunk, file, "/tmp", "session-1", _fileChangeApplyService, _llmRunner, _navigationService, stepNumber: 1, totalSteps: 1);
+        var sut = new TutorialStepViewModel(hunk, file, "/tmp", "session-1", _fileChangeApplyService, _llmRunner, _owner, stepNumber: 1, totalSteps: 1);
+
+        ProposedFileChangeViewModel? focusedFile = null;
+        DiffHunk? focusedHunk = null;
+        _owner.FileFocusRequested += (f, h) =>
+        {
+            focusedFile = f;
+            focusedHunk = h;
+        };
 
         Assert.True(sut.ViewInDiffCommand.CanExecute(null));
         sut.ViewInDiffCommand.Execute(null);
 
-        var request = Assert.IsType<DiffJumpRequest>(_navigationService.LastParameter);
-        Assert.Same(file, request.File);
-        Assert.Same(hunk.MatchedDiffHunks[0], request.TargetHunk);
-        Assert.Same(hunk, request.OriginStep);
+        Assert.Same(file, focusedFile);
+        Assert.Same(hunk.MatchedDiffHunks[0], focusedHunk);
     }
 
     [Fact]
