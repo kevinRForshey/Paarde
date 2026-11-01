@@ -204,7 +204,12 @@ public partial class App : Application
             // Views and ViewModels
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<SettingsView>();
-            services.AddTransient<TutorialViewModel>();
+            // Epic 25, T6: AddSingleton rather than AddTransient - the Assistant panel must be
+            // reachable from HistoryViewModel's Fork/Rerun without depending on ExplorerView ever
+            // having been constructed, and a second accidental instance would mean "Fork" from
+            // History silently updates a PromptViewModel/TutorialViewModel nobody is looking at.
+            services.AddSingleton<AssistantPanelViewModel>();
+            services.AddSingleton<TutorialViewModel>();
             services.AddTransient<TutorialView>();
             services.AddTransient<HistoryViewModel>();
             services.AddTransient<HistoryView>();
@@ -213,7 +218,7 @@ public partial class App : Application
             services.AddTransient<TerminalView>();
             services.AddTransient<DiffsViewModel>();
             services.AddTransient<DiffsView>();
-            services.AddTransient<PromptViewModel>();
+            services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
             services.AddTransient<MainViewModel>();
             services.AddTransient<MainView>();

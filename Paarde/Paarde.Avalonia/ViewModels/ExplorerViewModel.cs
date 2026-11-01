@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 
 using Avalonia.Threading;
 
@@ -9,6 +10,7 @@ using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
 using Paarde.Core.Models;
+using Paarde.Core.ViewModels;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -30,7 +32,13 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     private readonly IFileChangeApplyService _fileChangeApplyService;
     private readonly IDialogService _dialogService;
     private readonly ILanguageServerSessionManager _languageServerSessionManager;
+    private readonly IFolderPickerService _folderPickerService;
     private readonly ILogger<ExplorerViewModel> _logger;
+
+    // Epic 25, T5: the docked Assistant panel - Review (TutorialViewModel) needs to see this
+    // view model's SelectedTab and to push newly-proposed files into it as tabs, which is why
+    // ExplorerViewModel owns the AttachExplorer/event wiring below rather than the reverse.
+    public AssistantPanelViewModel AssistantPanel { get; }
 
     // Epic 17, T17.1.3: set by NavigateToLocation, consumed once by the active tab's
     // ExplorerFileTabControl.axaml.cs's Editor.TextChanged handler - same "take once, after the
@@ -72,6 +80,8 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         IFileChangeApplyService fileChangeApplyService,
         IDialogService dialogService,
         ILanguageServerSessionManager languageServerSessionManager,
+        IFolderPickerService folderPickerService,
+        AssistantPanelViewModel assistantPanel,
         ILogger<ExplorerViewModel>? logger = null)
     {
         _promptResultStore = promptResultStore;
@@ -80,7 +90,13 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         _fileChangeApplyService = fileChangeApplyService;
         _dialogService = dialogService;
         _languageServerSessionManager = languageServerSessionManager;
+        _folderPickerService = folderPickerService;
         _logger = logger ?? NullLogger<ExplorerViewModel>.Instance;
+
+        AssistantPanel = assistantPanel;
+        AssistantPanel.Review.AttachExplorer(this);
+        _promptResultStore.Files.CollectionChanged += OnPromptResultFilesChanged;
+        AssistantPanel.Review.FileFocusRequested += OnReviewFileFocusRequested;
 
         _languageServerSessionManager.DiagnosticsPublished += OnDiagnosticsPublished;
         OpenTabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasOpenTabs));
@@ -107,23 +123,66 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         OpenOrActivateTab(value.FullPath);
     }
 
-    private void OpenOrActivateTab(string filePath)
+    // Epic 25, T5: grew a second, optional parameter (R3/R4) so a file newly proposed by a
+    // prompt run (OnPromptResultFilesChanged) or re-focused from Review (OnReviewFileFocusRequested)
+    // can carry its ProposedFileChangeViewModel straight into the tab it opens/activates, while
+    // every pre-existing call site (tree clicks, Quick Open, LSP navigation) keeps compiling
+    // unchanged via the default. An already-open tab keeps whichever PendingChange it already had
+    // rather than letting a later, unrelated open clobber it.
+    private OpenFileTabViewModel OpenOrActivateTab(string filePath, ProposedFileChangeViewModel? pendingChange = null)
     {
         var existingTab = OpenTabs.FirstOrDefault(tab => string.Equals(tab.FilePath, filePath, StringComparison.Ordinal));
 
         if (existingTab is not null)
         {
+            existingTab.PendingChange ??= pendingChange;
             SelectedTab = existingTab;
-            return;
+            return existingTab;
         }
 
         var content = FileContentReader.ReadOrEmpty(filePath);
-        var tab = new OpenFileTabViewModel(filePath, content, WorkingDirectoryPath, _fileChangeApplyService, _llmRunner, _languageServerSessionManager);
+        var tab = new OpenFileTabViewModel(filePath, content, WorkingDirectoryPath, _fileChangeApplyService, _llmRunner, _languageServerSessionManager)
+        {
+            PendingChange = pendingChange,
+        };
         OpenTabs.Add(tab);
         SelectedTab = tab;
 
         _ = _languageServerSessionManager.NotifyDocumentOpenedAsync(filePath, content);
+        return tab;
     }
+
+    // Epic 25, T5 (R4): a prompt run just added file(s) to IPromptResultStore.Files - open/activate
+    // a tab for each one carrying its proposed change, mirroring what used to be Review's own
+    // separate tab strip.
+    private void OnPromptResultFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is null)
+        {
+            return;
+        }
+
+        foreach (ProposedFileChangeViewModel change in e.NewItems)
+        {
+            OpenOrActivateTab(ResolveFullPath(change.FilePath), change);
+        }
+    }
+
+    // Epic 25, T5 (R7): Review's file list / a step card's "View in Diff" asks to focus a
+    // proposed change - open/activate its tab and, if a specific hunk was targeted, ask the tab
+    // to scroll its editor there once it's loaded.
+    private void OnReviewFileFocusRequested(ProposedFileChangeViewModel change, DiffHunk? hunk)
+    {
+        var tab = OpenOrActivateTab(ResolveFullPath(change.FilePath), change);
+        if (hunk is not null)
+        {
+            tab.RequestScrollTo(hunk);
+        }
+    }
+
+    // Epic 25, T5 (R4): factored out of RefreshTree's touchedFullPaths computation so both it and
+    // the two handlers above share the same relative-path-against-WorkingDirectoryPath join.
+    private string ResolveFullPath(string relativePath) => Path.GetFullPath(Path.Combine(WorkingDirectoryPath, relativePath));
 
     // Epic 23, T23.1.2: close-selects-neighbor, same shape as TutorialViewModel.CloseSelectedTab -
     // confirms first if the tab being closed has unsaved edits, since closing (unlike switching
@@ -304,7 +363,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         try
         {
             var touchedFullPaths = _promptResultStore.Files
-                .Select(file => Path.GetFullPath(Path.Combine(WorkingDirectoryPath, file.FilePath)))
+                .Select(file => ResolveFullPath(file.FilePath))
                 .ToHashSet(StringComparer.Ordinal);
 
             Root = FileTreeNodeViewModel.FromEntry(FileTreeBuilder.Build(WorkingDirectoryPath), touchedFullPaths);
@@ -322,5 +381,21 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
             Root = null;
             StatusMessage = string.Format("Explorer_LoadFailed".Resolve(), ex.Message);
         }
+    }
+
+    // Epic 25, T5 (R10): lets the user pick a working directory from the Explorer page itself,
+    // rather than only ever inheriting whichever one Compose/Prompt last saved.
+    [RelayCommand]
+    private async Task OpenFolderAsync()
+    {
+        var path = await _folderPickerService.PickFolderAsync();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, path);
+        WorkingDirectoryPath = path;
+        RefreshTree();
     }
 }

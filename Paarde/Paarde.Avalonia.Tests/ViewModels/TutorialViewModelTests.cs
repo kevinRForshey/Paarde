@@ -21,13 +21,29 @@ public class TutorialViewModelTests
 
     private TutorialViewModel CreateSut() => new(_promptResultStore, _applyOrchestrationService, _applyHistoryLog, _dialogService, _llmRunner, _promptTemplateProvider, _fileSavePickerService, _localSettingsService, _buildTestRunner);
 
+    // Epic 25, T5: ExplorerViewModel now takes a real AssistantPanelViewModel (wrapping its own,
+    // unrelated PromptViewModel/TutorialViewModel pair, each needing only fakes for their own
+    // dependencies) rather than a fake - these helpers don't exercise that wiring at all, so a
+    // throwaway panel/store built fresh each time is simplest.
+    private static ExplorerViewModel CreateStandaloneExplorer()
+    {
+        var promptResultStore = new FakePromptResultStore();
+        var localSettingsService = new FakeLocalSettingsService();
+        var llmRunner = new FakeLlmRunner();
+        var compose = new PromptViewModel(llmRunner, localSettingsService, new FakeFolderPickerService(), new FakeFilePickerService(), promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
+        var review = new TutorialViewModel(promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), localSettingsService, new FakeBuildTestRunner());
+        var assistantPanel = new AssistantPanelViewModel(compose, review, promptResultStore);
+
+        return new ExplorerViewModel(localSettingsService, promptResultStore, llmRunner, new FakeFileChangeApplyService(), new FakeDialogService(), new FakeLanguageServerSessionManager(), new FakeFolderPickerService(), assistantPanel);
+    }
+
     // Epic 25, T4: Selected now reads ExplorerViewModel.SelectedTab?.PendingChange rather than its
     // own settable property - a real ExplorerViewModel (rather than a fake) stands in for it, with
     // SelectedTab assigned directly instead of going through OpenOrActivateTab/a real file tree, so
     // these tests don't need to touch disk.
     private static void Select(TutorialViewModel sut, ProposedFileChangeViewModel? file)
     {
-        var explorer = new ExplorerViewModel(new FakeLocalSettingsService(), new FakePromptResultStore(), new FakeLlmRunner(), new FakeFileChangeApplyService(), new FakeDialogService(), new FakeLanguageServerSessionManager());
+        var explorer = CreateStandaloneExplorer();
         sut.AttachExplorer(explorer);
 
         if (file is not null)
@@ -104,7 +120,7 @@ public class TutorialViewModelTests
         var file = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
         _promptResultStore.SetResult("tutorial", [file], "/tmp");
         var sut = CreateSut();
-        var explorer = new ExplorerViewModel(new FakeLocalSettingsService(), new FakePromptResultStore(), new FakeLlmRunner(), new FakeFileChangeApplyService(), new FakeDialogService(), new FakeLanguageServerSessionManager());
+        var explorer = CreateStandaloneExplorer();
         sut.AttachExplorer(explorer);
         explorer.SelectedTab = new OpenFileTabViewModel(file.FilePath, string.Empty, "/tmp", new FakeFileChangeApplyService(), new FakeLlmRunner(), new FakeLanguageServerSessionManager()) { PendingChange = file };
 

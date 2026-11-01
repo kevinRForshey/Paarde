@@ -118,7 +118,7 @@ that depend on them, deletions last.
   - `SelectionPersistenceTests`: dropped the now-nonexistent `tutorialViewModel.OnNavigatedTo(null!)`
     calls (the constructor already loads from the store eagerly).
   - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes.
-- [ ] T5 `ExplorerViewModel`:
+- [x] T5 `ExplorerViewModel`:
   - Add constructor parameters `IFolderPickerService folderPickerService` and
     `AssistantPanelViewModel assistantPanel`; expose `AssistantPanel { get; }`. In the
     constructor body: `assistantPanel.Review.AttachExplorer(this);`, subscribe
@@ -142,11 +142,37 @@ that depend on them, deletions last.
   - Add `[RelayCommand] OpenFolderAsync()` per design.md #3 (R10): picks a folder via
     `_folderPickerService`, persists `WorkingDirectorySettingsKeys.WorkingDirectory`, sets
     `WorkingDirectoryPath`, calls `RefreshTree()`.
-- [ ] T6 DI registrations in `App.axaml.cs`: add `AssistantPanelViewModel` as `AddSingleton`;
+  — done 2026-11-01, matching design.md #3 exactly (no deviations). Notes:
+  - `ExplorerViewModel`'s constructor now calls `AssistantPanel.Review.AttachExplorer(this)` -
+    `AssistantPanelViewModel`/`PromptViewModel`/`TutorialViewModel` are still registered
+    `AddTransient`/not yet registered at all (`AssistantPanelViewModel`) in `App.axaml.cs`; wiring
+    those registrations up (including `ExplorerViewModel` picking up its two new constructor
+    parameters via DI) is T6, done next.
+  - `ExplorerViewModelTests`/`TutorialViewModelTests`: both now need a real
+    `AssistantPanelViewModel` to construct an `ExplorerViewModel` (its own `AttachExplorer`/
+    `FileFocusRequested` wiring is exactly what these tests need, not just a constructor to
+    satisfy) - `ExplorerViewModelTests` grew a `CreateAssistantPanel()` helper reusing the test
+    class's own fakes/store; `TutorialViewModelTests` grew a `CreateStandaloneExplorer()` helper
+    that builds its own throwaway store/fakes, since its `Select`/selection-cleared tests use the
+    `ExplorerViewModel` purely as a stand-in for "Explorer selected a file" and don't exercise its
+    `AssistantPanel` wiring at all.
+  - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes
+    (`ClaudeCliRunnerTests.RunPromptAsync_AgentToolsEnabledAndCliRejectsTheFlag_ReturnsAnActionableErrorMessage`
+    failed once under full-suite parallel execution with `Win32Exception: Text file busy` on a
+    temp shell script shared across tests - a pre-existing flake unrelated to this task; passes
+    cleanly in isolation).
+- [x] T6 DI registrations in `App.axaml.cs`: add `AssistantPanelViewModel` as `AddSingleton`;
   change `PromptViewModel`/`TutorialViewModel` from `AddTransient` to `AddSingleton`; change
   `ExplorerViewModel`'s registration continues to resolve correctly once its constructor gains the
   two new parameters (DI resolves them automatically; no registration code change needed beyond
   the constructor signature itself). _(R1)_
+  — done 2026-11-01, exactly as specified: `AssistantPanelViewModel` registered `AddSingleton`;
+  `PromptViewModel`/`TutorialViewModel` changed from `AddTransient` to `AddSingleton`;
+  `ExplorerViewModel` left `AddTransient` and untouched (its registration call needed no edit -
+  DI resolves the two new constructor parameters, including the singleton `AssistantPanelViewModel`,
+  automatically). `IFolderPickerService` was already registered (`AddTransient`, pre-existing for
+  `PromptViewModel`), so no new registration was needed for that parameter either. Solution builds
+  with 0 warnings/0 errors; full suite (934 tests) passes.
 - [ ] T7 `HistoryViewModel`: add `AssistantPanelViewModel` constructor parameter; change `Launch`
   to call `_assistantPanel.Compose.LoadLaunchRequest(...)` + `_assistantPanel.ShowCompose()` +
   `_navigationService.NavigateTo(typeof(ExplorerViewModel).FullName!)` instead of navigating to

@@ -1,6 +1,7 @@
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
+using Paarde.Core.Services;
 using Paarde.Core.ViewModels;
 
 namespace Paarde.Avalonia.Tests.ViewModels;
@@ -13,6 +14,7 @@ public class ExplorerViewModelTests : IDisposable
     private readonly FakeFileChangeApplyService _fileChangeApplyService = new();
     private readonly FakeDialogService _dialogService = new();
     private readonly FakeLanguageServerSessionManager _languageServerSessionManager = new();
+    private readonly FakeFolderPickerService _folderPickerService = new();
     private readonly string _workingDirectory;
 
     public ExplorerViewModelTests()
@@ -28,7 +30,19 @@ public class ExplorerViewModelTests : IDisposable
         }
     }
 
-    private ExplorerViewModel CreateSut() => new(_localSettingsService, _promptResultStore, _llmRunner, _fileChangeApplyService, _dialogService, _languageServerSessionManager);
+    // Epic 25, T5: ExplorerViewModel now takes a real AssistantPanelViewModel (which itself wraps
+    // a real PromptViewModel/TutorialViewModel, each only needing fakes for their own
+    // dependencies) rather than a fake, since AttachExplorer/FileFocusRequested below need the
+    // genuine wiring, not just a constructor to satisfy.
+    private AssistantPanelViewModel CreateAssistantPanel()
+    {
+        var compose = new PromptViewModel(_llmRunner, _localSettingsService, _folderPickerService, new FakeFilePickerService(), _promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
+        var review = new TutorialViewModel(_promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), _dialogService, _llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), _localSettingsService, new FakeBuildTestRunner());
+
+        return new AssistantPanelViewModel(compose, review, _promptResultStore);
+    }
+
+    private ExplorerViewModel CreateSut() => new(_localSettingsService, _promptResultStore, _llmRunner, _fileChangeApplyService, _dialogService, _languageServerSessionManager, _folderPickerService, CreateAssistantPanel());
 
     private async Task SetSavedWorkingDirectoryAsync(string path) =>
         await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, path);
