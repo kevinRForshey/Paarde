@@ -252,7 +252,7 @@ that depend on them, deletions last.
   - Not yet referenced by any other view (that wiring is T11); verified with a from-scratch
     `dotnet build Paarde.slnx` (0 errors) and `dotnet test Paarde.slnx` (934/934 passing, unchanged
     counts since nothing exercises this new control yet).
-- [ ] T11 New `ReviewPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): move `TutorialView.axaml`'s
+- [x] T11 New `ReviewPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): move `TutorialView.axaml`'s
   left sidebar (Apply/Export/Refine buttons, master file list with tri-state selection, apply-history
   log) and overview header into this control, with the per-file tabbed area (`TabControl` over
   `OpenTabs`) replaced by a single content area bound to `Selected` and hosting
@@ -260,6 +260,23 @@ that depend on them, deletions last.
   `TutorialViewModel`'s new selection-changed handler (T4) instead of an `OpenTabs.Add`/tab-switch.
   `DataContext`/`x:DataType` is `vm:TutorialViewModel`, bound via `AssistantPanelControl`'s
   `Review` property. _(R6)_
+  - Done: moved the sidebar (Apply/Export/Refine groups), file list, apply-history log, and
+    overview header into `ReviewPanelControl.axaml` verbatim, swapping `TutorialDetailControl` for
+    `ReviewFileDetailControl` (T10) in the content-area `DataTemplate`. The per-file content area
+    and the file list's `SelectedItem` binding were already in this exact shape in
+    `TutorialView.axaml` ahead of this task (a `ContentControl` over `Selected`, not a
+    `TabControl`/`OpenTabs` - see that file's own "Full rework of this pane lands in T11" comment,
+    and `TutorialViewModel.OnSelectedFileListItemChanged`/`AttachExplorer` from T4), so no
+    view-model changes were needed here. `DataContext` is supplied externally (same
+    "DataContext supplied externally" pattern as `ComposePanelControl`, T9) - code-behind only
+    wires the file-list/content `ResizablePaneHelper` split (unchanged, still keyed to
+    `WorkspaceLayoutSettingsKeys.TutorialFileListWidth` - T15 is where that key gets swapped out).
+    `TutorialView.axaml[.cs]` itself was left untouched; it's still the page the old `Tutorial` nav
+    item points at until T16-T18 remove it. Wired `AssistantPanelControl`'s Review tab to
+    `views:ReviewPanelControl DataContext="{Binding Review}"`, replacing T8's placeholder.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing, unchanged counts since `ExplorerView` doesn't reference
+    `AssistantPanelControl` yet - that wiring is T12).
 - [ ] T12 `ExplorerView.axaml`: add the third `Grid` column + `GridSplitter` +
   `AssistantPanelControl` bound to `ExplorerViewModel.AssistantPanel`, plus a toolbar toggle button
   to collapse/expand it and a new "Open folder…" toolbar button bound to `OpenFolderCommand`.

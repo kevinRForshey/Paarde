@@ -1,0 +1,175 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             xmlns:views="using:Paarde.Avalonia.Views"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:coreVm="using:Paarde.Core.ViewModels"
+             xmlns:controls="using:Paarde.Avalonia.Controls"
+             x:Class="Paarde.Avalonia.Views.ReviewPanelControl"
+             x:DataType="vm:TutorialViewModel">
+
+    <!-- Epic 25, T11: TutorialView.axaml's left sidebar (Apply/Export/Refine + file list + apply
+         history) and overview header, moved here unchanged - this is now the Review tab's content,
+         hosted by AssistantPanelControl and bound to AssistantPanel.Review. The per-file content
+         area already became a plain ContentControl over Selected ahead of this task; the only
+         change here is ReviewFileDetailControl (T10) in place of TutorialDetailControl. -->
+    <Grid Name="WorkspaceGrid">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto">
+            <StackPanel Grid.Row="0" Margin="8" Spacing="4">
+
+                <TextBlock Text="APPLY" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
+                <CheckBox Content="Stage applied files in git" IsChecked="{Binding StageAppliedFilesInGit, Mode=TwoWay}"
+                          ToolTip.Tip="Run `git add` on the files Apply Selected just wrote, so they already show as staged in your next git status." />
+                <Button Command="{Binding ApplySelectedCommand}" HorizontalAlignment="Stretch"
+                         Classes="accent"
+                         ToolTip.Tip="Write every selected change, across every file, to disk.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Checkmark" FontSize="14" />
+                        <TextBlock Text="Apply Selected" />
+                    </StackPanel>
+                </Button>
+                <!-- Icons on the danger buttons are deliberate, not decorative: they give the
+                     destructive-action signal a second channel beyond color (WCAG 1.4.1). -->
+                <Button Command="{Binding UndoLastApplyCommand}" HorizontalAlignment="Stretch"
+                         Classes="danger"
+                         ToolTip.Tip="Restore the files from the most recent apply to their content from right before it.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ui:SymbolIcon Symbol="RotateCounterClockwise" FontSize="14" />
+                        <TextBlock Text="Undo Last Apply" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding RevertAllAppliedCommand}" HorizontalAlignment="Stretch"
+                         Classes="danger"
+                         ToolTip.Tip="Restore every file this session has applied a change to back to its content from before this session.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Restore" FontSize="14" />
+                        <TextBlock Text="Revert All Applied" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding ApplyStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                           IsVisible="{Binding ApplyStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- T12.2.2: only appears after a configured build/test command fails on apply. -->
+                <Button Content="Send errors to Claude" Command="{Binding SendBuildTestErrorsToClaudeCommand}"
+                         HorizontalAlignment="Stretch"
+                         IsVisible="{Binding HasPendingBuildTestFailure}"
+                         ToolTip.Tip="Send the captured build/test failure back to Claude Code, continuing this tutorial's conversation, and ask it to fix the problem." />
+                <TextBlock Text="{Binding SendBuildTestErrorsStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                           IsVisible="{Binding SendBuildTestErrorsStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+                <Separator Margin="0,8,0,0" />
+
+                <!-- T8.4.4: saves the overview + every file's numbered steps as a standalone document. -->
+                <TextBlock Margin="0,8,0,0" Text="EXPORT" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Command="{Binding ExportTutorialAsMarkdownCommand}"
+                             ToolTip.Tip="Save the tutorial's overview and steps as a Markdown file.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:SymbolIcon Symbol="SaveAs" FontSize="14" />
+                            <TextBlock Text="Export as Markdown" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ExportTutorialAsHtmlCommand}"
+                             ToolTip.Tip="Save the tutorial's overview and steps as an HTML file.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:SymbolIcon Symbol="SaveAs" FontSize="14" />
+                            <TextBlock Text="Export as HTML" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <TextBlock Text="{Binding ExportStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                           IsVisible="{Binding ExportStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+                <Separator Margin="0,8,0,0" />
+
+                <!-- T7.3.2: scoped follow-up that only asks Claude to change the selected file. -->
+                <TextBlock Margin="0,8,0,0" Text="REFINE" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
+                <TextBox Text="{Binding RefineInstruction, Mode=TwoWay}"
+                         Watermark="Refine selected file..."
+                         ToolTip.Tip="Describe a change to make to only the selected file, continuing this tutorial's conversation." />
+                <Button Content="Refine selected file" Command="{Binding RefineSelectedFileCommand}" HorizontalAlignment="Stretch" />
+                <TextBlock Text="{Binding RefineStatusMessage}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                           IsVisible="{Binding RefineStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <ListBox Grid.Row="1"
+                     Name="FileList"
+                     ItemsSource="{Binding Files}"
+                     SelectedItem="{Binding SelectedFileListItem, Mode=TwoWay}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="coreVm:ProposedFileChangeViewModel">
+                        <Grid Height="48" ColumnDefinitions="Auto,Auto,*">
+                            <CheckBox Grid.Column="0" IsThreeState="True" VerticalAlignment="Center"
+                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      ToolTip.Tip="Select which of this file's changes to apply." />
+                            <ui:SymbolIcon Grid.Column="1" Symbol="Document" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            <StackPanel Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding FilePath}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding SelectionSummary}" FontSize="11" Opacity="0.7" />
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- T4.2.3: apply-history log, collapsed entirely until the first apply/undo/revert of the session. -->
+            <StackPanel Grid.Row="2" Margin="8" Spacing="4" IsVisible="{Binding HasApplyHistory}">
+                <TextBlock Text="Apply History" FontWeight="Bold" FontSize="12" />
+                <ListBox ItemsSource="{Binding ApplyHistoryEntries}" MaxHeight="160">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+        </Grid>
+
+        <GridSplitter Grid.Column="1" Name="FileListSplitter" Width="4" ResizeDirection="Columns" />
+
+        <Border Grid.Column="2" Padding="16">
+            <Grid RowDefinitions="Auto,*">
+                <!-- T8.4.1: the overview from the model's `## Tutorial` section - previously parsed
+                     into PromptResultStore.Tutorial and never shown anywhere. -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,16" Spacing="4"
+                            IsVisible="{Binding HasTutorialOverview}">
+                    <TextBlock Text="Overview" FontWeight="SemiBold" FontSize="13" />
+                    <controls:MarkdownTextBlock Text="{Binding Tutorial}" />
+                    <Separator Margin="0,8,0,0" />
+                </StackPanel>
+
+                <Grid Grid.Row="1">
+                    <TextBlock Text="No tutorial yet. Run a prompt first, then come back here to review it."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="18"
+                               IsVisible="{Binding HasNoFiles}" />
+                    <TextBlock Text="Select a file from the list to view its tutorial."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               FontSize="18"
+                               IsVisible="{Binding HasFilesButNoneSelected}" />
+
+                    <ContentControl Content="{Binding Selected}"
+                                    IsVisible="{Binding Selected, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="coreVm:ProposedFileChangeViewModel">
+                                <views:ReviewFileDetailControl />
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

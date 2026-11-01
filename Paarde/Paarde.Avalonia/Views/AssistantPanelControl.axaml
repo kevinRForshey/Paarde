@@ -16,8 +16,10 @@
             <views:ComposePanelControl DataContext="{Binding Compose}" />
         </TabItem>
         <TabItem Header="Review">
-            <!-- T11 replaces this placeholder with ReviewPanelControl bound to Review. -->
-            <TextBlock Margin="8" Text="Review" Opacity="0.7" />
+            <!-- T11: ReviewPanelControl is TutorialView.axaml's sidebar + overview header + content
+                 area, unchanged - its DataContext comes from Review rather than it resolving
+                 TutorialViewModel itself. -->
+            <views:ReviewPanelControl DataContext="{Binding Review}" />
         </TabItem>
     </TabControl>
 </UserControl>
