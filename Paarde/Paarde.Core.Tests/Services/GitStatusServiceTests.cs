@@ -30,6 +30,21 @@ public class GitStatusServiceTests : IDisposable
         Assert.False(status.IsRepository);
         Assert.False(status.IsDirty);
         Assert.Empty(status.DirtyFiles);
+        Assert.Null(status.BranchName);
+    }
+
+    [Fact]
+    public void GetStatus_RepositoryWithCommit_ReportsCurrentBranchName()
+    {
+        InitRepository();
+        RunGit("checkout", "-b", "feature-branch");
+        File.WriteAllText(Path.Combine(_workingDirectory, "clean.txt"), "committed");
+        RunGit("add", "clean.txt");
+        CommitAll("initial commit");
+
+        var status = _service.GetStatus(_workingDirectory);
+
+        Assert.Equal("feature-branch", status.BranchName);
     }
 
     [Fact]

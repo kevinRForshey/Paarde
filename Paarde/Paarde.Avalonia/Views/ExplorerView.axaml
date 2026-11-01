@@ -1,10 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
-             xmlns:controls="using:Paarde.Avalonia.Controls"
-             xmlns:helpers="using:Paarde.Avalonia.Helpers"
+             xmlns:views="using:Paarde.Avalonia.Views"
              x:Class="Paarde.Avalonia.Views.ExplorerView"
              x:DataType="vm:ExplorerViewModel">
 
@@ -55,72 +53,50 @@
 
             <GridSplitter Grid.Column="1" Name="TreeSplitter" Width="4" ResizeDirection="Columns" />
 
-            <Grid Grid.Column="2" RowDefinitions="Auto,*,Auto">
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="8,0,0,4" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SelectedFilePath}"
-                               FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"
-                               IsVisible="{Binding SelectedFilePath, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-                    <Button Content="Explain this file"
-                             Command="{Binding ExplainSelectedFileCommand}"
-                             ToolTip.Tip="Ask the AI for a tutorial-style explanation of this file."
-                             IsVisible="{Binding SelectedFilePath, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-                    <ui:ProgressRing Width="18" Height="18" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsLoadingOverview}" />
-                    <!-- T10.2.2/T10.2.6: Save/Revert both gate on IsFileDirty, so there's nothing to
-                         accidentally click before an edit actually diverges from disk. -->
-                    <Button Content="Save"
-                             Command="{Binding SaveSelectedFileCommand}"
-                             ToolTip.Tip="Write this file's edits to disk." />
-                    <Button Content="Revert to disk"
-                             Command="{Binding RevertSelectedFileToDiskCommand}"
-                             ToolTip.Tip="Discard every edit and reload this file's current content from disk." />
-                    <TextBlock Text="Edited" IsVisible="{Binding IsFileDirty}" VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" />
-                </StackPanel>
-
-                <TextBlock Grid.Row="1"
+            <!-- Epic 23, T23.1.1/T23.1.2: multi-file tabbed editing - every file opened from the
+                 tree this visit stays open as its own tab (ExplorerFileTabControl instance), same
+                 OpenTabs/SelectedTab + TabControl.ContentTemplate shape TutorialView.axaml already
+                 established for its own tab strip, rather than the previous single ContentControl
+                 that threw its editor away on every tree selection. -->
+            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0"
                            Margin="8"
                            Text="Select a file on the left to preview it here."
                            Opacity="0.7"
-                           IsVisible="{Binding SelectedFilePath, Converter={x:Static conv:StringConverters.IsNullOrEmpty}}" />
+                           IsVisible="{Binding !HasOpenTabs}" />
 
-                <!-- T10.2.1: editable now - BindableText is TwoWay by default (T2.2.2), so edits
-                     flow straight back into SelectedFileContent, where OnSelectedFileContentChanged
-                     derives IsFileDirty. -->
-                <!-- Epic 17, T17.1.2/T17.1.3: Diagnostics feeds the underline renderer/hover
-                     tooltip; GoToDefinitionRequested/FindReferencesRequested (F12/Shift+F12) and
-                     the references flyout below are wired up in ExplorerView.axaml.cs. -->
-                <controls:CodeEditor Name="Editor"
-                                      Grid.Row="1"
-                                      Margin="8,0,0,0"
-                                      helpers:TextEditorExtensions.BindableText="{Binding SelectedFileContent}"
-                                      FilePath="{Binding SelectedFilePath}"
-                                      GhostTextSuggestion="{Binding GhostTextSuggestion}"
-                                      Diagnostics="{Binding Diagnostics}"
-                                      IsReadOnly="False"
-                                      HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Auto"
-                                      IsVisible="{Binding SelectedFilePath, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}">
-                    <FlyoutBase.AttachedFlyout>
-                        <Flyout Placement="Bottom">
-                            <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
-                        </Flyout>
-                    </FlyoutBase.AttachedFlyout>
-                </controls:CodeEditor>
-
-                <!-- T10.1.4: collapsed until there's something to show, so the preview pane keeps
-                     its full height while browsing and only gives up space once an explanation has
-                     actually been requested. -->
-                <Expander Grid.Row="2"
-                           Margin="8,8,0,0"
-                           Header="Overview"
-                           IsExpanded="True"
-                           MaxHeight="260"
-                           IsVisible="{Binding FileOverview, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <controls:MarkdownTextBlock Margin="4" Text="{Binding FileOverview}" />
-                    </ScrollViewer>
-                </Expander>
+                <Grid Grid.Row="1" RowDefinitions="Auto,*" IsVisible="{Binding HasOpenTabs}">
+                    <Button Grid.Row="0"
+                             Content="Close Tab"
+                             HorizontalAlignment="Right"
+                             Margin="8,0,0,4"
+                             Command="{Binding CloseSelectedTabCommand}"
+                             ToolTip.Tip="Close the active tab." />
+                    <TabControl Grid.Row="1"
+                                Margin="8,0,0,0"
+                                ItemsSource="{Binding OpenTabs}"
+                                SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
+                        <TabControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OpenFileTabViewModel">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{Binding FileName}"
+                                               MaxWidth="200"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding FilePath}" />
+                                    <TextBlock Text="*"
+                                               FontWeight="Bold"
+                                               IsVisible="{Binding IsDirty}"
+                                               ToolTip.Tip="This file has unsaved edits." />
+                                </StackPanel>
+                            </DataTemplate>
+                        </TabControl.ItemTemplate>
+                        <TabControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:OpenFileTabViewModel">
+                                <views:ExplorerFileTabControl />
+                            </DataTemplate>
+                        </TabControl.ContentTemplate>
+                    </TabControl>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>

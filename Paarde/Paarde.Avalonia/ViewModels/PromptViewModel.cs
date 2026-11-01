@@ -5,7 +5,6 @@ using System.Text;
 using Avalonia.Threading;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
@@ -21,7 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Avalonia.ViewModels;
 
-public partial class PromptViewModel : ObservableRecipient, INavigationAware
+public partial class PromptViewModel : ObservableRecipient
 {
     private const string PromptSettingsKey = "SavedPrompt";
     private const string TimeoutSecondsSettingsKey = "PromptTimeoutSeconds";
@@ -54,6 +53,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
     private readonly IPromptTemplateProvider _promptTemplateProvider;
     private readonly IRunSessionStore _runSessionStore;
     private readonly ICodebaseIndexService _codebaseIndexService;
+    private readonly IWorkingDirectoryContext _workingDirectoryContext;
     private readonly ILogger<PromptViewModel> _logger;
 
     [ObservableProperty]
@@ -195,7 +195,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
 
     private Stopwatch? _runStopwatch;
 
-    public PromptViewModel(ILlmRunner llmRunner, ILocalSettingsService localSettingsService, IFolderPickerService folderPickerService, IFilePickerService filePickerService, IPromptResultStore promptResultStore, IPromptTemplateProvider promptTemplateProvider, IRunSessionStore runSessionStore, ICodebaseIndexService codebaseIndexService, ILogger<PromptViewModel>? logger = null)
+    public PromptViewModel(ILlmRunner llmRunner, ILocalSettingsService localSettingsService, IFolderPickerService folderPickerService, IFilePickerService filePickerService, IPromptResultStore promptResultStore, IPromptTemplateProvider promptTemplateProvider, IRunSessionStore runSessionStore, ICodebaseIndexService codebaseIndexService, IWorkingDirectoryContext workingDirectoryContext, ILogger<PromptViewModel>? logger = null)
     {
         _llmRunner = llmRunner;
         _localSettingsService = localSettingsService;
@@ -205,6 +205,7 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         _promptTemplateProvider = promptTemplateProvider;
         _runSessionStore = runSessionStore;
         _codebaseIndexService = codebaseIndexService;
+        _workingDirectoryContext = workingDirectoryContext;
         _logger = logger ?? NullLogger<PromptViewModel>.Instance;
 
         // T5.4.2: ObservableCollection<T> doesn't go through an [ObservableProperty]'s On*Changed
@@ -214,15 +215,19 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         ToolActivityLog.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasToolActivity));
         MentionSuggestions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMentionSuggestions));
         SuggestedRelevantFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSuggestedRelevantFiles));
+
+        // Epic 25, T3: this used to run on every INavigationAware.OnNavigatedTo (the Prompt page
+        // was re-entered on each navigation). Now that Compose is a singleton living inside the
+        // always-docked Assistant panel rather than a page, there is no navigation event to hang
+        // this off - it only ever needs to happen once, when the app starts.
+        LoadSavedStateAsync();
     }
 
-    // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
-    // corrupt settings file (the one thing every ReadSettingAsync call here can actually throw
-    // on) is logged and reported via StatusMessage rather than unwound unobserved out of
-    // NavigationService.OnNavigated. RunPromptCommand.ExecuteAsync's own run (T7.2.3's
-    // launchRequest.AutoRun path) already has its own broad catch (see RunPromptAsync below), so
-    // it can't itself be the source of what this catches.
-    public async void OnNavigatedTo(object parameter)
+    // T9.2.3 (carried over from the removed INavigationAware.OnNavigatedTo): async void because
+    // this is fire-and-forget from the constructor - wrapped so a corrupt settings file (the one
+    // thing every ReadSettingAsync call here can actually throw on) is logged and reported via
+    // StatusMessage rather than unwound unobserved.
+    private async void LoadSavedStateAsync()
     {
         try
         {
@@ -259,32 +264,29 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
                 RecentWorkingDirectories.Add(path);
             }
 
-            // T7.2.3: a launch from the History page overrides whatever was just loaded from settings
-            // above with the prompt/working directory of the session being re-run or forked - Re-run
-            // additionally sends it immediately, same as if the user had clicked RunPromptCommand
-            // themselves, guarded by the same CanRunPrompt the button itself respects.
-            if (parameter is PromptLaunchRequest launchRequest)
-            {
-                PromptText = launchRequest.PromptText;
-                WorkingDirectoryPath = launchRequest.WorkingDirectoryPath;
-
-                if (launchRequest.AutoRun && RunPromptCommand.CanExecute(null))
-                {
-                    await RunPromptCommand.ExecuteAsync(null);
-                }
-            }
-
             UpdateEstimatedTokenCountDisplay();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load saved settings while navigating to the Prompt page.");
+            _logger.LogError(ex, "Failed to load saved settings for the Compose panel.");
             StatusMessage = string.Format("Prompt_LoadSettingsFailed".Resolve(), ex.Message);
         }
     }
 
-    public void OnNavigatedFrom()
+    // T7.2.3 (carried over from the removed INavigationAware.OnNavigatedTo's
+    // PromptLaunchRequest branch): called directly by HistoryViewModel's Fork/Rerun (R8) now that
+    // there's no navigation-parameter path to deliver it through. Re-run additionally sends it
+    // immediately, same as if the user had clicked RunPromptCommand themselves, guarded by the
+    // same CanRunPrompt the button itself respects.
+    public void LoadLaunchRequest(PromptLaunchRequest request)
     {
+        PromptText = request.PromptText;
+        WorkingDirectoryPath = request.WorkingDirectoryPath;
+
+        if (request.AutoRun && RunPromptCommand.CanExecute(null))
+        {
+            RunPromptCommand.Execute(null);
+        }
     }
 
     [RelayCommand]
@@ -724,6 +726,13 @@ public partial class PromptViewModel : ObservableRecipient, INavigationAware
         SuggestedRelevantFiles.Clear();
         SuggestRelevantFilesCommand.NotifyCanExecuteChanged();
         UpdateEstimatedTokenCountDisplay();
+
+        // Epic 20 (specs/build-and-run): tells RunPanelViewModel's toolbar/output strip - a DI
+        // singleton with no page-navigation lifecycle of its own - which working directory to
+        // detect Run configurations for. Fires on every change, including the initial load from
+        // settings in OnNavigatedTo below, which is also how the toolbar learns the saved working
+        // directory on first launch without needing to visit this page.
+        _workingDirectoryContext.SetCurrent(value);
     }
 
     partial void OnSelectedPresetChanged(PromptPreset value)

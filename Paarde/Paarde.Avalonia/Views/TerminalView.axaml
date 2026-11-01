@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:controls="using:Paarde.Avalonia.Controls"
              x:Class="Paarde.Avalonia.Views.TerminalView"
              x:DataType="vm:TerminalViewModel">
 
@@ -20,16 +21,15 @@
             <Button Grid.Column="3" Margin="8,0,0,0" Content="Clear" Command="{Binding ClearOutputCommand}" />
         </Grid>
 
-        <TextBox Name="OutputTextBox"
-                 Grid.Row="2"
-                 Margin="0,8,0,0"
-                 Text="{Binding OutputText}"
-                 IsReadOnly="True"
-                 AcceptsReturn="True"
-                 TextWrapping="NoWrap"
-                 FontFamily="Cascadia Mono,Consolas,monospace"
-                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
+        <!-- specs/terminal-emulation T7: the plain-text TextBox is replaced by TerminalControl,
+             bound to the TerminalBuffer TerminalViewModel feeds from IPtyProcessManager, same
+             swap ShellView.axaml's output strip already got in T6. InputReceived/Resized are
+             wired in code-behind (TerminalView.axaml.cs), same reasoning. -->
+        <controls:TerminalControl Name="OutputTerminal"
+                                  Grid.Row="2"
+                                  Margin="0,8,0,0"
+                                  FontSize="14"
+                                  Buffer="{Binding OutputBuffer}" />
 
         <TextBlock Grid.Row="3" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
     </Grid>

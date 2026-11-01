@@ -5,8 +5,10 @@ namespace Paarde.Core.Contracts.Services;
 // to launch a Python or TypeScript server, and vice versa.
 public interface IProjectTypeDetector
 {
-    // Returned strings are LanguageServerOptions.LanguageId values ("csharp"/"python"/
-    // "typescript"), not LSP languageIds - this is "which configured servers should run here," not
-    // "what language is this one file."
-    IReadOnlySet<string> DetectLanguageIds(string workingDirectoryPath);
+    // Keys are LanguageServerOptions.LanguageId values ("csharp"/"python"/"typescript"), not LSP
+    // languageIds. Values are the directory where that language's marker file was found - a
+    // server must be rooted there (its rootUri), not at workingDirectoryPath, because
+    // typescript-language-server (and other servers) resolve their project/toolchain from rootUri
+    // and a polyglot repo's backend/ and frontend/ projects can each have their own.
+    IReadOnlyDictionary<string, string> DetectLanguageRoots(string workingDirectoryPath);
 }

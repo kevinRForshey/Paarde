@@ -2580,34 +2580,58 @@ which already resolves `.py`/`.ts`/`.tsx`/`.js`/`.jsx` correctly; the gap is ent
 
 Full requirements, design, and task breakdown: [`specs/multi-language-support/`](specs/multi-language-support/requirements.md).
 
-**F18.1 — Per-language server configuration and routing** — Not started
-- [ ] T18.1.1 Replace the single global `LspOptions` with a per-language collection
+**F18.1 — Per-language server configuration and routing** — ✅ Done 2026-10-23
+- [x] T18.1.1 Replace the single global `LspOptions` with a per-language collection
   (`LanguageServerOptions`), with built-in defaults for `csharp`→`csharp-ls`,
   `python`→`pyright-langserver --stdio`, `typescript`→`typescript-language-server --stdio`, each
   independently overridable in Settings. See `specs/multi-language-support/design.md`.
-- [ ] T18.1.2 Fix `StdioLanguageServerClient.NotifyDocumentOpenedAsync`'s hardcoded
+- [x] T18.1.2 Fix `StdioLanguageServerClient.NotifyDocumentOpenedAsync`'s hardcoded
   `"languageId": "csharp"` to send the language actually detected for the open file.
-- [ ] T18.1.3 Add a project-type detector (`*.csproj`/`*.sln`, `pyproject.toml`/`setup.py`/
+- [x] T18.1.3 Add a project-type detector (`*.csproj`/`*.sln`, `pyproject.toml`/`setup.py`/
   `requirements.txt`, `package.json`) so only relevant servers are attempted per working
-  directory, with a per-language force-enable escape hatch in Settings.
+  directory, with a per-language force-enable escape hatch in Settings. — revised 2026-10-25:
+  manual polyglot verification (T18.4.1 below) found that reporting only *which* languages were
+  detected, and then rooting every server at the same top-level working directory, broke
+  `typescript-language-server` in a polyglot repo - it resolves its workspace TypeScript
+  installation from `rootUri` at `initialize` time, so a `backend/`+`frontend/` split repo left it
+  unable to find `frontend/node_modules/typescript` at all. `IProjectTypeDetector.
+  DetectLanguageIds(string) : IReadOnlySet<string>` is now `DetectLanguageRoots(string) :
+  IReadOnlyDictionary<string, string>`, reporting the directory each language's marker was found
+  in (root-before-subdirectories precedence preserved), and `LanguageServerSessionManager.
+  StartAllAsync` roots each client at its own detected directory instead of the blanket working
+  directory (a force-enabled-but-undetected language still falls back to the working directory,
+  since it has no detected root).
 
-**F18.2 — Concurrent multi-server lifecycle** — Not started
-- [ ] T18.2.1 New `ILanguageServerSessionManager` owning N `ILanguageServerClient` instances keyed
+**F18.2 — Concurrent multi-server lifecycle** — ✅ Done 2026-10-23
+- [x] T18.2.1 New `ILanguageServerSessionManager` owning N `ILanguageServerClient` instances keyed
   by language, so a polyglot working directory (e.g. a Python backend + TypeScript frontend) gets
   intelligence in both languages at once, with one language's start failure never affecting
   another's.
 
-**F18.3 — Settings UI** — Not started
-- [ ] T18.3.1 Replace the single flat executable-path/arguments field pair in Settings' "Code
+**F18.3 — Settings UI** — ✅ Done 2026-10-23
+- [x] T18.3.1 Replace the single flat executable-path/arguments field pair in Settings' "Code
   intelligence" section with one row per configured language.
 
-**F18.4 — Tests** — Not started
-- [ ] T18.4.1 `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, and extended
+**F18.4 — Tests** — ✅ Done 2026-10-23, manual verification completed 2026-10-25
+- [x] T18.4.1 `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, and extended
   `StdioLanguageServerClientTests` per `specs/multi-language-support/design.md`'s testing section.
+  — 2026-10-25: manual verification against real `pyright-langserver`/`typescript-language-server`
+  processes (`specs/multi-language-support/tasks.md` T10, previously "Not attempted" - no X server
+  and the executables weren't installed in that sandbox) is now done, substituting a headless
+  console harness exercising the real `LanguageServerSessionManager`/`StdioLanguageServerClient`
+  production code directly against spawned server processes for the GUI-driven check the task
+  originally called for (no computer-use/GUI-automation tool exists in this environment for a
+  native Avalonia window - browser automation tools only). Verified end-to-end against a synthetic
+  polyglot repo (Python `backend/` + TypeScript `frontend/`): diagnostics, go-to-definition,
+  find-references, and completion all correctly scoped per language. This exercise is what
+  surfaced and led to fixing the `rootUri` bug noted under T18.1.3 - before the fix, TypeScript
+  diagnostics/go-to-definition/references/completion all came back empty in the polyglot case;
+  after, they match Python's (already-correct) results. `csharp-ls` was not separately installed
+  or re-verified in this pass (C#-only code intelligence was already verified under Epic 17).
 
 ---
 
-### EPIC 19 — Editor autocomplete (LSP symbol/member completion) *(P2)*
+### EPIC 19 — Editor autocomplete (LSP symbol/member completion) *(P2)* — ✅ Done 2026-10-26
 
 *Why: Epic 15's "autocomplete" is LLM-guessed ghost text, not real symbol completion - there is no
 `textDocument/completion` call anywhere in this codebase, and `initialize` advertises an empty
@@ -2723,11 +2747,454 @@ editor has no stable on-disk file identity for a language server to track).
   in this codebase for the same reason) - covered by the `ilspycmd` decompile evidence cited under
   T19.2.1/T19.2.2 plus T19.4.2's manual verification below, not a new automated test. Full solution
   builds with 0 warnings/errors, 801/801 tests pass (481 Core + 320 Avalonia - 4 new).
-- [ ] T19.4.2 Manual verification in a real C# project (requires a running `Application`/display,
+- [x] T19.4.2 Manual verification in a real C# project (requires a running `Application`/display,
   unavailable in this sandbox): typing `.` after a known symbol shows a populated dropdown;
   Tab/Enter/click accept; Escape dismisses; a ghost-text suggestion visible at trigger time
   disappears when the dropdown opens; typing past all matches auto-hides the window. Repeat once
-  [[multi-language-support]] ships for a Python and a TypeScript file.
+  [[multi-language-support]] ships for a Python and a TypeScript file. — 2026-10-25: the
+  protocol-level half of this (does `GetCompletionAsync` actually return real completions for a
+  Python and a TypeScript file) is now verified - see Epic 18's T18.4.1 note. 2026-10-26: the
+  `CodeEditor`-level half (`CompletionWindow` popping up, Tab/Enter/click/Escape, ghost-text
+  coexistence) is now also done - Kevin visually verified it on a machine with a display (this
+  sandbox has none) and confirmed it works. Epic 19 is fully complete.
+
+---
+
+## The "wizard → IDE" initiative (Epics 20–25)
+
+**Context:** asked 2026-10-26 to plan how to make Paarde feel more like an IDE than a wizard, with
+a concrete, immediate ask folded into it — persistent Build/Run controls for .NET today,
+generalized for other languages later. What follows is that plan: one epic that ships the concrete
+ask on its own (Epic 20); a direct follow-up that fixes the gap Epic 20 exposed — Run's output
+panel is silent for full-screen TUI apps because there's no real PTY/terminal emulation anywhere
+in Paarde (Epic 21); then three epics that fix the structural reason everything else in this app
+still reads as a wizard (Epics 22–24); then one larger, explicitly optional bet flagged for later
+judgment rather than committed to now (Epic 25).
+
+**Diagnosis — what "wizard" means here, precisely:** every page in this app (`Prompt`,
+`Explorer`, `Terminal`, `Diffs`, `Tutorial`, `History`, `Settings`) is a full `Frame` navigation
+target under `ShellView`'s `NavigationView` (`PageService.cs`, `ShellView.axaml`). Nothing
+persists across a page switch except what's been explicitly saved to settings — there is no
+concept of "state that survives regardless of which page you're looking at," which is the one
+thing every IDE (VS Code, Rider, Visual Studio) has and every installer-style wizard doesn't.
+Concretely, today:
+- There's nowhere to put a Run button that isn't itself a page you navigate to and away from.
+- Output from a build/test/terminal command (Epics 12/16) only exists on the page that produced
+  it; switching pages loses sight of it even though the process might still be running.
+- There's no status bar — no at-a-glance git branch/dirty state, no language-server connection
+  state, no caret position — all things Epic 17/18's diagnostics and Epic 4.3's `IGitStatusService`
+  already compute internally but surface nowhere persistent.
+- Explorer can only show one file at a time (`SelectedFilePath`) — there's no equivalent of
+  editor tabs, so comparing two files means losing sight of the first one entirely.
+- Every action (even "find a file," "run a command," "check diagnostics") requires knowing which
+  of seven pages it lives on and navigating there first, rather than one keyboard shortcut from
+  wherever you already are.
+
+None of this is wrong *as a wizard* — the Prompt→Tutorial→Diffs→Apply flow genuinely is a
+sequential workflow with a beginning and an end, and keeping it page-based is fine. What's missing
+is a **persistent layer underneath the pages** that doesn't care which step of that workflow
+you're on. That's what Epics 20–23 build, in increasing order of how much of the shell they touch.
+
+### EPIC 20 — Build & Run *(P0 — the explicit, concrete ask)* — ✅ Done 2026-10-26, manually verified 2026-10-31
+
+*Why: "incorporate build and run buttons in DotNet applications (for now and also for other
+compiled languages in the future)" is the specific, immediate request this whole initiative grew
+out of. It's also fully self-contained — it doesn't need Epic 22's bigger shell rework to ship,
+it just needs *somewhere* persistent to live, which it brings with it (a minimal toolbar + output
+strip in `ShellView`, generalized into the full dock by Epic 22 later). Full spec, including the
+exact new types, merge/detection algorithm, and process-lifecycle design:
+[`specs/build-and-run/`](specs/build-and-run/requirements.md).*
+
+**F20.1 — Run configuration model and detection** — ✅ Done 2026-10-26
+- [x] T20.1.1 `RunConfiguration` record (language id, working directory, project-relative path,
+  build command, run command, auto-detected flag) + per-working-directory settings keys. See
+  `specs/build-and-run/design.md`.
+- [x] T20.1.2 `IRunConfigurationDetector`/`RunConfigurationDetector`: C# via `.csproj` scan +
+  `OutputType`/`Sdk`/test-project classification (reusing Epic 18's `IProjectTypeDetector.
+  DetectLanguageRoots` as the starting point, not a second filesystem walk from scratch); Python
+  via a common-entry-point-filename heuristic; TypeScript via `package.json`'s `scripts` map.
+- [x] T20.1.3 `RunConfigurationsProvider`: merges fresh detection against the saved list without
+  overwriting a user-edited entry; seeds a first-ever C# candidate's build command from Epic 12's
+  existing global `BuildTestSettingsKeys.BuildCommand` when set.
+
+**F20.2 — A process that doesn't just wait for exit** — ✅ Done 2026-10-26
+- [x] T20.2.1 `IRunProcessManager`/`RunProcessManager`: starts a process and returns immediately
+  (unlike `IBuildTestRunner`/`ITerminalCommandRunner`, both wait-for-exit today), streams output
+  live, kills the full process tree on `Stop`, auto-stops a still-running prior process on a new
+  `Start`. Register as a DI singleton; wire `Stop()` into `App.axaml.cs`'s exit handler alongside
+  `ILanguageServerSessionManager.StopAllAsync()` so a Run session never outlives the app. — each
+  running process tracks its own `StoppedByUs` flag (not one shared field) so a second `Start()`
+  can't misreport the prior process's exit as a real exit code.
+
+**F20.3 — A persistent place for the controls to live** — ✅ Done 2026-10-26
+- [x] T20.3.1 `RunPanelViewModel` (DI singleton): configuration picker, Build/Run/Stop commands,
+  Build-before-Run sequencing with failure short-circuit. — learns the working directory via a new
+  minimal `IWorkingDirectoryContext` pub/sub hook (fed by `PromptViewModel`) rather than
+  `INavigationAware`, plus an eager load of the saved working directory in its own constructor so
+  the toolbar works even in a session that never visits the Prompt page.
+- [x] T20.3.2 `ShellView.axaml` gains a toolbar row above the existing `NavigationView` and a
+  collapsible output strip below it (auto-expanding on a build start/failure or a run start) - no
+  other page's `.axaml` changes. Epic 22 is what generalizes this one strip into the full
+  Build/Run/Problems/Terminal dock; this ships only the Build/Run tab's worth, but it's real and
+  usable from every page on day one.
+
+**F20.4 — Tests** — ✅ Done 2026-10-26, manually verified 2026-10-31
+- [x] T20.4.1 `RunConfigurationDetectorTests`, `RunConfigurationsProviderTests`,
+  `RunProcessManagerTests`, `RunPanelViewModelTests` per `specs/build-and-run/design.md`'s testing
+  section. — done 2026-10-26: 22 new tests in `Paarde.Core.Tests`, 21 new in `Paarde.Avalonia.Tests`
+  (including fixes to `PromptViewModelTests`/`SettingsViewModelTests` for the new constructor
+  parameters `RunPanelViewModel`'s wiring required). `RunPanelViewModelTests` doesn't exercise
+  `OnProcessOutputReceived`/`OnProcessExited` since those marshal through `Dispatcher.UIThread.
+  Post`, which this plain xunit host doesn't pump - same gap already documented on
+  `TerminalViewModelTests`. Full suites pass: 515/515 Core, 340/340 Avalonia.
+- [x] T20.4.2 Manual verification against this repo itself: Build/Run/Stop actually drive
+  `dotnet build`/`dotnet run`, Stop leaves no orphaned process, switching configurations switches
+  targets, and all of it is reachable from every page.
+  _(Manually verified 2026-10-31 by Kevin Forshey.)_
+
+---
+
+### EPIC 21 — Real terminal emulation (PTY + VT100) *(P1 — direct follow-up to Epic 20)*
+
+*Why: asked 2026-10-26 why Run's output panel stayed empty for a Terminal.Gui-based console app.
+Root cause, confirmed by direct reproduction: `RunProcessManager`/`ProcessCommandRunner` both read
+child-process output via `Process.OutputDataReceived`, which is strictly line-oriented and only
+fires on `\n`. Full-screen TUI frameworks (Terminal.Gui, and anything else using the alternate
+screen buffer) redraw entirely through newline-free ANSI/VT100 cursor-positioning escape sequences
+- that never fires `OutputDataReceived` during normal operation, and the one blob that does arrive
+on process teardown is raw, unreadable escape-code soup. There is no PTY anywhere in Paarde today;
+Epic 16 (T16.1.1) already identified this exact gap in 2026-10-22 and explicitly deferred it
+("Recommend the scoped-down version first... no PTY") because building one well is real work. This
+epic is that deferred work, done properly rather than patched around. Full spec, including the
+exact new types and the architectural tradeoff below: [`specs/terminal-emulation/`]
+(specs/terminal-emulation/requirements.md).*
+
+*Library choice, researched rather than guessed per explicit instruction to not ship "LLM generated
+slop": [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) (tomlm) for cross-platform PTY
+allocation (ConPTY on Windows, `forkpty`/`posix_openpt` on Linux/macOS) - MIT, `net10.0`, actively
+maintained, async `PtyProvider.SpawnAsync(PtyOptions, CancellationToken)` → `IPtyConnection`
+(`ReaderStream`/`WriterStream`/`Pid`/`ExitCode`/`ProcessExited`/`Resize`/`Kill`). [XTerm.NET]
+(https://www.nuget.org/packages/XTerm.NET) (tomlm, same author) as the headless VT100/ANSI
+emulation engine - MIT, `net10.0`, UI-framework-agnostic ("bring your own renderer"), full
+VT100/ANSI + 256/true color + Unicode/wcwidth, normal + alternate screen buffer support. Both
+rejected/deprioritized alternatives: `XtermSharp` and `VtNetCore` (both stale since 2022/2023),
+`ghostflyby/Pty.Net` (unproven fork). The same author's `Iciclecreek.Avalonia.Terminal` is a
+feature-complete, drop-in Avalonia terminal control built on exactly these two libraries, and would
+otherwise be the obvious choice - but it requires Avalonia `[12.0.4, )`, while Paarde is
+deliberately pinned to `11.3.22` (see `Paarde.Avalonia.csproj`'s comment on why). Adopting it would
+cascade into a major-version `FluentAvaloniaUI` bump and an `AvaloniaEdit`/`AvaloniaEdit.TextMate`
+upgrade, an app-wide regression risk far outside this epic's scope. Decision (confirmed
+2026-10-26): stay on Avalonia 11.3.x, consume Porta.Pty and XTerm.NET directly (both are
+Avalonia-version-agnostic), and build a small, Paarde-owned Avalonia-11-compatible rendering
+control instead of adopting the third-party widget.*
+
+**F21.1 — PTY-backed process execution** — T21.1.1, T21.1.2 done 2026-10-27
+- [x] T21.1.1 Add the `Porta.Pty` package reference to `Paarde.Core`. Add `IPtyProcessManager`/
+  `PtyProcessManager`: spawns via `PtyProvider.SpawnAsync`, exposes the raw byte stream (not
+  line-based `OutputReceived`), a `Resize(cols, rows)`/`WriteInput` passthrough, and the same
+  `Stop`/process-tree-kill/"stopped by us" semantics `RunProcessManager` already has.
+  _(Done 2026-10-27: `Paarde.Core/Contracts/Services/IPtyProcessManager.cs`,
+  `Paarde.Core/Services/PtyProcessManager.cs`, registered as a DI singleton with `Stop()` wired
+  into `App.axaml.cs`'s exit handler. Verified live against the real `TODOTUI1` repro - the PTY
+  path streams the app's alternate-screen redraw immediately, where the old pipe-based path
+  produced nothing. Full 515/515 Core + 340/340 Avalonia suites still pass.)_
+- [x] T21.1.2 Wire `RunPanelViewModel` (Epic 20) to use the PTY-backed path for Run (not Build -
+  build output is still naturally line-oriented and doesn't need a PTY).
+  _(Done 2026-10-27: `RunPanelViewModel` now takes `IPtyProcessManager` instead of
+  `IRunProcessManager` and owns a `TerminalBuffer OutputBuffer`; `RunAsync` starts via
+  `_ptyProcessManager.StartAsync(...)`, `OnProcessOutputReceived(byte[])` feeds `OutputBuffer`
+  directly, and `WriteInput`/`Resize` passthroughs let the View wire `TerminalControl`'s events to
+  it without reaching past the ViewModel. Build's output stays line-oriented
+  (`IBuildTestRunner`) but is fed into the same `OutputBuffer` through a new `EncodeForTerminal`
+  helper that normalizes its bare `\n` to `\r\n` first - confirmed via a throwaway harness that
+  XTerm.NET's `Terminal` treats bare `\n` strictly per VT100 semantics (no implicit carriage
+  return), which otherwise renders as a "staircase". `IRunProcessManager`/`RunProcessManager` and
+  their test fake/suite had no other consumers and were deleted outright as dead code, along with
+  their DI registration/exit-stop in `App.axaml.cs`. Full 520/520 Core + 362/362 Avalonia suites
+  pass. See `specs/terminal-emulation/tasks.md` T6 for the full writeup.)_
+
+**F21.2 — VT100/ANSI emulation** — T21.2.1 done 2026-10-27
+- [x] T21.2.1 Add the `XTerm.NET` package reference. Add a thin adapter that feeds PTY output bytes
+  into an `XTerm.NET` `Terminal` instance and exposes its screen-cell buffer (text, colors,
+  attributes, cursor position, alternate-buffer state) in a form the rendering control (F21.3) can
+  consume without depending on Avalonia itself.
+  _(Done 2026-10-27: `Paarde.Core/Services/TerminalBuffer.cs`. Its `Changed` event is raised by
+  `TerminalBuffer` itself after every `Feed`/`Resize`, not from XTerm.NET's own `BufferChanged` -
+  that only fires on alternate/normal screen switches, not on every write, so it isn't a general
+  repaint signal. Color resolution was verified empirically against the real library rather than
+  its README, whose documented color-mode contract doesn't match the actual source. Regression-
+  tested with the exact byte-for-byte escape sequence captured from the `TODOTUI1` repro. Full
+  526/526 Core + 340/340 Avalonia suites pass.)_
+- [ ] T21.2.2 Explicitly out of scope for this epic: scrollback UI beyond what XTerm.NET's buffer
+  gives for free, Sixel/Kitty graphics, and terminal window-manipulation escape sequences (resize-
+  the-OS-window, etc.) - none of which Run/Terminal's use case needs.
+
+**F21.3 — A Paarde-owned terminal rendering control** — T21.3.1, T21.3.2 done 2026-10-27
+- [x] T21.3.1 New Avalonia 11-compatible control: a grid of styled character cells + a blinking
+  cursor, repainted from the XTerm.NET buffer adapter (F21.2) on each update. Scoped to monospace
+  text + ANSI colors/attributes only - no custom theming beyond what the app's existing color
+  palette needs.
+  _(Done 2026-10-27: `Paarde.Avalonia/Controls/TerminalControl.cs`. A plain `Control` subclass (no
+  template) - the first standalone custom-drawn `Control` in this codebase - with a bindable
+  `Buffer` property that subscribes to `TerminalBuffer.Changed` and repaints via
+  `Dispatcher.UIThread.Post(InvalidateVisual)`. `Render` draws each cell with `FormattedText`
+  (`Cascadia Mono,Consolas,monospace`), honoring per-cell colors/bold/inverse/invisible, plus a
+  cursor rectangle (filled when focused, outlined when not). All Avalonia API shapes were confirmed
+  by reflecting against the installed 11.3.22 DLLs rather than guessed. Verified with a throwaway
+  headless-rendering harness that feeds the real captured `TODOTUI1` byte blob through a live
+  `TerminalControl` and renders it with no exceptions. Keyboard input (T21.3.2, below) and wiring
+  into Run/Terminal (T21.3.3) are separate tasks. Full 526/526 Core + 340/340 Avalonia suites
+  pass. Resize handling also landed as part of this control (not broken out as its own roadmap
+  line): `OnSizeChanged` recomputes `cols`/`rows` from pixel size and the measured monospace cell
+  via a pure `ComputeGridSize` method, calls `Buffer.Resize` directly, and raises a `Resized`
+  event shaped to match `IPtyProcessManager.Resize(int, int)` so a consumer wires
+  `control.Resized += ptyProcessManager.Resize;` directly - verified end-to-end with a headless
+  harness that arranged a real control at 1600x1000px and confirmed its bound buffer resized
+  accordingly with no redundant re-resize on an unchanged size. Full 526/526 Core + 362/362
+  Avalonia suites pass.)_
+- [x] T21.3.2 Keyboard input from the control is written back to the PTY's `WriterStream` (F21.1),
+  including control characters (Ctrl+C, arrow keys as their VT100 escape sequences, etc.) so
+  interactive full-screen apps (Terminal.Gui, `vim`, `htop`) behave normally.
+  _(Done 2026-10-27: `TerminalControl.OnTextInput`/`OnKeyDown` raise a new `InputReceived`
+  (`Action<byte[]>?`) event rather than taking a direct `IPtyProcessManager` dependency - its
+  byte-shape deliberately matches `WriteInput(byte[])` so a consumer wires
+  `control.InputReceived += ptyProcessManager.WriteInput;` directly, and `WriteInput`'s existing
+  no-op-when-nothing-running behavior satisfies "only while a process is running" without this
+  control needing to track process state. Special-key encoding (arrows, Home/End/Page Up/Down,
+  Insert/Delete, Enter/Tab/Backspace/Escape, Ctrl+A-Z) is a pure `internal TryEncodeSpecialKey`
+  method, unit-tested directly (19 cases in `TerminalControlTests`) without an Avalonia display.
+  Full 526/526 Core + 359/359 Avalonia suites pass.)_
+- [x] T21.3.3 Wire the control into Run's output strip (Epic 20) as the renderer when a run is
+  PTY-backed, and into Epic 16's `TerminalView` page, replacing its current plain-text
+  `OutputText` append for the cases where a PTY is in use.
+  _(Run half done 2026-10-27 as part of T21.1.2 above: `ShellView.axaml`'s output-strip `TextBox`
+  is replaced by `<controls:TerminalControl Buffer="{Binding RunPanelViewModel.OutputBuffer}" />`
+  inside the unchanged `Expander`, with `ShellView.axaml.cs` wiring `InputReceived`/`Resized` to
+  `RunPanelViewModel`'s passthroughs. Terminal half done 2026-10-27 per
+  `specs/terminal-emulation/tasks.md` T7: `TerminalView.axaml` now hosts the same `TerminalControl`.)_
+
+**F21.4 — Tests** — ✅ Done 2026-10-30, manually verified 2026-10-31
+- [x] T21.4.1 `PtyProcessManagerTests` (or equivalent): a real PTY-backed process starts, streams
+  bytes, resizes, and stops/kills its tree the same way `RunProcessManagerTests` already verifies
+  for the plain-pipe path.
+  _(Done 2026-10-30: `Paarde.Core.Tests/Services/PtyProcessManagerTests.cs`, 10 tests spawning real
+  commands through a real PTY with per-platform commands (cmd.exe on Windows, sh elsewhere): output
+  streaming, natural exit code, working directory, `Stop()` → `Exited(null)`, restart-stops-previous,
+  `Resize` while running, a `WriteInput` stdin round trip, inner-quotes/`&&` reaching the shell
+  intact, and the nothing-running no-ops. **Writing these found a real Windows bug:** Porta.Pty's
+  default Windows argument formatting quotes every argument (`cmd.exe "/c" "exit 3"`), which cmd.exe
+  misparses - every Run/Terminal command on Windows failed with `'"<command>' is not recognized`.
+  CI never saw it because Linux's `sh -c` gets a real argv. Fixed in `PtyProcessManager` by passing
+  `VerbatimCommandLine = true` with the standard `cmd /s /c "<command>"` form (confirmed against a
+  decompile of Porta.Pty 2.2.3's `WindowsArguments`). The echo test also asserts exit code 0, since
+  the old error message itself contained the echoed text and would otherwise mask a regression.
+  All 10 pass on Windows. Process-tree kill of grandchildren isn't asserted - there's no portable
+  way to enumerate them from a test - so that stays part of T9's manual check.)_
+- [x] T21.4.2 Terminal-adapter tests: feeding known ANSI/VT100 sequences (cursor moves, alternate
+  screen enter/exit, colors) through the XTerm.NET adapter produces the expected cell-buffer state.
+  Rendering-control visual verification, like every other Avalonia control in this roadmap, needs a
+  real display and is manual/deferred.
+  _(Done 2026-10-27 alongside T21.2.1: `TerminalBufferTests` covers cursor positioning, 16/256/
+  true-color SGR, alternate-buffer enter/exit, resize, and the byte-for-byte `TODOTUI1` regression
+  blob.)_
+
+---
+
+### EPIC 22 — Persistent workbench shell *(P1 — the structural fix)*
+
+*Why: Epic 20 proves the pattern (one strip in `ShellView`, visible from every page) for Build/Run
+specifically. This epic generalizes that pattern into the thing that actually makes the app stop
+feeling like a wizard: a real output **dock** (tabs, not one strip) and a **status bar** — the two
+pieces every IDE has that a page-based wizard doesn't. Nothing here requires touching any
+individual page's content; it's additive to `ShellView` only, same scope discipline Epic 20 used.
+Full spec: [`specs/ide-workbench-shell/`](specs/ide-workbench-shell/requirements.md).*
+
+**F22.1 — Generalize Epic 20's output strip into a multi-tab dock** — T22.1.1, T22.1.2 done
+2026-10-27
+- [x] T22.1.1 Replace the single Build/Run output strip with a small tabbed dock (Build, Run,
+  Problems, Terminal) living in the same `ShellView` location. "Terminal" absorbs Epic 16's
+  `TerminalView` page's content (the page itself can be removed from the `NavigationView` once its
+  functionality lives in the dock, or kept as a deep-link for muscle memory - decide at
+  implementation time). "Problems" surfaces Epic 17/18's LSP diagnostics across every open file,
+  not just the one currently shown in Explorer, aggregated via a new small
+  `IDiagnosticsAggregator` that both Explorer and the dock subscribe to instead of Explorer owning
+  the only copy of `Diagnostics`.
+  _(Done: four-tab `TabControl` (Build/Run/Problems/Terminal) inside `ShellView`'s existing
+  `Expander`, fed by `WorkbenchDockViewModel`. `TerminalViewModel` promoted to a DI singleton so
+  the Terminal page and the dock's Terminal tab share one live PTY session, kept as a deep-link
+  per `specs/ide-workbench-shell/design.md`'s decision.)_
+- [x] T22.1.2 The dock remembers which tab was last active and whether it was expanded/collapsed
+  across navigation (and ideally across app restarts, same persisted-UI-state convention this
+  app already uses for working directory/theme/window size).
+  _(Done: `WorkbenchDockSettingsKeys` (`Dock.ActiveTab`, `Dock.IsExpanded`) persisted via
+  `ILocalSettingsService`, restored on construction.)_
+
+**F22.2 — A status bar** — T22.2.1, T22.2.2 done 2026-10-27
+- [x] T22.2.1 A thin bar anchored at the very bottom of `ShellView` (below the dock, below
+  everything): current git branch + dirty-file count (`IGitStatusService.GetStatus` already
+  computes `IsDirty`/`DirtyFiles`; branch name itself needs a small addition - `git branch
+  --show-current` - since `GitStatus` doesn't carry it today), the active `RunConfiguration`'s
+  name, and a per-language code-intelligence connection indicator (reusing
+  `ILanguageServerSessionManager`'s per-language state from Epic 18, surfaced instead of staying
+  internal).
+  _(Done: `StatusBarViewModel` (DI singleton) backs a new status bar row in `ShellView.axaml`.)_
+- [x] T22.2.2 When `CodeEditor` has focus (Explorer, Tutorial's proposal editor), the status bar
+  also shows caret line:column - needs a new bindable `CodeEditor.CaretPosition` property pushed
+  up from AvaloniaEdit's own `TextArea.Caret.PositionChanged`, then threaded up through whichever
+  view currently hosts the focused editor to `ShellViewModel`.
+  _(Done: `CodeEditor.CaretPositionProperty` + `IActiveEditorContext`, wired from `ExplorerView`/
+  `TutorialDetailControl`.)_
+
+**F22.3 — Tests** — T22.3.1 done 2026-10-27
+- [x] T22.3.1 `IDiagnosticsAggregator` tests (aggregates across files, clears on file close);
+  status bar branch-name parsing tests for `IGitStatusService`'s extension; dock tab-persistence
+  tests.
+  _(Done: `DiagnosticsAggregatorTests`, `GitStatusServiceTests`/`LanguageServerSessionManagerTests`
+  extensions, `StatusBarViewModelTests`, `WorkbenchDockViewModelTests`. Manual verification of the
+  rendered dock/status bar (`specs/ide-workbench-shell/tasks.md` T8) remains deferred - same
+  sandboxed-environment limitation as every other Avalonia-rendering task in this roadmap.)_
+
+---
+
+### EPIC 23 — Multi-file tabbed editing in Explorer *(P1/P2)*
+
+*Why: `ExplorerViewModel.SelectedFilePath`/`SelectedFileContent` (Epic 10) is a single slot - only
+one file can be open at a time, so comparing two files or keeping a reference file visible while
+editing another means losing sight of the first one. Tabs aren't new to this app - Epic 8's
+T8.2.2 already built exactly this pattern for the Tutorial page's proposed-file review
+(`TutorialViewModel.OpenTabs`, an `ObservableCollection<ProposedFileChangeViewModel>` backing a
+`TabControl`, with close-selects-neighbor semantics and dirty-marker (`*`) headers) - this epic is
+applying that same, already-proven pattern to Explorer's arbitrary-file browsing, not inventing
+tabs for the first time.*
+
+**F23.1 — Open files as tabs, not a single slot** — T23.1.1, T23.1.2, T23.1.3 done 2026-10-27
+- [x] T23.1.1 `ExplorerViewModel` grows an `ObservableCollection<OpenFileTabViewModel>` (each
+  wrapping the per-file state `SelectedFilePath`/`SelectedFileContent`/`IsFileDirty`/
+  `_originalFileContentOnDisk` already track for the single-file case today) plus a
+  `SelectedTab` - same `OpenTabs`/`Selected` shape `TutorialViewModel` already established, not a
+  new one. Double-clicking a tree node opens a new tab (or activates an existing one for that
+  path, VS Code's convention - `TutorialViewModel.OnSelectedChanged`'s "add to `OpenTabs` if not
+  already there" is the closer precedent than a brand-new dedupe rule) rather than replacing the
+  current single file.
+  _(Done 2026-10-27: added `OpenFileTabViewModel` (new, `Paarde.Avalonia/ViewModels/`) - one
+  instance per open tab, self-contained the same way `ProposedFileChangeViewModel` already is for
+  Tutorial's tabs, owning `Content`/`IsDirty`/`StatusMessage`/`FileOverview`/`IsLoadingOverview`/
+  `Diagnostics`/`GhostTextSuggestion`/`CompletionItems` plus `Save`/`RevertToDisk`/`Explain`
+  commands and the ghost-text/completion round trips directly (including its own per-tab
+  `CancellationTokenSource`, since a request in one tab must no longer cancel one in another).
+  `ExplorerViewModel` gained `OpenTabs`/`SelectedTab`/`HasOpenTabs` and an `OpenOrActivateTab`
+  helper; tree-node selection (not double-click specifically - matching `OnSelectedChanged`'s own
+  precedent more closely) opens or activates a tab via that helper. `GoToDefinitionAsync`/
+  `FindReferencesAsync` now take an explicit `filePath` parameter instead of reading a removed
+  `SelectedFilePath`, and `NavigateToLocation` opens/activates the target's tab before leaving a
+  pending caret target for the newly-active tab's editor to apply.)_
+- [x] T23.1.2 `ExplorerView.axaml` gains a `TabControl`/tab strip above the `CodeEditor`, styled
+  the same as `TutorialView.axaml`'s (dirty `*` marker, close-selects-neighbor on
+  `CloseSelectedTabCommand`); closing a dirty tab reuses the existing discard-confirmation dialog
+  (T10.2.5) rather than a new one.
+  _(Done 2026-10-27: `ExplorerView.axaml`'s single embedded `CodeEditor` became a
+  `TabControl ItemsSource="{Binding OpenTabs}"`/`SelectedItem="{Binding SelectedTab}"` with a
+  `ContentTemplate` instantiating a new `ExplorerFileTabControl` (new `UserControl`,
+  `Paarde.Avalonia/Views/`) per open tab - same "separate control instance per tab" shape
+  `TutorialDetailControl` already established, so each tab gets its own `CodeEditor` instance
+  rather than one shared editor whose binding path gets swapped. `ExplorerFileTabControl` houses
+  the per-tab toolbar (Save/Revert/Explain, dirty marker), editor, references flyout, and Overview
+  expander that used to live directly in `ExplorerView.axaml`; its code-behind reaches the
+  page-level `ExplorerViewModel` for cross-file navigation via `this.FindAncestorOfType<ExplorerView>()`,
+  the same ancestor-lookup pattern `TutorialDetailControl` uses for `ILlmRunner`.
+  `CloseSelectedTabCommand` (parameterless, matching `TutorialViewModel`'s own naming/shape exactly)
+  prompts via the existing `IDialogService.ConfirmAsync` only when the tab being closed is dirty,
+  with new `Explorer_CloseDirtyTabConfirm*` string resources replacing the old
+  `Explorer_DiscardEditsConfirm*` ones (switching tabs can no longer discard anything now that every
+  tab keeps its own content, so only closing a dirty tab still needs to ask). `ExplorerView.axaml.cs`
+  is now trimmed down to just the tree-pane-width (`ResizablePaneHelper`) logic.)_
+- [x] T23.1.3 Per-tab language-server document lifecycle: every open tab needs its own `didOpen`/
+  `didClose` pair with `ILanguageServerSessionManager` (today there's exactly one open document at
+  a time, tied to the single-slot model) - closing a tab must send `didClose` for *that* file, not
+  whichever file happens to be selected when the close happens.
+  _(Done 2026-10-27: `OpenOrActivateTab` calls `NotifyDocumentOpenedAsync` once per newly-created
+  tab (a no-op if the tab already exists and is just being activated); `CloseSelectedTabAsync`
+  calls `NotifyDocumentClosedAsync(tab.FilePath)` for the specific tab being closed, read from the
+  tab itself rather than from any shared "currently selected" state, before removing it from
+  `OpenTabs`. `OnDiagnosticsPublished` now looks up the matching tab by `FilePath` across
+  `OpenTabs` instead of assuming a single active file.)_
+
+**F23.2 — Tests** — T23.2.1 done 2026-10-27
+- [x] T23.2.1 `ExplorerViewModelTests` extended for: opening a second file doesn't discard the
+  first's unsaved edits; closing a tab prompts for a dirty file and not a clean one; switching tabs
+  swaps which file's diagnostics/overview are shown; `didOpen`/`didClose` fire per tab correctly.
+  _(Done 2026-10-27: rewrote `ExplorerViewModelTests` against the new `OpenTabs`/`SelectedTab` API -
+  selecting a file opens/activates a tab, selecting a directory or null leaves tabs untouched,
+  re-selecting an already-open file activates the existing tab rather than duplicating it, and
+  `RefreshTreeCommand` clears the stale tree selection without closing any tabs. The three
+  discard-confirmation-on-switch tests no longer have a behavior to test (switching tabs can't
+  discard anything once every tab keeps its own content) and were replaced with one test plus an
+  explanatory comment confirming the new "open a second tab without prompting or touching the
+  first" behavior, and `CloseSelectedTabCommand` got its own not-dirty/dirty-confirmed/
+  dirty-declined/close-selects-neighbor tests. Save/Revert/Explain's tests moved onto a new
+  `OpenFileTabViewModelTests` alongside the logic they cover. `dotnet build Paarde.slnx
+  --no-incremental`: 0 warnings/0 errors. Full solution test run: 911/911 passed.)_
+
+---
+
+### EPIC 24 — Command palette & Quick Open *(P2)* — Implementation done 2026-10-30, manual verification pending
+
+*Why: right now, "run a build," "open a file," "jump to Settings," and "search the codebase" each
+require first knowing which of seven pages that lives on. A command palette (`Ctrl+Shift+P`,
+VS Code/Sublime/every modern IDE's convention) and a Quick Open (`Ctrl+P`, fuzzy file-name search)
+replace "navigate to the right page" with "type what you want" from anywhere - the single biggest
+per-action speed difference between a wizard and a tool people live in all day.
+Full spec: [`specs/command-palette/`](specs/command-palette/requirements.md).*
+
+**F24.1 — Quick Open** — Done 2026-10-30
+- [x] T24.1.1 `Ctrl+P` anywhere in the app opens a lightweight popup (same `Popup`/`ListBox` shape
+  Epic 14's `@file`-mention picker already built) substring-matching file names from
+  `FileTreeBuilder`'s existing gitignore-aware walk (via the existing `FileMentionMatcher`);
+  selecting a result navigates to Explorer with that file opened as a tab (Epic 23).
+  _(Done: new `QuickOpenViewModel` (DI singleton) + a global `Ctrl+P` `KeyBinding` on the `Window`
+  in `ShellView.axaml.cs`. `ExplorerViewModel.OnNavigatedTo` grew a `parameter is string filePath`
+  branch that calls the existing `OpenOrActivateTab`, so Quick Open reaches the already-running
+  Explorer page instance without promoting it to a singleton.)_
+
+**F24.2 — Command palette** — Done 2026-10-30
+- [x] T24.2.1 `Ctrl+Shift+P` opens a similar popup listing a small, explicit registry of named
+  commands (`"Build"`, `"Run"`, `"Stop"`, one `"Go to <Page>"` entry per `NavigationView` page)
+  rather than introspecting every `[RelayCommand]` in the app - an explicit allowlist keeps this
+  from surfacing half-finished or page-context-dependent commands that would do nothing (or throw)
+  if invoked from the wrong place.
+  _(Done: new `CommandPaletteViewModel` (DI singleton) with a hand-written `PaletteCommand`
+  registry (11 entries) delegating Build/Run/Stop to `RunPanelViewModel`'s existing commands.
+  Disabled entries (R2.4) stay in the list via a computed `PaletteCommand.IsEnabled`. At most one
+  of Quick Open/the command palette is ever open at a time (R3.2), wired via an
+  `AttachCommandPalette`/`AttachQuickOpen` reference set once by `ShellViewModel`'s constructor
+  rather than circular DI constructor injection between the two singletons.)_
+
+**F24.3 — Tests** — Done 2026-10-30
+- [x] T24.3.1 Substring-filter and registry-dispatch tests (reusing the existing
+  `FileMentionMatcher` rather than a second implementation); command-registry dispatch tests.
+  _(Done: new `QuickOpenViewModelTests`, `CommandPaletteViewModelTests`, plus
+  `ExplorerViewModelTests` extensions for the new `OnNavigatedTo` branch (including a regression
+  guard for non-`string`/`null` parameters). `dotnet build Paarde.slnx`: 0 warnings/0 errors. Full
+  solution test run: 928/928 passed. Manual verification of the rendered popups/global keybindings
+  (`specs/command-palette/tasks.md` T9) remains deferred - same sandboxed-environment limitation as
+  every other Avalonia-rendering task in this roadmap.)_
+
+---
+
+### EPIC 25 — Unified workbench: dock the Assistant panel beside the editor
+
+*Why: Epics 20–24 fixed the shell (persistent Build/Run toolbar, output dock, status bar, tabbed
+Explorer editing, command palette/Quick Open) but left the app's actual core loop - compose a
+prompt, review its result, apply it - as three separate full pages (Main → Prompt → Tutorial/Diffs)
+the user wizards through, with the code editor itself only appearing as one stop along the way
+instead of being the thing the whole screen is organized around. Having now lived with Epics 20–24
+for a while, the "wizard" feeling is confirmed to be about this flow's page-per-step structure, not
+the shell - so this epic commits to collapsing Main/Prompt/Diffs/Tutorial into a single dockable
+Assistant panel (Compose + Review tabs) that lives beside Explorer's editor, with Explorer promoted
+to the app's landing page. A finished run's files open automatically as Explorer tabs with Epic
+13's inline diff rendering, so there is no longer a gap between "the run finished" and "I can see
+and act on the result" - the editor is visible the entire time, not reached only after three page
+navigations. Full spec: `specs/unified-workbench/requirements.md`.*
 
 ---
 
@@ -2775,13 +3242,46 @@ editor has no stable on-disk file identity for a language server to track).
     `LanguageServerSessionManager` replacing the single `ILanguageServerClient` consumer in
     `ExplorerViewModel`/DI with per-language isolation (one language's start failure never blocks
     another) and a same-working-directory no-op guard. Settings' "Code intelligence" section
-    reworked into a per-language repeated row. Solution builds clean, 794/794 tests pass (22 new:
-    `ProjectTypeDetectorTests`, `LanguageServerSessionManagerTests`, 2 extended
-    `StdioLanguageServerClientTests` cases). Not manually verified against real
-    `pyright-langserver`/`typescript-language-server`/`csharp-ls` processes across C#-only/
-    Python-only/TypeScript-only/polyglot repos (no X server in this sandbox, same limitation noted
-    on earlier UI-touching tasks, and these executables aren't installed here regardless).
+    reworked into a per-language repeated row. Solution builds clean, 802/802 tests pass. ✅ Manually
+    verified 2026-10-25 against real `pyright-langserver`/`typescript-language-server` processes
+    via a headless harness exercising the production code directly (no GUI-automation tool exists
+    in this environment for a native Avalonia window). This verification pass found and fixed a
+    real bug: `LanguageServerSessionManager` rooted every language's server at the same top-level
+    working directory, which broke `typescript-language-server` in a polyglot (Python `backend/` +
+    TypeScript `frontend/`) repo, since it resolves its workspace TypeScript installation from
+    `rootUri` at `initialize` time. `IProjectTypeDetector` now reports each detected language's own
+    marker-file directory (`DetectLanguageRoots`, not just `DetectLanguageIds`), and each server is
+    rooted there instead. `csharp-ls` was not separately re-verified in this pass (C#-only code
+    intelligence was already verified under Epic 17).
 19. **Epic 19** — editor autocomplete (real LSP completion, distinct from Epic 15's LLM ghost
     text). Builds on AvaloniaEdit's existing `CompletionWindow`, and shares an `initialize`
     capability-advertisement change with Epic 18 - either can land first. Full spec:
-    `specs/editor-autocomplete/`.
+    `specs/editor-autocomplete/`. ✅ Done 2026-10-26, visually verified end-to-end.
+
+20. **Epic 20** — Build & Run. The explicit, concrete ask behind the "wizard → IDE" initiative
+    (see that section above Epic 20) and fully self-contained - it brings its own minimal
+    persistent toolbar/output strip with it rather than waiting on Epic 22. Ship this first of the
+    six new epics precisely because it's the one with a specific request attached, not a judgment
+    call about priorities. Full spec: `specs/build-and-run/`.
+21. **Epic 21** — real terminal emulation (PTY + VT100), via Porta.Pty + XTerm.NET. Direct
+    follow-up to Epic 20: fixes the silent-output gap for full-screen TUI apps that Epic 20's own
+    manual verification surfaced, and is also what Epic 16's Terminal page should move onto.
+    Sequenced right after Epic 20 since it's a bug fix for what Epic 20 just shipped, not a
+    judgment call about priorities either.
+22. **Epic 22** — persistent workbench shell (output dock generalized from Epic 20's strip, status
+    bar). This is the structural fix for "feels like a wizard" - do it right after Epic 20 so the
+    dock only gets built once (as a multi-tab generalization of what Epic 20 already shipped)
+    rather than Epic 20 and Epic 22 each building their own output surface.
+23. **Epic 23** — multi-file tabbed editing in Explorer. Depends on nothing from 20/22 technically,
+    but sequenced after them since tabs are the next most IDE-defining affordance once the shell
+    itself no longer feels like a wizard, and Explorer is a calmer surface to add tabs to once it's
+    not also absorbing the shell rework.
+24. **Epic 24** — command palette & Quick Open. Explicitly sequenced last among the committed four:
+    a command palette's value (jump to any action from anywhere) is largest once Epics 20–22 have
+    actually added more "anywhere-reachable" actions (Build/Run/Stop, dock tabs, file tabs) for it
+    to expose - building the palette first would mean populating it with less.
+25. **Epic 25** — unified workbench: dock the Assistant panel beside the editor. Sequenced last
+    because it depends on every one of Epics 20–24: the output dock/status bar (22) it sits above,
+    the tabbed Explorer editing (23) its `OpenFileTabViewModel.PendingChange` bridge extends, and
+    the command palette (24) whose "Go to `<Page>`" entries shrink once Main/Prompt/Diffs/Tutorial
+    stop being separate pages. Full spec: `specs/unified-workbench/`.

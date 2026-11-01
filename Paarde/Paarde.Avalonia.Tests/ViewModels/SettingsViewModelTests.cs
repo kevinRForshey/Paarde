@@ -13,13 +13,17 @@ public class SettingsViewModelTests
     private readonly FakeSecureStorageService _secureStorageService = new();
     private readonly PromptTemplateProvider _promptTemplateProvider = new();
     private readonly LanguageServerOptionsProvider _languageServerOptionsProvider;
+    private readonly FakeProjectTypeDetector _projectTypeDetector = new();
+    private readonly FakeRunConfigurationDetector _runConfigurationDetector = new();
+    private readonly RunConfigurationsProvider _runConfigurationsProvider;
 
     public SettingsViewModelTests()
     {
         _languageServerOptionsProvider = new LanguageServerOptionsProvider(_localSettingsService);
+        _runConfigurationsProvider = new RunConfigurationsProvider(_localSettingsService, _projectTypeDetector, _runConfigurationDetector);
     }
 
-    private SettingsViewModel CreateSut() => new(_themeSelectorService, _localSettingsService, _secureStorageService, _promptTemplateProvider, _languageServerOptionsProvider);
+    private SettingsViewModel CreateSut() => new(_themeSelectorService, _localSettingsService, _secureStorageService, _promptTemplateProvider, _languageServerOptionsProvider, _runConfigurationsProvider);
 
     [Fact]
     public void ClaudeCliSettings_DefaultToClaudeAndDashP()

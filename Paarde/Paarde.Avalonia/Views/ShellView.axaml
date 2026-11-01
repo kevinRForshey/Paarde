@@ -3,53 +3,234 @@
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:controls="using:Paarde.Avalonia.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
              x:Class="Paarde.Avalonia.Views.ShellView"
              x:DataType="vm:ShellViewModel">
 
-    <ui:NavigationView x:Name="NavigationViewControl"
-                        IsBackButtonVisible="True"
-                        IsBackEnabled="{Binding IsBackEnabled}"
-                        SelectedItem="{Binding Selected}"
-                        IsSettingsVisible="True"
-                        PaneDisplayMode="Left"
-                        Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
-        <ui:NavigationView.MenuItems>
-            <ui:NavigationViewItem Content="Main" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.MainViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Home" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Prompt" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.PromptViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Send" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.ExplorerViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Folder" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Play" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Diffs" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.DiffsViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Code" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="Tutorial" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TutorialViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Document" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-            <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
-                <ui:NavigationViewItem.IconSource>
-                    <ui:SymbolIconSource Symbol="Clock" />
-                </ui:NavigationViewItem.IconSource>
-            </ui:NavigationViewItem>
-        </ui:NavigationView.MenuItems>
-        <ui:Frame x:Name="NavigationFrame" />
-    </ui:NavigationView>
+    <!-- Epic 20 (specs/build-and-run F20.3, design.md "Shell placement"): the NavigationView is
+         now row 1 of a 3-row grid instead of the whole control, so the Build/Run/Stop toolbar
+         (row 0) and output strip (row 2) are visible no matter which page is navigated to -
+         R5.1/R5.2, the one piece of the broader "wizard -> IDE" problem this epic can't defer. -->
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+        <Grid Grid.Row="0"
+              ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+              Margin="8"
+              DataContext="{Binding RunPanelViewModel}">
+            <ComboBox Grid.Column="0"
+                      ItemsSource="{Binding Configurations}"
+                      SelectedItem="{Binding SelectedConfiguration}"
+                      PlaceholderText="No run configuration found - add one on the Settings page"
+                      HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button Grid.Column="1" Margin="8,0,0,0" Content="Build" Command="{Binding BuildCommand}" />
+            <Button Grid.Column="2" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommand}" Classes="accent" />
+            <Button Grid.Column="3" Margin="8,0,0,0" Content="Stop" Command="{Binding StopCommand}" />
+            <TextBlock Grid.Column="4"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       Text="{Binding StatusMessage}" />
+        </Grid>
+
+        <!-- UX pass: compact icon-rail pane instead of the ~320px labeled sidebar - reclaims
+             width for page content (most of all, Explorer's editor) on every page. The current
+             page's name is still shown via the Header binding below, and FluentAvalonia's own
+             hamburger toggle still lets the pane expand temporarily to show labels. -->
+        <ui:NavigationView Grid.Row="1"
+                            x:Name="NavigationViewControl"
+                            IsBackButtonVisible="True"
+                            IsBackEnabled="{Binding IsBackEnabled}"
+                            SelectedItem="{Binding Selected}"
+                            IsSettingsVisible="True"
+                            PaneDisplayMode="LeftCompact"
+                            Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="Main" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.MainViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Home" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Prompt" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.PromptViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Send" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.ExplorerViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Folder" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Play" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Diffs" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.DiffsViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Code" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Tutorial" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TutorialViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Document" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
+                    <ui:NavigationViewItem.IconSource>
+                        <ui:SymbolIconSource Symbol="Clock" />
+                    </ui:NavigationViewItem.IconSource>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.MenuItems>
+            <ui:Frame x:Name="NavigationFrame" />
+        </ui:NavigationView>
+
+        <!-- Epic 24, R1/R3: Quick Open - reachable via Ctrl+P regardless of the currently
+             navigated page (ShellView.axaml.cs's global KeyBinding), same Popup+ListBox shape as
+             Epic 14's @mention picker (PromptView.axaml). Anchored to NavigationFrame/Center for
+             the same "no X server to verify caret-relative placement against" reason Epic 14's
+             own remark already gives. -->
+        <Popup Name="QuickOpenPopup"
+               Grid.Row="1"
+               PlacementTarget="NavigationFrame"
+               Placement="Center"
+               IsLightDismissEnabled="True"
+               DataContext="{Binding QuickOpenViewModel}"
+               IsOpen="{Binding IsOpen}">
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    MinWidth="420">
+                <StackPanel Spacing="4">
+                    <TextBox Name="QuickOpenQueryBox"
+                             Text="{Binding Query}"
+                             Watermark="Go to file..."
+                             KeyDown="OnQuickOpenQueryBoxKeyDown" />
+                    <TextBlock Text="{Binding EmptyStateMessage}"
+                               IsVisible="{Binding EmptyStateMessage, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                    <ListBox Name="QuickOpenResultsList"
+                             MaxHeight="240"
+                             ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedResult}"
+                             DoubleTapped="OnQuickOpenResultDoubleTapped" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Epic 24, R2/R3: the command palette - same shape as QuickOpenPopup above. Disabled
+             entries (PaletteCommand.IsEnabled) stay in the list rather than being filtered out,
+             per R2.4. -->
+        <Popup Name="CommandPalettePopup"
+               Grid.Row="1"
+               PlacementTarget="NavigationFrame"
+               Placement="Center"
+               IsLightDismissEnabled="True"
+               DataContext="{Binding CommandPaletteViewModel}"
+               IsOpen="{Binding IsOpen}">
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    MinWidth="420">
+                <StackPanel Spacing="4">
+                    <TextBox Name="CommandPaletteQueryBox"
+                             Text="{Binding Query}"
+                             Watermark="Type a command..."
+                             KeyDown="OnCommandPaletteQueryBoxKeyDown" />
+                    <ListBox Name="CommandPaletteResultsList"
+                             MaxHeight="240"
+                             ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedResult}"
+                             DoubleTapped="OnCommandPaletteResultDoubleTapped">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PaletteCommand">
+                                <TextBlock Text="{Binding Name}" IsEnabled="{Binding IsEnabled}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- specs/ide-workbench-shell R1: Epic 20/21's single Build/Run strip is now a four-tab
+             dock (Build, Run, Problems, Terminal) inside the same Expander - one shared
+             IsExpanded still covers the whole dock (design.md's decision against per-tab
+             expand/collapse state). InputReceived/Resized/the tab<->ActiveTabKey sync are wired
+             in code-behind (ShellView.axaml.cs), same reasoning Epic 20/21 already established for
+             reaching past a property into RunPanelViewModel's/TerminalViewModel's PTY services. -->
+        <!-- MaxHeight caps how much of the window the dock can claim when expanded; the
+             terminal's own natural size is a standard 80x24 grid, so this is what decides how
+             many rows are actually usable (~22 at FontSize 14). FontSize is set here rather than
+             left to the control's default so legibility is tunable without a recompile. -->
+        <Expander Grid.Row="2"
+                  Margin="8,0,8,8"
+                  Header="Output"
+                  MaxHeight="360"
+                  DataContext="{Binding WorkbenchDockViewModel}"
+                  IsExpanded="{Binding IsExpanded}">
+            <TabControl Name="DockTabControl">
+                <TabItem Header="Build">
+                    <controls:TerminalControl FontSize="14" Buffer="{Binding RunPanelViewModel.BuildOutputBuffer}" />
+                </TabItem>
+                <TabItem Header="Run">
+                    <controls:TerminalControl Name="OutputTerminal"
+                                              FontSize="14"
+                                              Buffer="{Binding RunPanelViewModel.RunOutputBuffer}" />
+                </TabItem>
+                <TabItem Header="Problems">
+                    <ListBox Name="ProblemsList">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProblemRow">
+                                <TextBlock Text="{Binding Summary}" FontFamily="Cascadia Mono,Consolas,monospace" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+                <TabItem Header="Terminal">
+                    <!-- Same content TerminalView.axaml has, bound to the shared
+                         WorkbenchDockViewModel.TerminalViewModel instance - InputReceived/Resized
+                         wired in code-behind the same way as OutputTerminal above. -->
+                    <Grid Margin="0,8,0,0" RowDefinitions="Auto,*,Auto" DataContext="{Binding TerminalViewModel}">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto">
+                            <TextBox Grid.Column="0"
+                                      Text="{Binding CommandText}"
+                                      Watermark="Type a command to run in the current working directory..."
+                                      FontFamily="Cascadia Mono,Consolas,monospace" />
+                            <Button Grid.Column="1" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommandCommand}" Classes="accent" />
+                            <Button Grid.Column="2" Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelCommandCommand}" IsVisible="{Binding IsRunning}" />
+                            <Button Grid.Column="3" Margin="8,0,0,0" Content="Clear" Command="{Binding ClearOutputCommand}" />
+                        </Grid>
+                        <controls:TerminalControl Name="DockTerminal"
+                                                  Grid.Row="1"
+                                                  Margin="0,8,0,0"
+                                                  FontSize="14"
+                                                  Buffer="{Binding OutputBuffer}" />
+                        <TextBlock Grid.Row="2" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Expander>
+
+        <!-- specs/ide-workbench-shell, R3: a thin status bar anchored below everything else -
+             git branch/dirty count, the active run configuration, per-language LSP state, and
+             (only when a CodeEditor has focus) the caret's line:column. -->
+        <Border Grid.Row="3"
+                Padding="8,4"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                DataContext="{Binding StatusBarViewModel}">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <TextBlock Text="{Binding GitBranchName}" IsVisible="{Binding GitBranchName, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding DirtyFileCount, StringFormat='{}{0} dirty'}" IsVisible="{Binding GitBranchName, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding RunConfigurationName}" />
+                <TextBlock Text="{Binding LanguageServerStatus}" />
+                <TextBlock Text="{Binding CaretPositionText}" IsVisible="{Binding CaretPositionText, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+        </Border>
+    </Grid>
 </UserControl>

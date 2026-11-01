@@ -14,6 +14,16 @@ public interface ILanguageServerSessionManager
     // for a subscriber to filter to "the file I currently have open," same as Epic 17.
     event Action<string, IReadOnlyList<LspDiagnostic>>? DiagnosticsPublished;
 
+    // specs/ide-workbench-shell, R3.4: every LanguageId currently running a server - a snapshot,
+    // not a live collection, so a caller (the status bar) can't mutate session state through it.
+    IReadOnlyCollection<string> RunningLanguageIds { get; }
+
+    // specs/ide-workbench-shell, R3.4: raised after RunningLanguageIds' underlying set actually
+    // changes - at the end of StartAllAsync (whatever did or didn't start) and StopAllAsync - so a
+    // subscriber like the status bar can re-read RunningLanguageIds without needing to know
+    // StartAllAsync/StopAllAsync are the only two things that ever change it.
+    event Action? RunningLanguageIdsChanged;
+
     // Detects which languages are present (IProjectTypeDetector) and starts a server for each one
     // that's both detected (or force-enabled) and available, independently - one language's
     // missing executable or failed start never prevents another's from starting.

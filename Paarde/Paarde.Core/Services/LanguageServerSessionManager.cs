@@ -1,3 +1,5 @@
+using System.Linq;
+
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
 using Paarde.Core.Models;
@@ -37,6 +39,10 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
 
     public event Action<string, IReadOnlyList<LspDiagnostic>>? DiagnosticsPublished;
 
+    public IReadOnlyCollection<string> RunningLanguageIds => _clientsByServerGroup.Keys.ToArray();
+
+    public event Action? RunningLanguageIdsChanged;
+
     // R3.1/R4: evaluates every configured language independently - detected-or-force-enabled and
     // executable-available - so a repo with only some of the configured languages' markers starts
     // only those servers. R3.4: a try/catch per language means one failure never blocks another.
@@ -53,12 +59,14 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
         await StopAllAsync();
         _startedWorkingDirectoryPath = workingDirectoryPath;
 
-        var detectedLanguageIds = _projectTypeDetector.DetectLanguageIds(workingDirectoryPath);
+        var detectedLanguageRoots = _projectTypeDetector.DetectLanguageRoots(workingDirectoryPath);
         var allOptions = await _optionsProvider();
 
         foreach (var options in allOptions)
         {
-            if (!detectedLanguageIds.Contains(options.LanguageId) && !options.ForceEnabled)
+            var isDetected = detectedLanguageRoots.TryGetValue(options.LanguageId, out var languageRootPath);
+
+            if (!isDetected && !options.ForceEnabled)
             {
                 continue;
             }
@@ -73,7 +81,14 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
                 }
 
                 client.DiagnosticsPublished += OnClientDiagnosticsPublished;
-                await client.StartAsync(workingDirectoryPath, cancellationToken);
+
+                // Root each server at the directory where its own marker file was found - never at
+                // the overall workingDirectoryPath - so typescript-language-server (which resolves
+                // its project/toolchain from rootUri at initialize time) finds frontend/'s
+                // node_modules/typescript in a polyglot backend/+frontend/ repo instead of failing
+                // to resolve a TypeScript installation at all. A force-enabled-but-undetected
+                // language has no detected root, so it falls back to workingDirectoryPath.
+                await client.StartAsync(isDetected ? languageRootPath! : workingDirectoryPath, cancellationToken);
                 _clientsByServerGroup[options.LanguageId] = client;
             }
             catch (Exception ex)
@@ -81,10 +96,17 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
                 _logger.LogWarning(ex, "Failed to start the {LanguageId} language server for {WorkingDirectoryPath}.", options.LanguageId, workingDirectoryPath);
             }
         }
+
+        RunningLanguageIdsChanged?.Invoke();
     }
 
     public async Task StopAllAsync()
     {
+        if (_clientsByServerGroup.Count == 0)
+        {
+            return;
+        }
+
         foreach (var client in _clientsByServerGroup.Values)
         {
             client.DiagnosticsPublished -= OnClientDiagnosticsPublished;
@@ -100,6 +122,7 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
         }
 
         _clientsByServerGroup.Clear();
+        RunningLanguageIdsChanged?.Invoke();
     }
 
     public Task NotifyDocumentOpenedAsync(string filePath, string text)

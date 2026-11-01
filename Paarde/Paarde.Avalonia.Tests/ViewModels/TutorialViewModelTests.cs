@@ -1,4 +1,3 @@
-using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
@@ -22,13 +21,46 @@ public class TutorialViewModelTests
 
     private TutorialViewModel CreateSut() => new(_promptResultStore, _applyOrchestrationService, _applyHistoryLog, _dialogService, _llmRunner, _promptTemplateProvider, _fileSavePickerService, _localSettingsService, _buildTestRunner);
 
+    // Epic 25, T5: ExplorerViewModel now takes a real AssistantPanelViewModel (wrapping its own,
+    // unrelated PromptViewModel/TutorialViewModel pair, each needing only fakes for their own
+    // dependencies) rather than a fake - these helpers don't exercise that wiring at all, so a
+    // throwaway panel/store built fresh each time is simplest.
+    private static ExplorerViewModel CreateStandaloneExplorer()
+    {
+        var promptResultStore = new FakePromptResultStore();
+        var localSettingsService = new FakeLocalSettingsService();
+        var llmRunner = new FakeLlmRunner();
+        var compose = new PromptViewModel(llmRunner, localSettingsService, new FakeFolderPickerService(), new FakeFilePickerService(), promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
+        var review = new TutorialViewModel(promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), localSettingsService, new FakeBuildTestRunner());
+        var assistantPanel = new AssistantPanelViewModel(compose, review, promptResultStore);
+
+        return new ExplorerViewModel(localSettingsService, promptResultStore, llmRunner, new FakeFileChangeApplyService(), new FakeDialogService(), new FakeLanguageServerSessionManager(), new FakeFolderPickerService(), assistantPanel);
+    }
+
+    // Epic 25, T4: Selected now reads ExplorerViewModel.SelectedTab?.PendingChange rather than its
+    // own settable property - a real ExplorerViewModel (rather than a fake) stands in for it, with
+    // SelectedTab assigned directly instead of going through OpenOrActivateTab/a real file tree, so
+    // these tests don't need to touch disk.
+    private static void Select(TutorialViewModel sut, ProposedFileChangeViewModel? file)
+    {
+        var explorer = CreateStandaloneExplorer();
+        sut.AttachExplorer(explorer);
+
+        if (file is not null)
+        {
+            explorer.SelectedTab = new OpenFileTabViewModel(file.FilePath, string.Empty, "/tmp", new FakeFileChangeApplyService(), new FakeLlmRunner(), new FakeLanguageServerSessionManager())
+            {
+                PendingChange = file,
+            };
+        }
+    }
+
     [Fact]
-    public void OnNavigatedTo_TutorialOverviewPresent_PopulatesTutorialAndHasTutorialOverview()
+    public void Constructor_TutorialOverviewAlreadyInTheStore_PopulatesTutorialAndHasTutorialOverview()
     {
         _promptResultStore.SetResult("This run adds a new widget.", [], "/tmp");
-        var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
+        var sut = CreateSut();
 
         Assert.Equal("This run adds a new widget.", sut.Tutorial);
         Assert.True(sut.HasTutorialOverview);
@@ -37,95 +69,65 @@ public class TutorialViewModelTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void OnNavigatedTo_NoTutorialOverview_HasTutorialOverviewIsFalse(string tutorial)
+    public void Constructor_NoTutorialOverviewInTheStore_HasTutorialOverviewIsFalse(string tutorial)
     {
         _promptResultStore.SetResult(tutorial, [], "/tmp");
-        var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
+        var sut = CreateSut();
 
         Assert.False(sut.HasTutorialOverview);
-    }
-
-    [Fact]
-    public void HasUnsavedChanges_NoFiles_IsFalse()
-    {
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-
-        Assert.False(sut.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public void HasUnsavedChanges_NoFileIsDirty_IsFalse()
-    {
-        _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-
-        Assert.False(sut.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public void HasUnsavedChanges_OneFileIsDirty_IsTrue()
-    {
-        _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-
-        sut.Files[0].EditedContent = "edited";
-
-        Assert.True(sut.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public void HasUnsavedChanges_DirtyFileRevertedBackToProposed_IsFalseAgain()
-    {
-        _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.Files[0].EditedContent = "edited";
-
-        sut.Files[0].RevertToProposedCommand.Execute(null);
-
-        Assert.False(sut.HasUnsavedChanges);
     }
 
     [Fact]
     public void HasNoFiles_NoPromptRunYet_IsTrue()
     {
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         Assert.True(sut.HasNoFiles);
         Assert.False(sut.HasFilesButNoneSelected);
     }
 
     [Fact]
-    public void HasFilesButNoneSelected_FilesPresent_IsFalseOnceOnNavigatedToAutoSelectsTheFirstOne()
+    public void HasFilesButNoneSelected_FilesPresentButNoExplorerSelection_IsTrue()
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
+
         var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
-
-        // OnNavigatedTo already calls EnsureItemSelected, so with files present there's always a
-        // selection by the time the page is shown - HasFilesButNoneSelected only guards the moment
-        // between the two, or a Selected that's been explicitly cleared.
+        // Epic 25: unlike the old auto-select-the-first-file behavior, there's no selection at all
+        // until Explorer (via AttachExplorer) says otherwise - HasFilesButNoneSelected is true for
+        // every file-selecting view model that hasn't attached/selected yet, not just a brief moment.
         Assert.False(sut.HasNoFiles);
-        Assert.False(sut.HasFilesButNoneSelected);
+        Assert.True(sut.HasFilesButNoneSelected);
     }
 
     [Fact]
-    public void HasFilesButNoneSelected_FilesPresentButSelectionCleared_IsTrue()
+    public void HasFilesButNoneSelected_ExplorerSelectsAFile_BecomesFalse()
     {
-        _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
+        var file = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
+        _promptResultStore.SetResult("tutorial", [file], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
-        sut.Selected = null;
+        Select(sut, file);
+
+        Assert.False(sut.HasFilesButNoneSelected);
+        Assert.Same(file, sut.Selected);
+    }
+
+    [Fact]
+    public void HasFilesButNoneSelected_ExplorerSelectionCleared_IsTrueAgain()
+    {
+        var file = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
+        _promptResultStore.SetResult("tutorial", [file], "/tmp");
+        var sut = CreateSut();
+        var explorer = CreateStandaloneExplorer();
+        sut.AttachExplorer(explorer);
+        explorer.SelectedTab = new OpenFileTabViewModel(file.FilePath, string.Empty, "/tmp", new FakeFileChangeApplyService(), new FakeLlmRunner(), new FakeLanguageServerSessionManager()) { PendingChange = file };
+
+        explorer.SelectedTab = null;
 
         Assert.True(sut.HasFilesButNoneSelected);
+        Assert.Null(sut.Selected);
     }
 
     [Fact]
@@ -394,7 +396,6 @@ public class TutorialViewModelTests
             [new FileApplyResult("a.txt", FileApplyOutcome.Applied)]);
         _buildTestRunner.ResultsToReturn.Enqueue(new CommandResult(1, string.Empty, "it broke", TimeSpan.FromSeconds(1)));
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
         await sut.ApplySelectedCommand.ExecuteAsync(null);
 
         _llmRunner.ResultToReturn = new LlmRunResult
@@ -425,7 +426,6 @@ public class TutorialViewModelTests
             [new FileApplyResult("a.txt", FileApplyOutcome.Applied)]);
         _buildTestRunner.ResultsToReturn.Enqueue(new CommandResult(1, string.Empty, "it broke", TimeSpan.FromSeconds(1)));
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
         await sut.ApplySelectedCommand.ExecuteAsync(null);
 
         _llmRunner.ResultToReturn = new LlmRunResult
@@ -462,12 +462,11 @@ public class TutorialViewModelTests
     }
 
     [Fact]
-    public async Task OnNavigatedTo_SavedStageAppliedFilesInGitPreferenceIsFalse_RestoresIt()
+    public async Task Constructor_SavedStageAppliedFilesInGitPreferenceIsFalse_RestoresIt()
     {
         await _localSettingsService.SaveSettingAsync("Tutorial_StageAppliedFilesInGit", false);
-        var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
+        var sut = CreateSut();
         await Task.Yield();
 
         Assert.False(sut.StageAppliedFilesInGit);
@@ -673,7 +672,6 @@ public class TutorialViewModelTests
         _applyOrchestrationService.TryUndoLastApplyResultToReturn = true;
         _applyOrchestrationService.UndoLastApplyRevertResultToReturn = new RevertResult([new RevertFileResult("a.txt", true)]);
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         await sut.UndoLastApplyCommand.ExecuteAsync(null);
 
@@ -751,19 +749,17 @@ public class TutorialViewModelTests
     public void HasApplyHistory_NoHistoryLogged_IsFalse()
     {
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         Assert.False(sut.HasApplyHistory);
         Assert.Empty(sut.ApplyHistoryEntries);
     }
 
     [Fact]
-    public void OnNavigatedTo_HistoryAlreadyLogged_PopulatesApplyHistoryEntries()
+    public void Constructor_HistoryAlreadyLogged_PopulatesApplyHistoryEntries()
     {
         _applyHistoryLog.Record(ApplyHistoryEntryKind.Applied, new[] { "a.txt" });
-        var sut = CreateSut();
 
-        sut.OnNavigatedTo(null!);
+        var sut = CreateSut();
 
         Assert.True(sut.HasApplyHistory);
         Assert.Single(sut.ApplyHistoryEntries);
@@ -835,7 +831,6 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         Assert.False(sut.RefineSelectedFileCommand.CanExecute(null));
     }
@@ -845,7 +840,7 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
+        Select(sut, sut.Files[0]);
         sut.RefineInstruction = "make it better";
 
         Assert.True(sut.RefineSelectedFileCommand.CanExecute(null));
@@ -856,7 +851,7 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp", "session-1");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
+        Select(sut, sut.Files[0]);
         sut.RefineInstruction = "add a comment";
         _llmRunner.ResultToReturn = new LlmRunResult
         {
@@ -868,7 +863,6 @@ public class TutorialViewModelTests
 
         Assert.Equal("refined content", sut.Files[0].ProposedContent);
         Assert.Equal("refined content", _promptResultStore.Files[0].ProposedContent);
-        Assert.Same(sut.Files[0], sut.Selected);
     }
 
     [Fact]
@@ -876,7 +870,7 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp", "session-1");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
+        Select(sut, sut.Files[0]);
         sut.RefineInstruction = "add a comment";
         _llmRunner.ResultToReturn = new LlmRunResult
         {
@@ -895,7 +889,7 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
+        Select(sut, sut.Files[0]);
         sut.RefineInstruction = "add a comment";
         _llmRunner.ResultToReturn = new LlmRunResult { Success = false, ErrorMessage = "boom" };
         var originalFile = sut.Files[0];
@@ -912,7 +906,7 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
+        Select(sut, sut.Files[0]);
         sut.RefineInstruction = "add a comment";
         _llmRunner.ResultToReturn = new LlmRunResult
         {
@@ -931,7 +925,6 @@ public class TutorialViewModelTests
     public void CanExportTutorial_NoFilesAndNoOverview_IsFalse()
     {
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         Assert.False(sut.ExportTutorialAsMarkdownCommand.CanExecute(null));
         Assert.False(sut.ExportTutorialAsHtmlCommand.CanExecute(null));
@@ -942,7 +935,6 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("This run adds a widget.", [], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
 
         Assert.True(sut.ExportTutorialAsMarkdownCommand.CanExecute(null));
     }
@@ -952,7 +944,6 @@ public class TutorialViewModelTests
     {
         _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
         _fileSavePickerService.PathToReturn = null;
 
         await sut.ExportTutorialAsMarkdownCommand.ExecuteAsync(null);
@@ -968,7 +959,6 @@ public class TutorialViewModelTests
             [new ProposedFileChangeViewModel("a.txt", "proposed", "original") { Hunks = [new ProposedHunk("Add it", "Explanation.", "snippet", null)] }],
             "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
         var path = Path.Combine(Path.GetTempPath(), $"paarde-export-test-{Guid.NewGuid():N}.md");
         _fileSavePickerService.PathToReturn = path;
 
@@ -995,7 +985,6 @@ public class TutorialViewModelTests
             [new ProposedFileChangeViewModel("a.txt", "proposed", "original") { Hunks = [new ProposedHunk("Add it", "Explanation.", "snippet", null)] }],
             "/tmp");
         var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
         var path = Path.Combine(Path.GetTempPath(), $"paarde-export-test-{Guid.NewGuid():N}.html");
         _fileSavePickerService.PathToReturn = path;
 
@@ -1013,141 +1002,4 @@ public class TutorialViewModelTests
         }
     }
 
-    [Fact]
-    public void OnNavigatedTo_TutorialJumpRequest_SelectsTheRequestedFileAndExposesAPendingStepTarget()
-    {
-        var hunk = new ProposedHunk("Add it", "Explanation.", "snippet", null);
-        var file = new ProposedFileChangeViewModel("a.txt", "proposed", "original") { Hunks = [hunk] };
-        var otherFile = new ProposedFileChangeViewModel("b.txt", "proposed", "original");
-        _promptResultStore.SetResult("tutorial", [otherFile, file], "/tmp");
-        var sut = CreateSut();
-
-        sut.OnNavigatedTo(new TutorialJumpRequest(file, hunk));
-
-        Assert.Same(file, sut.Selected);
-        Assert.Same(hunk, sut.TakePendingStepTarget());
-    }
-
-    [Fact]
-    public void TakePendingStepTarget_CalledTwice_OnlyReturnsTheTargetOnce()
-    {
-        var hunk = new ProposedHunk("Add it", "Explanation.", "snippet", null);
-        var file = new ProposedFileChangeViewModel("a.txt", "proposed", "original") { Hunks = [hunk] };
-        _promptResultStore.SetResult("tutorial", [file], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(new TutorialJumpRequest(file, hunk));
-
-        sut.TakePendingStepTarget();
-
-        Assert.Null(sut.TakePendingStepTarget());
-    }
-
-    [Fact]
-    public void OnNavigatedTo_FilesPresent_OpensTheAutoSelectedFileAsATab()
-    {
-        _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
-        var sut = CreateSut();
-
-        sut.OnNavigatedTo(null!);
-
-        Assert.True(sut.HasOpenTabs);
-        Assert.Same(sut.Selected, Assert.Single(sut.OpenTabs));
-    }
-
-    [Fact]
-    public void SelectingAnotherFile_OpensItAsAnAdditionalTabWithoutClosingTheOthers()
-    {
-        var fileA = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
-        var fileB = new ProposedFileChangeViewModel("b.txt", "proposed", "original");
-        _promptResultStore.SetResult("tutorial", [fileA, fileB], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-
-        sut.Selected = fileB;
-
-        Assert.Equal(2, sut.OpenTabs.Count);
-        Assert.Contains(fileA, sut.OpenTabs);
-        Assert.Contains(fileB, sut.OpenTabs);
-    }
-
-    [Fact]
-    public void ReselectingAnAlreadyOpenTab_DoesNotDuplicateIt()
-    {
-        var fileA = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
-        var fileB = new ProposedFileChangeViewModel("b.txt", "proposed", "original");
-        _promptResultStore.SetResult("tutorial", [fileA, fileB], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.Selected = fileB;
-
-        sut.Selected = fileA;
-
-        Assert.Equal(2, sut.OpenTabs.Count);
-    }
-
-    [Fact]
-    public void CanCloseSelectedTab_NoFileSelected_CannotBeExecuted()
-    {
-        var sut = CreateSut();
-
-        Assert.False(sut.CloseSelectedTabCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void CloseSelectedTabCommand_ClosingANonLastTab_SelectsTheNeighboringTab()
-    {
-        var fileA = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
-        var fileB = new ProposedFileChangeViewModel("b.txt", "proposed", "original");
-        var fileC = new ProposedFileChangeViewModel("c.txt", "proposed", "original");
-        _promptResultStore.SetResult("tutorial", [fileA, fileB, fileC], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.Selected = fileB;
-        sut.Selected = fileC;
-        sut.Selected = fileB;
-
-        Assert.True(sut.CloseSelectedTabCommand.CanExecute(null));
-        sut.CloseSelectedTabCommand.Execute(null);
-
-        Assert.DoesNotContain(fileB, sut.OpenTabs);
-        Assert.Same(fileC, sut.Selected);
-    }
-
-    [Fact]
-    public void CloseSelectedTabCommand_ClosingTheLastRemainingTab_ClearsSelection()
-    {
-        _promptResultStore.SetResult("tutorial", [new ProposedFileChangeViewModel("a.txt", "proposed", "original")], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-
-        sut.CloseSelectedTabCommand.Execute(null);
-
-        Assert.Null(sut.Selected);
-        Assert.False(sut.HasOpenTabs);
-    }
-
-    [Fact]
-    public async Task RefineSelectedFileAsync_Success_SwapsTheRefinedFileIntoTheSameTabPosition()
-    {
-        var fileA = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
-        var fileB = new ProposedFileChangeViewModel("b.txt", "proposed", "original");
-        _promptResultStore.SetResult("tutorial", [fileA, fileB], "/tmp");
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.Selected = fileB;
-        sut.RefineInstruction = "add a comment";
-        _llmRunner.ResultToReturn = new LlmRunResult
-        {
-            Success = true,
-            Output = """{"responseType": "development", "tutorial": "Refined.", "files": [{"path": "a.txt", "content": "refined content", "steps": []}]}""",
-        };
-        sut.Selected = fileA;
-
-        await sut.RefineSelectedFileCommand.ExecuteAsync(null);
-
-        Assert.Equal(2, sut.OpenTabs.Count);
-        Assert.DoesNotContain(fileA, sut.OpenTabs);
-        Assert.Same(sut.Files[0], sut.OpenTabs[0]);
-        Assert.Same(fileB, sut.OpenTabs[1]);
-    }
 }

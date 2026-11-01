@@ -7,6 +7,15 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <!-- Epic 21 (specs/terminal-emulation): cross-platform PTY allocation (ConPTY on Windows,
+         forkpty/posix_openpt on Linux/macOS) so a spawned process sees a real terminal device
+         instead of a plain pipe - see design.md's "Library choice" for why this one over the
+         alternatives. -->
+    <PackageReference Include="Porta.Pty" Version="2.2.3" />
+    <!-- Epic 21 (specs/terminal-emulation): headless VT100/ANSI parser - turns the raw bytes
+         IPtyProcessManager streams into actual screen state (cells, attributes, cursor) instead of
+         this app trying to hand-parse escape sequences itself. See design.md's "Library choice". -->
+    <PackageReference Include="XTerm.NET" Version="3.0.0" />
     <!-- Abstractions only - no DI container/hosting pulled into Core. Lets services accept an
          optional ILogger<T> (T9.2.1) without this project knowing how logging is wired up; the
          Avalonia host supplies the real implementation via Microsoft.Extensions.Hosting. -->

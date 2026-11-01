@@ -9,20 +9,13 @@ namespace Paarde.Core.Services;
 
 // Shells out to run an arbitrary command (T12.1.1) - the same Process-based pattern
 // ClaudeCliRunner already uses for `claude` and GitStatusService uses for `git`, generalized to
-// whatever command Settings has configured for build/test (Epic 12) or, later, whatever the user
-// types into a terminal panel (Epic 16).
-public class ProcessCommandRunner : IBuildTestRunner, ITerminalCommandRunner
+// whatever command Settings has configured for build/test (Epic 12). Epic 16's terminal panel and
+// Epic 20's Run toolbar both moved onto IPtyProcessManager instead (specs/terminal-emulation T6/
+// T7) - this class is IBuildTestRunner's wait-for-exit implementation only, untouched by that
+// epic since nothing watches IBuildTestRunner's output live (design.md "Summary").
+public class ProcessCommandRunner : IBuildTestRunner
 {
-    public Task<CommandResult> RunAsync(string command, string workingDirectoryPath, CancellationToken cancellationToken = default) =>
-        RunCommandAsync(command, workingDirectoryPath, onOutputLine: null, cancellationToken);
-
-    // ITerminalCommandRunner (T16.1.1/T16.1.3): same process-running logic as the IBuildTestRunner
-    // overload above, just also reporting each line as it arrives rather than only the buffered
-    // result once the process exits.
-    public Task<CommandResult> RunAsync(string command, string workingDirectoryPath, Action<string> onOutputLine, CancellationToken cancellationToken = default) =>
-        RunCommandAsync(command, workingDirectoryPath, onOutputLine, cancellationToken);
-
-    private async Task<CommandResult> RunCommandAsync(string command, string workingDirectoryPath, Action<string>? onOutputLine, CancellationToken cancellationToken)
+    public async Task<CommandResult> RunAsync(string command, string workingDirectoryPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -53,7 +46,6 @@ public class ProcessCommandRunner : IBuildTestRunner, ITerminalCommandRunner
             if (e.Data != null)
             {
                 standardOutput.AppendLine(e.Data);
-                onOutputLine?.Invoke(e.Data);
             }
         };
 
@@ -62,7 +54,6 @@ public class ProcessCommandRunner : IBuildTestRunner, ITerminalCommandRunner
             if (e.Data != null)
             {
                 standardError.AppendLine(e.Data);
-                onOutputLine?.Invoke(e.Data);
             }
         };
 

@@ -17,6 +17,12 @@ public class FakeLanguageServerSessionManager : ILanguageServerSessionManager
 
     public event Action<string, IReadOnlyList<LspDiagnostic>>? DiagnosticsPublished;
 
+    public IReadOnlyCollection<string> RunningLanguageIds { get; set; } = Array.Empty<string>();
+
+    public event Action? RunningLanguageIdsChanged;
+
+    public void RaiseRunningLanguageIdsChanged() => RunningLanguageIdsChanged?.Invoke();
+
     public Task StartAllAsync(string workingDirectoryPath, CancellationToken cancellationToken = default)
     {
         LastStartedWorkingDirectoryPath = workingDirectoryPath;

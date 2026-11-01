@@ -1,5 +1,3 @@
-using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
@@ -27,7 +25,7 @@ public partial class TutorialStepViewModel : ObservableObject
     private readonly string? _resumeSessionId;
     private readonly IFileChangeApplyService _fileChangeApplyService;
     private readonly ILlmRunner _llmRunner;
-    private readonly INavigationService _navigationService;
+    private readonly TutorialViewModel _owner;
     private readonly ILogger<TutorialStepViewModel> _logger;
 
     public string Title { get; }
@@ -68,7 +66,7 @@ public partial class TutorialStepViewModel : ObservableObject
     [ObservableProperty]
     private bool isAskingQuestion;
 
-    public TutorialStepViewModel(ProposedHunk hunk, ProposedFileChangeViewModel file, string workingDirectoryPath, string? resumeSessionId, IFileChangeApplyService fileChangeApplyService, ILlmRunner llmRunner, INavigationService navigationService, int stepNumber, int totalSteps, ILogger<TutorialStepViewModel>? logger = null)
+    public TutorialStepViewModel(ProposedHunk hunk, ProposedFileChangeViewModel file, string workingDirectoryPath, string? resumeSessionId, IFileChangeApplyService fileChangeApplyService, ILlmRunner llmRunner, TutorialViewModel owner, int stepNumber, int totalSteps, ILogger<TutorialStepViewModel>? logger = null)
     {
         Title = hunk.Title;
         Explanation = hunk.Explanation;
@@ -80,7 +78,7 @@ public partial class TutorialStepViewModel : ObservableObject
         _resumeSessionId = resumeSessionId;
         _fileChangeApplyService = fileChangeApplyService;
         _llmRunner = llmRunner;
-        _navigationService = navigationService;
+        _owner = owner;
         _logger = logger ?? NullLogger<TutorialStepViewModel>.Instance;
 
         // Hunk.IsApplied/MatchedDiffHunks live on a different ObservableObject than this view
@@ -122,12 +120,12 @@ public partial class TutorialStepViewModel : ObservableObject
 
     private bool CanApply() => !Hunk.IsApplied && !string.IsNullOrWhiteSpace(_workingDirectoryPath);
 
-    // T8.4.5: jumps to this step's change on the Diffs page. Disabled when the step's Location
-    // didn't resolve to any DiffHunk (e.g. the snippet turned out identical to what was already
-    // there) - there's nothing to scroll to in that case.
+    // Epic 25, R7: asks the owning TutorialViewModel to focus this step's change - replaces the old
+    // DiffJumpRequest/NavigateTo(DiffsViewModel) jump now that there's no separate Diffs page to
+    // navigate to. Disabled when the step's Location didn't resolve to any DiffHunk (e.g. the
+    // snippet turned out identical to what was already there) - there's nothing to focus in that case.
     [RelayCommand(CanExecute = nameof(CanViewInDiff))]
-    private void ViewInDiff() =>
-        _navigationService.NavigateTo(typeof(DiffsViewModel).FullName!, new DiffJumpRequest(_file, Hunk.MatchedDiffHunks[0], Hunk));
+    private void ViewInDiff() => _owner.RequestFileFocus(_file, Hunk.MatchedDiffHunks[0]);
 
     private bool CanViewInDiff() => Hunk.MatchedDiffHunks.Count > 0;
 

@@ -43,6 +43,17 @@ public partial class App : Application
         return service;
     }
 
+    public static T GetKeyedService<T>(object key)
+        where T : class
+    {
+        if ((Current as App)!.Host.Services.GetKeyedService(typeof(T), key) is not T service)
+        {
+            throw new ArgumentException($"{typeof(T)} needs to be registered with key '{key}' in ConfigureServices within App.axaml.cs.");
+        }
+
+        return service;
+    }
+
     public static Window? MainWindow
     {
         get; private set;
@@ -122,7 +133,6 @@ public partial class App : Application
 
             services.AddTransient<IGitStatusService, GitStatusService>();
             services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
-            services.AddTransient<ITerminalCommandRunner, ProcessCommandRunner>();
 
             // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
             // prompts in the same session instead of re-tokenizing the whole project on every
@@ -139,6 +149,48 @@ public partial class App : Application
                 sp.GetRequiredService<IProjectTypeDetector>(),
                 sp.GetRequiredService<LanguageServerOptionsProvider>().GetOptionsAsync,
                 logger: sp.GetRequiredService<ILogger<LanguageServerSessionManager>>()));
+
+            // specs/ide-workbench-shell, R4: subscribes to ILanguageServerSessionManager directly
+            // (not relayed through ExplorerViewModel), so it has to be a singleton constructed
+            // before any page navigates anywhere - WorkbenchDockViewModel's own eager construction
+            // (via ShellViewModel) is what actually guarantees that, the same way RunPanelViewModel
+            // already guarantees it for Build/Run.
+            services.AddSingleton<IDiagnosticsAggregator, DiagnosticsAggregator>();
+
+            // Epic 20 (specs/build-and-run): RunConfigurationsProvider/RunPanelViewModel are
+            // singletons for the same reason ILanguageServerSessionManager above is - they back
+            // ShellView's persistent toolbar (R5.1), not any one page.
+            services.AddSingleton<IRunConfigurationDetector, RunConfigurationDetector>();
+            services.AddSingleton<RunConfigurationsProvider>();
+
+            // Epic 21 (specs/terminal-emulation T6): RunPanelViewModel starts processes through
+            // this instead of the retired IRunProcessManager - singleton because it owns at most
+            // one long-lived PTY-backed process at a time, the same ownership shape
+            // ILanguageServerSessionManager has for its per-language server processes.
+            services.AddSingleton<IPtyProcessManager, PtyProcessManager>();
+
+            // specs/terminal-emulation T7: TerminalViewModel gets its own, separately keyed
+            // PtyProcessManager instance rather than sharing RunPanelViewModel's - Run's
+            // persistent toolbar and the Terminal page are independent features (same as the
+            // pre-epic IRunProcessManager/ITerminalCommandRunner split), so a command typed into
+            // one must not stop or report status for whatever's running in the other.
+            services.AddKeyedSingleton<IPtyProcessManager, PtyProcessManager>(TerminalViewModel.PtyProcessManagerKey);
+            services.AddSingleton<IWorkingDirectoryContext, WorkingDirectoryContext>();
+            services.AddSingleton<IActiveEditorContext, ActiveEditorContext>();
+            services.AddSingleton<RunPanelViewModel>();
+            services.AddSingleton<StatusBarViewModel>();
+
+            // specs/ide-workbench-shell R1.3: promoted from AddTransient so the Terminal page and
+            // the workbench dock's Terminal tab share the exact same instance/session - see this
+            // class's own remark.
+            services.AddSingleton<TerminalViewModel>();
+            services.AddSingleton<WorkbenchDockViewModel>();
+
+            // Epic 24, R1/R2/R3: Quick Open and the command palette - reachable from anywhere via
+            // ShellViewModel-owned global KeyBindings, so each must be one instance, not one per
+            // page navigation.
+            services.AddSingleton<QuickOpenViewModel>();
+            services.AddSingleton<CommandPaletteViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
@@ -152,17 +204,21 @@ public partial class App : Application
             // Views and ViewModels
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<SettingsView>();
-            services.AddTransient<TutorialViewModel>();
+            // Epic 25, T6: AddSingleton rather than AddTransient - the Assistant panel must be
+            // reachable from HistoryViewModel's Fork/Rerun without depending on ExplorerView ever
+            // having been constructed, and a second accidental instance would mean "Fork" from
+            // History silently updates a PromptViewModel/TutorialViewModel nobody is looking at.
+            services.AddSingleton<AssistantPanelViewModel>();
+            services.AddSingleton<TutorialViewModel>();
             services.AddTransient<TutorialView>();
             services.AddTransient<HistoryViewModel>();
             services.AddTransient<HistoryView>();
             services.AddTransient<ExplorerViewModel>();
             services.AddTransient<ExplorerView>();
-            services.AddTransient<TerminalViewModel>();
             services.AddTransient<TerminalView>();
             services.AddTransient<DiffsViewModel>();
             services.AddTransient<DiffsView>();
-            services.AddTransient<PromptViewModel>();
+            services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
             services.AddTransient<MainViewModel>();
             services.AddTransient<MainView>();
@@ -248,6 +304,15 @@ public partial class App : Application
                 // bounded (a couple of seconds at most), so blocking briefly here is acceptable on
                 // the way out.
                 GetService<ILanguageServerSessionManager>().StopAllAsync().GetAwaiter().GetResult();
+
+                // Epic 20 (specs/build-and-run R4.6)/Epic 21 (specs/terminal-emulation R1.2, T6,
+                // T7): a Run or Terminal session is the same kind of app-owned, otherwise-orphaned
+                // child process - Stop() is synchronous and already bounded by killing the process
+                // tree, so no extra waiting is needed here. Two separately keyed instances (T7),
+                // so both need stopping independently.
+                GetService<IPtyProcessManager>().Stop();
+                GetKeyedService<IPtyProcessManager>(TerminalViewModel.PtyProcessManagerKey).Stop();
+
                 Environment.Exit(0);
             };
 
