@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:views="using:Paarde.Avalonia.Views"
              x:Class="Paarde.Avalonia.Views.AssistantPanelControl"
              x:DataType="vm:AssistantPanelViewModel">
 
@@ -10,8 +11,9 @@
          Review automatically (AssistantPanelViewModel's own PromptResultStore subscription). -->
     <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
         <TabItem Header="Compose">
-            <!-- T9 replaces this placeholder with ComposePanelControl bound to Compose. -->
-            <TextBlock Margin="8" Text="Compose" Opacity="0.7" />
+            <!-- T9: ComposePanelControl is PromptView.axaml's body, unchanged - its DataContext
+                 comes from Compose rather than it resolving PromptViewModel itself. -->
+            <views:ComposePanelControl DataContext="{Binding Compose}" />
         </TabItem>
         <TabItem Header="Review">
             <!-- T11 replaces this placeholder with ReviewPanelControl bound to Review. -->

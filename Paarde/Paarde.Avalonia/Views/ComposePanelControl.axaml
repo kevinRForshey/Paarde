@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             x:Class="Paarde.Avalonia.Views.ComposePanelControl"
+             x:DataType="vm:PromptViewModel">
+
+    <!-- Epic 25, T9: PromptView.axaml's body, moved here unchanged - DataContext now comes from
+         AssistantPanelControl's Compose property (bound by whoever hosts it) rather than this
+         control resolving PromptViewModel itself from DI/navigation. -->
+    <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto">
+        <TextBlock Grid.Row="0"
+                   Text="Prompt"
+                   FontSize="20"
+                   FontWeight="SemiBold" />
+
+        <Grid Grid.Row="1" Margin="0,8,0,0" ColumnDefinitions="*,Auto,Auto">
+            <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="Project location" FontSize="12" Opacity="0.7" />
+                <TextBox Text="{Binding WorkingDirectoryPath}"
+                         Watermark="No folder selected"
+                         IsReadOnly="True" />
+            </StackPanel>
+            <!-- T8.2.4: fast project switching without leaving the Prompt page - see
+                 PromptViewModel.RecentWorkingDirectories/OnSelectedRecentWorkingDirectoryChanged. -->
+            <ComboBox Grid.Column="1"
+                      Margin="8,20,0,0"
+                      VerticalAlignment="Top"
+                      MinWidth="160"
+                      PlaceholderText="Recent..."
+                      ItemsSource="{Binding RecentWorkingDirectories}"
+                      SelectedItem="{Binding SelectedRecentWorkingDirectory}"
+                      IsVisible="{Binding HasRecentWorkingDirectories}" />
+            <Button Grid.Column="2"
+                    Margin="8,20,0,0"
+                    VerticalAlignment="Top"
+                    Command="{Binding BrowseWorkingDirectoryCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="OpenFolder" FontSize="14" />
+                    <TextBlock Text="Browse..." />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,8,0,0" Spacing="4">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                <TextBlock Grid.Column="0" Text="Context files" FontSize="12" Opacity="0.7" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Command="{Binding AddContextFilesCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="Attach" FontSize="14" />
+                        <TextBlock Text="Add files..." />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding AddContextFolderCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="Folder" FontSize="14" />
+                        <TextBlock Text="Add folder..." />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding RemoveAttachedPathCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="DeleteFilled" FontSize="14" />
+                        <TextBlock Text="Remove selected" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="4" Margin="8,0,0,0" Command="{Binding SuggestRelevantFilesCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="Target" FontSize="14" />
+                        <TextBlock Text="Suggest relevant files" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+            <ListBox ItemsSource="{Binding AttachedPaths}" SelectedItem="{Binding SelectedAttachedPath}" MaxHeight="96" />
+
+            <!-- T14.2.3: suggestions are never auto-attached - double-tap accepts one (removing it
+                 from this list), "Dismiss" clears the rest without attaching anything. -->
+            <Border IsVisible="{Binding HasSuggestedRelevantFiles}"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="8">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="Suggested relevant files (double-click to attach)" FontSize="12" Opacity="0.7" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="Dismiss" Command="{Binding DismissSuggestedRelevantFilesCommand}" />
+                    </Grid>
+                    <ListBox Name="SuggestedRelevantFilesListBox"
+                             ItemsSource="{Binding SuggestedRelevantFiles}"
+                             MaxHeight="96"
+                             DoubleTapped="OnSuggestedRelevantFileDoubleTapped" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Margin="0,8,0,0" Spacing="4">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Prompt text" FontSize="12" Opacity="0.7" />
+                <TextBlock Grid.Column="1" Text="{Binding EstimatedTokenCountDisplay}" FontSize="12" Opacity="0.7" />
+            </Grid>
+            <TextBox Name="PromptTextBox"
+                     Text="{Binding PromptText}"
+                     Watermark="Enter the prompt you want to send to Claude Code..."
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     TextChanged="OnPromptTextBoxTextChanged"
+                     KeyDown="OnPromptTextBoxKeyDown" />
+
+            <!-- T14.1.1: a lightweight popup rather than reusing AvaloniaEdit's CompletionWindow,
+                 since the prompt box is a plain TextBox, not a CodeEditor. Anchored to the TextBox
+                 itself (not the exact caret position) - this sandbox has no X server to visually
+                 verify caret-relative placement against, and the simpler anchor is just as
+                 functional. -->
+            <Popup Name="MentionPopup"
+                   PlacementTarget="PromptTextBox"
+                   Placement="Bottom"
+                   IsLightDismissEnabled="True"
+                   IsOpen="{Binding HasMentionSuggestions}">
+                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                        BorderThickness="1"
+                        MaxHeight="160"
+                        MinWidth="240">
+                    <ListBox Name="MentionListBox"
+                             ItemsSource="{Binding MentionSuggestions}"
+                             DoubleTapped="OnMentionSuggestionDoubleTapped" />
+                </Border>
+            </Popup>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8">
+            <Button Command="{Binding SavePromptCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="SaveFilled" FontSize="14" />
+                    <TextBlock Text="Save prompt" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding RunPromptCommand}" Classes="accent">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="SendFilled" FontSize="14" />
+                    <TextBlock Text="Send to Claude Code" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding CancelPromptCommand}" IsVisible="{Binding IsRunning}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                    <TextBlock Text="Cancel" />
+                </StackPanel>
+            </Button>
+            <CheckBox Content="Continue previous conversation"
+                      IsChecked="{Binding ContinuePreviousConversation}"
+                      IsEnabled="{Binding HasPreviousSession}"
+                      VerticalAlignment="Center" />
+            <ui:ProgressRing Width="20" Height="20" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsRunning}" />
+            <TextBlock Text="{Binding ElapsedTimeDisplay}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" Opacity="0.7" />
+            <TextBlock Text="{Binding StreamProgressDisplay}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" Opacity="0.7" />
+        </StackPanel>
+
+        <!-- T-UX.2: split from the action row above - these are per-run settings, not actions,
+             and were competing visually with "Send to Claude Code" for attention. Grouped via a
+             separator (common region) and de-emphasized opacity, matching the muted-label
+             convention used elsewhere on this page, rather than hidden behind an Expander -
+             desktop tolerates this density fine once it's grouped (see ux-desktop skill). -->
+        <Separator Grid.Row="5" Margin="0,12,0,8" Opacity="0.4" />
+        <StackPanel Grid.Row="5" Margin="0,16,0,0" Orientation="Horizontal" Spacing="8" Opacity="0.85">
+            <TextBlock Text="Run options" VerticalAlignment="Center" FontSize="12" Opacity="0.7" FontWeight="SemiBold" />
+            <TextBlock Text="Preset" VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7" />
+            <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" Width="120" />
+            <TextBlock Text="Tutorial detail" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
+            <ComboBox ItemsSource="{Binding AvailableDepths}" SelectedItem="{Binding SelectedDepth}" Width="120" />
+            <TextBlock Text="Timeout (seconds)" VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7" />
+            <NumericUpDown Value="{Binding TimeoutSeconds}" Minimum="1" Maximum="86400" Increment="30" Width="140" />
+        </StackPanel>
+
+        <!-- Epic 11 (F11.2.2): same "Expander, collapsed until non-empty" pattern as ExplorerView's
+             Overview (T10.1.4) - only takes up space once a run has actually used a tool. -->
+        <Expander Grid.Row="6"
+                  Margin="0,8,0,0"
+                  Header="Tool activity"
+                  IsExpanded="True"
+                  MaxHeight="120"
+                  IsVisible="{Binding HasToolActivity}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding ToolActivityLog}" />
+            </ScrollViewer>
+        </Expander>
+
+        <TextBlock Grid.Row="7" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
+        <TextBlock Grid.Row="7" Margin="0,24,0,0" HorizontalAlignment="Right" Text="{Binding UsageSummary}" Opacity="0.7" FontSize="12" />
+    </Grid>
+</UserControl>

@@ -202,11 +202,28 @@ that depend on them, deletions last.
     control. Not referenced by any other view yet - `ExplorerView.axaml` wiring it in is T12.
   - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes (unchanged - no
     existing test touches this new, unreferenced control).
-- [ ] T9 New `ComposePanelControl.axaml[.cs]`: move `PromptView.axaml`'s body (prompt textbox,
+- [x] T9 New `ComposePanelControl.axaml[.cs]`: move `PromptView.axaml`'s body (prompt textbox,
   `@mention` popup, folder/file pickers, run button/progress, streaming output) into this control
   unchanged, `DataContext`/`x:DataType` now `vm:PromptViewModel` bound via
   `AssistantPanelControl`'s `Compose` property instead of the control resolving its own view model
-  from DI/navigation. _(R2)_
+  from DI/navigation. _(R2)_ — done 2026-11-01, matching design.md exactly. Notes:
+  - `ComposePanelControl.axaml`'s body is `PromptView.axaml`'s `Grid` copied verbatim (only
+    `x:Class` changed). `PromptView.axaml[.cs]` itself is untouched for now - it's still the
+    DI/navigation-resolving page the old `Prompt` nav item points at until T16/T17 remove that
+    destination; deleting it isn't in scope until then.
+  - `ComposePanelControl.axaml.cs` is `PromptView.axaml.cs`'s code-behind with one change: the old
+    constructor-assigned `ViewModel { get; }` (resolved via `App.GetService<PromptViewModel>()`)
+    became `private PromptViewModel ViewModel => (PromptViewModel)DataContext!;`, since this
+    control's `DataContext` is now supplied externally (`AssistantPanelControl` binds it to
+    `Compose`) rather than resolved by the control itself. Every `ViewModel.X` call site elsewhere
+    in the file is unchanged.
+  - `AssistantPanelControl.axaml`'s Compose `TabItem` placeholder (T8) is replaced with
+    `<views:ComposePanelControl DataContext="{Binding Compose}" />`; the Review tab's placeholder
+    is untouched (still T11).
+  - Solution builds with 0 warnings/0 errors (only the pre-existing `NETSDK1187` locale warnings);
+    full suite (934 tests) passes (unchanged - no existing test touches this new, still-unreferenced-
+    by-any-navigated-view control; `AssistantPanelControl`/`ComposePanelControl` aren't exercised by
+    ExplorerView until T12).
 - [ ] T10 New `ReviewFileDetailControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): copy
   `TutorialDetailControl.axaml`, delete its header row (duplicate file path - Explorer's tab header
   already shows it) and its `CodeEditor` + the `FlyoutBase.AttachedFlyout` references-list markup
