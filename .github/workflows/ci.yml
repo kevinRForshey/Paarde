@@ -27,9 +27,23 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test with coverage
+      # Run one test project per `dotnet test` invocation rather than the whole .slnx at once.
+      # `dotnet test` against a solution runs each project's tests concurrently as separate
+      # testhost processes - on this runner's limited cores, that starves Porta.Pty's native PTY
+      # exit-notification thread (PtyProcessManagerTests) long enough to intermittently lose/delay
+      # it, timing the test out. Confirmed locally: Paarde.Core.Tests alone with coverage passed
+      # 6/6 reruns in ~2s each, but running it alongside Paarde.Avalonia.Tests via the .slnx
+      # (matching CI's prior command) reproduced the exact timeout, with Core.Tests itself slowing
+      # from ~2s to ~18s.
+      - name: Test Paarde.Core.Tests with coverage
         run: >
-          dotnet test --no-build --configuration Release
+          dotnet test Paarde.Core.Tests/Paarde.Core.Tests.csproj --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      - name: Test Paarde.Avalonia.Tests with coverage
+        run: >
+          dotnet test Paarde.Avalonia.Tests/Paarde.Avalonia.Tests.csproj --no-build --configuration Release
           --collect:"XPlat Code Coverage"
           --results-directory ./coverage
 
