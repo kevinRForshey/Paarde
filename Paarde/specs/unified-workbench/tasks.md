@@ -277,12 +277,28 @@ that depend on them, deletions last.
   - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
     Paarde.slnx` (934/934 passing, unchanged counts since `ExplorerView` doesn't reference
     `AssistantPanelControl` yet - that wiring is T12).
-- [ ] T12 `ExplorerView.axaml`: add the third `Grid` column + `GridSplitter` +
+- [x] T12 `ExplorerView.axaml`: add the third `Grid` column + `GridSplitter` +
   `AssistantPanelControl` bound to `ExplorerViewModel.AssistantPanel`, plus a toolbar toggle button
   to collapse/expand it and a new "Open folder…" toolbar button bound to `OpenFolderCommand`.
   `ExplorerView.axaml.cs`'s constructor wires a second `ResizablePaneHelper` for the new
   `ExplorerAssistantPanelWidth` column, same shape as the existing `ExplorerTreeWidth` one. _(R2,
   R10)_
+  - Done: added two more `WorkspaceGrid` columns (`Auto` splitter + `360`-wide panel column) after
+    the existing tree/splitter/content three, a `GridSplitter` (`AssistantPanelSplitter`), and
+    `views:AssistantPanelControl Grid.Column="4" DataContext="{Binding AssistantPanel}"`
+    (`AssistantPanel` already existed on `ExplorerViewModel` from T5/T6). Added "Open folder..."
+    (bound to the already-existing `OpenFolderCommand` from T5) and an "Assistant" toggle button to
+    the toolbar row. `ExplorerAssistantPanelWidth` didn't exist yet - added it to
+    `WorkspaceLayoutSettingsKeys` now rather than waiting for T15, since this task needs it;
+    `DiffsFileListWidth`/`TutorialFileListWidth` are untouched (still used by `DiffsView`/
+    `TutorialView` until T18) and T15 is unaffected, it only has the removal half left to do.
+  - The toggle button reuses `ResizablePaneHelper`'s own "width 0 is collapsed" convention
+    (documented on that class already) rather than adding a separate `IsExpanded` flag: it
+    remembers the last non-zero width in a field before zeroing the column, and calls the helper's
+    existing `OnSplitterDragCompleted()` to persist either state the same way a manual drag would.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing - no existing test exercises `ExplorerView`'s XAML/code-behind
+    directly, so the new column/control/handlers don't change any test outcome).
 - [ ] T13 `ExplorerFileTabControl.axaml`: change
   `helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"` to
   `="{Binding EffectiveContent, Mode=TwoWay}"`; add `DiffLines="{Binding PendingChange.DiffLines}"`

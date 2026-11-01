@@ -4,6 +4,7 @@
     <option name="projectPerEditor">
       <map>
         <entry key="Paarde.Avalonia/Views/DiffsView.axaml" value="Paarde.Avalonia/Paarde.Avalonia.csproj" />
+        <entry key="Paarde.Avalonia/Views/ExplorerView.axaml" value="Paarde.Avalonia/Paarde.Avalonia.csproj" />
         <entry key="Paarde.Avalonia/Views/HistoryView.axaml" value="Paarde.Avalonia/Paarde.Avalonia.csproj" />
         <entry key="Paarde.Avalonia/Views/SettingsView.axaml" value="Paarde.Avalonia/Paarde.Avalonia.csproj" />
         <entry key="Paarde.Avalonia/Views/TutorialView.axaml" value="Paarde.Avalonia/Paarde.Avalonia.csproj" />

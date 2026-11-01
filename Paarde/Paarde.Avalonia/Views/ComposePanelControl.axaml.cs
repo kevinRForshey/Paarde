@@ -26,15 +26,23 @@ public partial class ComposePanelControl : UserControl
 
     private void OnPromptTextBoxTextChanged(object? sender, TextChangedEventArgs e)
     {
+        // Bug fix: switching away from the Compose tab tears down this control (TabControl
+        // recreates its content per selection), which clears DataContext before the TextBox's own
+        // final TextChanged fires - without this guard, ViewModel below is null and throws.
+        if (DataContext is not PromptViewModel viewModel)
+        {
+            return;
+        }
+
         _activeMentionTrigger = MentionTriggerDetector.FindActiveTrigger(PromptTextBox.Text ?? string.Empty, PromptTextBox.CaretIndex);
 
         if (_activeMentionTrigger is { } trigger)
         {
-            ViewModel.UpdateMentionSuggestions(trigger.Query);
+            viewModel.UpdateMentionSuggestions(trigger.Query);
         }
         else
         {
-            ViewModel.CloseMentionPopup();
+            viewModel.CloseMentionPopup();
         }
     }
 
