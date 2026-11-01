@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Helpers;
@@ -16,6 +17,15 @@ public partial class ExplorerView : UserControl
 
     private readonly ResizablePaneHelper _paneHelper;
 
+    // Epic 25, T12 (R2): same ResizablePaneHelper as the tree pane, keyed to its own setting so
+    // the two columns resize/persist independently.
+    private readonly ResizablePaneHelper _assistantPanelHelper;
+
+    // Remembers the width the Assistant panel had before the toggle button collapsed it, since
+    // ResizablePaneHelper's own "width 0 is collapsed" convention has no separate flag to restore
+    // from - collapsing from a drag has nothing to remember, but collapsing from this button does.
+    private double _assistantPanelWidthBeforeCollapse = 360;
+
     public ExplorerView()
     {
         ViewModel = App.GetService<ExplorerViewModel>();
@@ -27,5 +37,26 @@ public partial class ExplorerView : UserControl
         _paneHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[0], App.GetService<ILocalSettingsService>(), WorkspaceLayoutSettingsKeys.ExplorerTreeWidth, defaultWidth: 220);
         Loaded += async (_, _) => await _paneHelper.RestoreAsync();
         TreeSplitter.DragCompleted += (_, _) => _paneHelper.OnSplitterDragCompleted();
+
+        _assistantPanelHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[4], App.GetService<ILocalSettingsService>(), WorkspaceLayoutSettingsKeys.ExplorerAssistantPanelWidth, defaultWidth: 360);
+        Loaded += async (_, _) => await _assistantPanelHelper.RestoreAsync();
+        AssistantPanelSplitter.DragCompleted += (_, _) => _assistantPanelHelper.OnSplitterDragCompleted();
+    }
+
+    private void OnToggleAssistantPanelButtonClick(object? sender, RoutedEventArgs e)
+    {
+        var column = WorkspaceGrid.ColumnDefinitions[4];
+
+        if (column.Width.Value > 0)
+        {
+            _assistantPanelWidthBeforeCollapse = column.Width.Value;
+            column.Width = new GridLength(0);
+        }
+        else
+        {
+            column.Width = new GridLength(_assistantPanelWidthBeforeCollapse);
+        }
+
+        _assistantPanelHelper.OnSplitterDragCompleted();
     }
 }

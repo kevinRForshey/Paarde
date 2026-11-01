@@ -173,25 +173,86 @@ that depend on them, deletions last.
   automatically). `IFolderPickerService` was already registered (`AddTransient`, pre-existing for
   `PromptViewModel`), so no new registration was needed for that parameter either. Solution builds
   with 0 warnings/0 errors; full suite (934 tests) passes.
-- [ ] T7 `HistoryViewModel`: add `AssistantPanelViewModel` constructor parameter; change `Launch`
+- [x] T7 `HistoryViewModel`: add `AssistantPanelViewModel` constructor parameter; change `Launch`
   to call `_assistantPanel.Compose.LoadLaunchRequest(...)` + `_assistantPanel.ShowCompose()` +
   `_navigationService.NavigateTo(typeof(ExplorerViewModel).FullName!)` instead of navigating to
-  `typeof(PromptViewModel)`. _(R8)_
-- [ ] T8 New `AssistantPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): a `ui:TabView`/
+  `typeof(PromptViewModel)`. _(R8)_ — done 2026-11-01, exactly as specified. Notes:
+  - `PromptViewModel.LoadLaunchRequest(PromptLaunchRequest)` already existed (built ahead of
+    schedule alongside an earlier task), so T7 only needed to change the caller.
+  - `App.axaml.cs` needed no edit: `HistoryViewModel` is `AddTransient` and DI resolves the new
+    `AssistantPanelViewModel` constructor parameter (singleton, since T6) automatically.
+  - `HistoryViewModelTests`: added a `CreateAssistantPanel()` helper (same real
+    `PromptViewModel`/`TutorialViewModel`-wrapping pattern as `AssistantPanelViewModelTests`) and
+    rewrote `ForkCommand`/`RerunCommand` tests to assert on `assistantPanel.Compose.PromptText`/
+    `WorkingDirectoryPath`/`SelectedTabIndex` and navigation to `ExplorerViewModel`, instead of
+    the old `PromptLaunchRequest` navigation-parameter assertions (removed, now unreachable since
+    `Launch` no longer passes a parameter to `NavigateTo`).
+  - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes.
+- [x] T8 New `AssistantPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): a `ui:TabView`/
   `TabControl` with two items bound to `AssistantPanel.SelectedTabIndex`, "Compose" hosting a new
-  `ComposePanelControl.axaml` and "Review" hosting a new `ReviewPanelControl.axaml`. _(R2)_
-- [ ] T9 New `ComposePanelControl.axaml[.cs]`: move `PromptView.axaml`'s body (prompt textbox,
+  `ComposePanelControl.axaml` and "Review" hosting a new `ReviewPanelControl.axaml`. _(R2)_ —
+  done 2026-11-01. Notes:
+  - Used a plain `TabControl` (not FluentAvalonia's `ui:TabView`) with two fixed `TabItem`s bound
+    via `SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"` - matches the existing
+    `TabControl` precedent already in `ExplorerView.axaml`/old `TutorialView.axaml`, and nothing
+    else in the codebase uses `ui:TabView` yet.
+  - Deviation (deliberate, to keep this task independently buildable): since `ComposePanelControl`
+    and `ReviewPanelControl` don't exist until T9/T11, each `TabItem`'s content is a placeholder
+    `TextBlock` for now; T9 and T11 will each replace their own tab's placeholder with the real
+    control. Not referenced by any other view yet - `ExplorerView.axaml` wiring it in is T12.
+  - Solution builds with 0 warnings/0 errors; full suite (934 tests) passes (unchanged - no
+    existing test touches this new, unreferenced control).
+- [x] T9 New `ComposePanelControl.axaml[.cs]`: move `PromptView.axaml`'s body (prompt textbox,
   `@mention` popup, folder/file pickers, run button/progress, streaming output) into this control
   unchanged, `DataContext`/`x:DataType` now `vm:PromptViewModel` bound via
   `AssistantPanelControl`'s `Compose` property instead of the control resolving its own view model
-  from DI/navigation. _(R2)_
-- [ ] T10 New `ReviewFileDetailControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): copy
+  from DI/navigation. _(R2)_ — done 2026-11-01, matching design.md exactly. Notes:
+  - `ComposePanelControl.axaml`'s body is `PromptView.axaml`'s `Grid` copied verbatim (only
+    `x:Class` changed). `PromptView.axaml[.cs]` itself is untouched for now - it's still the
+    DI/navigation-resolving page the old `Prompt` nav item points at until T16/T17 remove that
+    destination; deleting it isn't in scope until then.
+  - `ComposePanelControl.axaml.cs` is `PromptView.axaml.cs`'s code-behind with one change: the old
+    constructor-assigned `ViewModel { get; }` (resolved via `App.GetService<PromptViewModel>()`)
+    became `private PromptViewModel ViewModel => (PromptViewModel)DataContext!;`, since this
+    control's `DataContext` is now supplied externally (`AssistantPanelControl` binds it to
+    `Compose`) rather than resolved by the control itself. Every `ViewModel.X` call site elsewhere
+    in the file is unchanged.
+  - `AssistantPanelControl.axaml`'s Compose `TabItem` placeholder (T8) is replaced with
+    `<views:ComposePanelControl DataContext="{Binding Compose}" />`; the Review tab's placeholder
+    is untouched (still T11).
+  - Solution builds with 0 warnings/0 errors (only the pre-existing `NETSDK1187` locale warnings);
+    full suite (934 tests) passes (unchanged - no existing test touches this new, still-unreferenced-
+    by-any-navigated-view control; `AssistantPanelControl`/`ComposePanelControl` aren't exercised by
+    ExplorerView until T12).
+- [x] T10 New `ReviewFileDetailControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): copy
   `TutorialDetailControl.axaml`, delete its header row (duplicate file path - Explorer's tab header
   already shows it) and its `CodeEditor` + the `FlyoutBase.AttachedFlyout` references-list markup
   tied to it, keeping the overview `TextBlock`/`MarkdownTextBlock` and the `TutorialStepViewModel`
   step-card `ItemsControl` exactly as they are today. Code-behind trimmed to whatever (if anything)
   doesn't reference the removed editor. _(R6)_
-- [ ] T11 New `ReviewPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): move `TutorialView.axaml`'s
+  - Done: removed the header row (`SymbolIcon` + file-path `TextBlock`) and the `CodeEditor`, plus
+    the Undo/Redo buttons (`Editor.CanUndo`/`CanRedo`/`.Undo()`/`.Redo()` have no meaning once the
+    editor is gone - editing now happens on the file's own Explorer tab via `EffectiveContent`,
+    T1/T5/T13). Revert-to-proposed/Revert-to-original stayed - they act on `EditedContent`
+    directly, not on an `Editor` instance. The hunk-selection row, step-navigation row, and the
+    `TutorialStepViewModel` step-card `ItemsControl` all carried over unchanged. Code-behind
+    dropped everything wired to the removed `Editor` (`RefreshUndoRedoButtons`,
+    `OnUndoButtonClick`/`OnRedoButtonClick`, `OnDiffHunkActionRequested` and the
+    `Editor.DiffHunkActionRequested`/`GhostTextRequested`/`PropertyChanged`/`GotFocus`/`LostFocus`
+    subscriptions, and the `IActiveEditorContext` caret forwarding) and kept everything else as-is,
+    including `FindAncestorOfType<TutorialView>()` in `RebuildSteps`/`ApplyPendingStepTarget` -
+    T11 retargets that to `ReviewPanelControl` once it's the control that actually hosts this one.
+  - Deviation note: neither a `FlyoutBase.AttachedFlyout` references-list nor a separate "overview"
+    `TextBlock`/`MarkdownTextBlock` actually exists in `TutorialDetailControl.axaml`/`.axaml.cs` as
+    they stand today (confirmed by reading both files in full and grepping for
+    `FlyoutBase|Overview|References` - no hits). The real "Overview" header/text lives in
+    `TutorialView.axaml` (`HasTutorialOverview`), which T11 explicitly moves into
+    `ReviewPanelControl`, not here - this task's wording appears to describe either stale or
+    misattributed content. Nothing was removed/kept on that basis beyond what's documented above.
+  - Not yet referenced by any other view (that wiring is T11); verified with a from-scratch
+    `dotnet build Paarde.slnx` (0 errors) and `dotnet test Paarde.slnx` (934/934 passing, unchanged
+    counts since nothing exercises this new control yet).
+- [x] T11 New `ReviewPanelControl.axaml[.cs]` (`Paarde.Avalonia/Views/`): move `TutorialView.axaml`'s
   left sidebar (Apply/Export/Refine buttons, master file list with tri-state selection, apply-history
   log) and overview header into this control, with the per-file tabbed area (`TabControl` over
   `OpenTabs`) replaced by a single content area bound to `Selected` and hosting
@@ -199,12 +260,45 @@ that depend on them, deletions last.
   `TutorialViewModel`'s new selection-changed handler (T4) instead of an `OpenTabs.Add`/tab-switch.
   `DataContext`/`x:DataType` is `vm:TutorialViewModel`, bound via `AssistantPanelControl`'s
   `Review` property. _(R6)_
-- [ ] T12 `ExplorerView.axaml`: add the third `Grid` column + `GridSplitter` +
+  - Done: moved the sidebar (Apply/Export/Refine groups), file list, apply-history log, and
+    overview header into `ReviewPanelControl.axaml` verbatim, swapping `TutorialDetailControl` for
+    `ReviewFileDetailControl` (T10) in the content-area `DataTemplate`. The per-file content area
+    and the file list's `SelectedItem` binding were already in this exact shape in
+    `TutorialView.axaml` ahead of this task (a `ContentControl` over `Selected`, not a
+    `TabControl`/`OpenTabs` - see that file's own "Full rework of this pane lands in T11" comment,
+    and `TutorialViewModel.OnSelectedFileListItemChanged`/`AttachExplorer` from T4), so no
+    view-model changes were needed here. `DataContext` is supplied externally (same
+    "DataContext supplied externally" pattern as `ComposePanelControl`, T9) - code-behind only
+    wires the file-list/content `ResizablePaneHelper` split (unchanged, still keyed to
+    `WorkspaceLayoutSettingsKeys.TutorialFileListWidth` - T15 is where that key gets swapped out).
+    `TutorialView.axaml[.cs]` itself was left untouched; it's still the page the old `Tutorial` nav
+    item points at until T16-T18 remove it. Wired `AssistantPanelControl`'s Review tab to
+    `views:ReviewPanelControl DataContext="{Binding Review}"`, replacing T8's placeholder.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing, unchanged counts since `ExplorerView` doesn't reference
+    `AssistantPanelControl` yet - that wiring is T12).
+- [x] T12 `ExplorerView.axaml`: add the third `Grid` column + `GridSplitter` +
   `AssistantPanelControl` bound to `ExplorerViewModel.AssistantPanel`, plus a toolbar toggle button
   to collapse/expand it and a new "Open folder…" toolbar button bound to `OpenFolderCommand`.
   `ExplorerView.axaml.cs`'s constructor wires a second `ResizablePaneHelper` for the new
   `ExplorerAssistantPanelWidth` column, same shape as the existing `ExplorerTreeWidth` one. _(R2,
   R10)_
+  - Done: added two more `WorkspaceGrid` columns (`Auto` splitter + `360`-wide panel column) after
+    the existing tree/splitter/content three, a `GridSplitter` (`AssistantPanelSplitter`), and
+    `views:AssistantPanelControl Grid.Column="4" DataContext="{Binding AssistantPanel}"`
+    (`AssistantPanel` already existed on `ExplorerViewModel` from T5/T6). Added "Open folder..."
+    (bound to the already-existing `OpenFolderCommand` from T5) and an "Assistant" toggle button to
+    the toolbar row. `ExplorerAssistantPanelWidth` didn't exist yet - added it to
+    `WorkspaceLayoutSettingsKeys` now rather than waiting for T15, since this task needs it;
+    `DiffsFileListWidth`/`TutorialFileListWidth` are untouched (still used by `DiffsView`/
+    `TutorialView` until T18) and T15 is unaffected, it only has the removal half left to do.
+  - The toggle button reuses `ResizablePaneHelper`'s own "width 0 is collapsed" convention
+    (documented on that class already) rather than adding a separate `IsExpanded` flag: it
+    remembers the last non-zero width in a field before zeroing the column, and calls the helper's
+    existing `OnSplitterDragCompleted()` to persist either state the same way a manual drag would.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing - no existing test exercises `ExplorerView`'s XAML/code-behind
+    directly, so the new column/control/handlers don't change any test outcome).
 - [ ] T13 `ExplorerFileTabControl.axaml`: change
   `helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"` to
   `="{Binding EffectiveContent, Mode=TwoWay}"`; add `DiffLines="{Binding PendingChange.DiffLines}"`

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:views="using:Paarde.Avalonia.Views"
@@ -13,6 +14,23 @@
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
             <Button Content="Refresh" Command="{Binding RefreshTreeCommand}" />
+            <!-- Epic 25, T12 (R10): lets the user pick a working directory from Explorer itself,
+                 rather than only ever inheriting whichever one Compose/Prompt last saved. -->
+            <Button Command="{Binding OpenFolderCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="OpenFolder" FontSize="14" />
+                    <TextBlock Text="Open folder..." />
+                </StackPanel>
+            </Button>
+            <!-- Epic 25, T12 (R2): collapses/expands the docked Assistant panel by driving the
+                 same "width 0 is collapsed" convention ResizablePaneHelper already uses for the
+                 tree pane - see ExplorerView.axaml.cs's OnToggleAssistantPanelButtonClick. -->
+            <Button Name="ToggleAssistantPanelButton" Click="OnToggleAssistantPanelButtonClick" ToolTip.Tip="Show or hide the Assistant panel.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Comment" FontSize="14" />
+                    <TextBlock Text="Assistant" />
+                </StackPanel>
+            </Button>
         </StackPanel>
 
         <TextBlock Grid.Row="1"
@@ -28,11 +46,16 @@
              - Explorer stays a browse/view surface, editing a proposal stays the Tutorial page's job. -->
         <!-- T8.2.3: resizable/persisted pane widths - see ResizablePaneHelper, wired up in
              ExplorerView.axaml.cs. Dragging TreeSplitter all the way shut collapses the tree. -->
+        <!-- Epic 25, T12 (R2): the docked Assistant panel - a third column/splitter alongside the
+             existing tree/content split, same ResizablePaneHelper + "drag shut to collapse"
+             convention as TreeSplitter, persisted separately via ExplorerAssistantPanelWidth. -->
         <Grid Grid.Row="2" Margin="8" Name="WorkspaceGrid">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
 
             <TreeView Grid.Column="0"
@@ -98,6 +121,21 @@
                     </TabControl>
                 </Grid>
             </Grid>
+
+            <GridSplitter Grid.Column="3" Name="AssistantPanelSplitter" Width="4" ResizeDirection="Columns" />
+
+            <!-- Bug fix (post-T12 runtime crash): DataContext="{Binding AssistantPanel}" as a plain
+                 attribute raced against AssistantPanelControl's own compiled bindings seeing the
+                 still-inherited ExplorerViewModel before the binding resolved. Content/
+                 ContentTemplate assigns DataContext atomically instead - see AssistantPanelControl.axaml's
+                 own fix for the same issue. -->
+            <ContentControl Grid.Column="4" Content="{Binding AssistantPanel}">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate x:DataType="vm:AssistantPanelViewModel">
+                        <views:AssistantPanelControl />
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
         </Grid>
     </Grid>
 </UserControl>

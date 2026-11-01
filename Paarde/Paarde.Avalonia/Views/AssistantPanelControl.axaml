@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:views="using:Paarde.Avalonia.Views"
+             x:Class="Paarde.Avalonia.Views.AssistantPanelControl"
+             x:DataType="vm:AssistantPanelViewModel">
+
+    <!-- Epic 25, T8: the docked Assistant panel - hosted by ExplorerView once T12 wires it up.
+         Two fixed tabs (not an ItemsSource-driven TabControl) since there are always exactly
+         these two, bound to AssistantPanel.SelectedTabIndex so a finished run can switch to
+         Review automatically (AssistantPanelViewModel's own PromptResultStore subscription). -->
+    <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+        <!-- Bug fix (post-T11 runtime crash): setting DataContext="{Binding ...}" as an attribute
+             directly on a non-templated child races against that child's own compiled bindings -
+             they can evaluate against the still-inherited parent DataContext (ExplorerViewModel)
+             before the DataContext binding resolves, throwing an InvalidCastException. Routing
+             through Content/ContentTemplate instead (the same pattern Selected/
+             ReviewFileDetailControl already uses) makes the ContentPresenter assign DataContext
+             atomically as part of realizing the template, so no child binding can see the old value. -->
+        <TabItem Header="Compose" Content="{Binding Compose}">
+            <TabItem.ContentTemplate>
+                <DataTemplate x:DataType="vm:PromptViewModel">
+                    <views:ComposePanelControl />
+                </DataTemplate>
+            </TabItem.ContentTemplate>
+        </TabItem>
+        <TabItem Header="Review" Content="{Binding Review}">
+            <TabItem.ContentTemplate>
+                <DataTemplate x:DataType="vm:TutorialViewModel">
+                    <views:ReviewPanelControl />
+                </DataTemplate>
+            </TabItem.ContentTemplate>
+        </TabItem>
+    </TabControl>
+</UserControl>

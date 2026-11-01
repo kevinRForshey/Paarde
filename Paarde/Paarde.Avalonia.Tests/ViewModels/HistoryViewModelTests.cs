@@ -1,7 +1,7 @@
-using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
+using Paarde.Core.Services;
 
 namespace Paarde.Avalonia.Tests.ViewModels;
 
@@ -9,8 +9,23 @@ public class HistoryViewModelTests
 {
     private readonly FakeRunSessionStore _runSessionStore = new();
     private readonly FakeNavigationService _navigationService = new();
+    private readonly FakeLlmRunner _llmRunner = new();
+    private readonly FakeLocalSettingsService _localSettingsService = new();
+    private readonly FakePromptResultStore _promptResultStore = new();
 
-    private HistoryViewModel CreateSut() => new(_runSessionStore, _navigationService);
+    // Epic 25, T7: Fork/Rerun now drive the docked Assistant panel's own Compose view model
+    // directly rather than navigating with a PromptLaunchRequest parameter, so a real
+    // AssistantPanelViewModel (wrapping its own, otherwise-unrelated PromptViewModel/
+    // TutorialViewModel pair) stands in for it here too.
+    private AssistantPanelViewModel CreateAssistantPanel()
+    {
+        var compose = new PromptViewModel(_llmRunner, _localSettingsService, new FakeFolderPickerService(), new FakeFilePickerService(), _promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
+        var review = new TutorialViewModel(_promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), _llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), _localSettingsService, new FakeBuildTestRunner());
+
+        return new AssistantPanelViewModel(compose, review, _promptResultStore);
+    }
+
+    private HistoryViewModel CreateSut() => new(_runSessionStore, _navigationService, CreateAssistantPanel());
 
     private static RunSession CreateSession(string userPromptText, DateTimeOffset startedAt, IReadOnlyList<RunSessionFile>? files = null) => new(
         Guid.NewGuid().ToString("N"),
@@ -104,32 +119,38 @@ public class HistoryViewModelTests
     }
 
     [Fact]
-    public void ForkCommand_NavigatesToPromptPageWithAutoRunFalse()
+    public void ForkCommand_LoadsComposeAndNavigatesToExplorerWithoutAutoRunning()
     {
         _runSessionStore.SessionsToList = new[] { CreateSession("fork this prompt", DateTimeOffset.UtcNow) };
-        var sut = CreateSut();
+        var assistantPanel = CreateAssistantPanel();
+        var sut = new HistoryViewModel(_runSessionStore, _navigationService, assistantPanel);
         sut.OnNavigatedTo(null!);
 
         sut.ForkCommand.Execute(null);
 
+        Assert.Equal("fork this prompt", assistantPanel.Compose.PromptText);
+        Assert.Equal("/working/dir", assistantPanel.Compose.WorkingDirectoryPath);
+        Assert.Equal(0, assistantPanel.SelectedTabIndex);
         Assert.Equal(1, _navigationService.NavigateToCallCount);
-        Assert.Equal(typeof(PromptViewModel).FullName, _navigationService.LastPageKey);
-        var request = Assert.IsType<PromptLaunchRequest>(_navigationService.LastParameter);
-        Assert.Equal("fork this prompt", request.PromptText);
-        Assert.Equal("/working/dir", request.WorkingDirectoryPath);
-        Assert.False(request.AutoRun);
+        Assert.Equal(typeof(ExplorerViewModel).FullName, _navigationService.LastPageKey);
     }
 
     [Fact]
-    public void RerunCommand_NavigatesToPromptPageWithAutoRunTrue()
+    public void RerunCommand_LoadsComposeAndNavigatesToExplorerWithAutoRun()
     {
         _runSessionStore.SessionsToList = new[] { CreateSession("rerun this prompt", DateTimeOffset.UtcNow) };
-        var sut = CreateSut();
+        _llmRunner.ResultToReturn = new LlmRunResult
+        {
+            Success = true,
+            Output = """{"responseType": "answer", "answer": "An answer."}""",
+        };
+        var assistantPanel = CreateAssistantPanel();
+        var sut = new HistoryViewModel(_runSessionStore, _navigationService, assistantPanel);
         sut.OnNavigatedTo(null!);
 
         sut.RerunCommand.Execute(null);
 
-        var request = Assert.IsType<PromptLaunchRequest>(_navigationService.LastParameter);
-        Assert.True(request.AutoRun);
+        Assert.Equal("rerun this prompt", assistantPanel.Compose.PromptText);
+        Assert.Equal(typeof(ExplorerViewModel).FullName, _navigationService.LastPageKey);
     }
 }
