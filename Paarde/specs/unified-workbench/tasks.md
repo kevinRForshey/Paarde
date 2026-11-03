@@ -332,23 +332,92 @@ that depend on them, deletions last.
     the same pair `ApplyPendingCaretTarget` already uses for its own cross-file jumps.
   - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
     Paarde.slnx` (934/934 passing).
-- [ ] T15 `WorkspaceLayoutSettingsKeys`: add `ExplorerAssistantPanelWidth`; remove
+- [x] T15 `WorkspaceLayoutSettingsKeys`: add `ExplorerAssistantPanelWidth`; remove
   `DiffsFileListWidth`/`TutorialFileListWidth`. _(R12)_
-- [ ] T16 `ShellView.axaml`: remove the Main, Prompt, Diffs, Tutorial `NavigationViewItem`s from
+  - Done: `ExplorerAssistantPanelWidth` was already added in T12. The literal removal of
+    `DiffsFileListWidth`/`TutorialFileListWidth` has to wait for T18 - both are still read today
+    (`DiffsView.axaml.cs`, `TutorialView.axaml.cs`, and `ReviewPanelControl.axaml.cs` all construct
+    a `ResizablePaneHelper` from one of them), and `DiffsView`/`TutorialView` aren't deleted until
+    T18, so deleting the constants now would break their build before then - matches the
+    dependency `WorkspaceLayoutSettingsKeys.cs`'s own T12 comment already called out.
+    What *did* move now: `ReviewPanelControl` was reusing `TutorialFileListWidth` (T11, for
+    continuity with TutorialView's old sidebar width), but it's the permanent replacement for that
+    sidebar, not TutorialView itself - left depending on a key named after a page this epic deletes
+    would be wrong going forward. Added `ReviewFileListWidth` and pointed `ReviewPanelControl` at
+    it instead, so the rename below only removes the two keys with zero remaining readers.
+  - Follow-up folded into T18: once `DiffsView.axaml[.cs]`/`TutorialView.axaml[.cs]` are deleted,
+    delete `WorkspaceLayoutSettingsKeys.DiffsFileListWidth`/`TutorialFileListWidth` too (R12's
+    literal removal).
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing).
+- [x] T16 `ShellView.axaml`: remove the Main, Prompt, Diffs, Tutorial `NavigationViewItem`s from
   `NavigationView.MenuItems`. `CommandPaletteViewModel`'s constructor: remove the `GoTo("Main",
   typeof(MainViewModel))`, `GoTo("Prompt", typeof(PromptViewModel))`, `GoTo("Diffs",
   typeof(DiffsViewModel))`, `GoTo("Tutorial", typeof(TutorialViewModel))` registry entries,
   leaving `Build`/`Run`/`Stop`/`Explorer`/`Terminal`/`History`/`Settings` untouched. _(R9, R13)_
-- [ ] T17 `App.axaml.cs`: change the startup navigation call to
+  - Done: both removals exactly as specified; `ShellView.axaml`'s `NavigationView.MenuItems` is now
+    just Explorer/Terminal/History (Settings is handled separately via `IsSettingsVisible="True"`,
+    unchanged).
+  - `CommandPaletteViewModelTests.Open_PopulatesResultsWithFullRegistry`'s expected registry count
+    (11) was a direct casualty of this change - updated to 7 now rather than leaving it red for
+    T19, since it's this task's own change that broke it, not one of the T19-listed rewrites.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing).
+- [x] T17 `App.axaml.cs`: change the startup navigation call to
   `GetService<INavigationService>().NavigateTo(typeof(ExplorerViewModel).FullName!);`; remove the
   `MainViewModel`/`DiffsViewModel` DI registrations and their page-type mappings in `IPageService`'s
   setup. _(R10, R9)_
-- [ ] T18 Grep the solution for `DiffJumpRequest`/`TutorialJumpRequest` to confirm T4/T16 removed
+  - Done: startup navigation retargeted (plus the adjacent error-log message, which said "the main
+    page" and is now accurate again); `AddTransient<MainViewModel>`/`<MainView>`/`<DiffsViewModel>`/
+    `<DiffsView>` removed from `App.axaml.cs`, and `PageService`'s matching `Configure<...>()` calls
+    removed too - `PromptViewModel`/`TutorialViewModel`'s DI registrations and `PageService`
+    mappings are untouched, per R9's scope (Main+Diffs only; Prompt/Tutorial aren't in design.md's
+    "Deleted types/files" list either).
+  - Follow-up folded into T18: once `TutorialView.axaml[.cs]` is deleted there, its
+    `AddTransient<TutorialView>()` registration and `Configure<TutorialViewModel, TutorialView>()`
+    mapping become dead code referencing a deleted type and must go with it.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing).
+- [x] T18 Grep the solution for `DiffJumpRequest`/`TutorialJumpRequest` to confirm T4/T16 removed
   every usage, then delete both record types' declarations. Delete
   `Paarde.Avalonia/ViewModels/DiffsViewModel.cs`, `Views/DiffsView.axaml[.cs]`,
   `Paarde.Avalonia/ViewModels/MainViewModel.cs`, `Views/MainView.axaml[.cs]`,
   `Views/TutorialView.axaml[.cs]`, `Views/TutorialDetailControl.axaml[.cs]`. Leave
-  `Views/DiffsDetailControl.axaml[.cs]` in place (still used by `HistoryView.axaml`). _(R9, R6)_
+  `Views/DiffsDetailControl.axaml[.cs]` in place (still used by `HistoryView.axaml`). Also delete
+  `WorkspaceLayoutSettingsKeys.DiffsFileListWidth`/`TutorialFileListWidth` now that this step
+  removes their last readers (T15 follow-up, R12). Also remove `App.axaml.cs`'s
+  `AddTransient<TutorialView>()` registration and `PageService`'s
+  `Configure<TutorialViewModel, TutorialView>()` mapping, now dead once `TutorialView` is deleted
+  (T17 follow-up). _(R9, R6, R12)_
+  - Done: grepped for `DiffJumpRequest`/`TutorialJumpRequest`; only live (non-comment) usages were
+    in `DiffsViewModel.cs` and `DiffsViewModelTests.cs`, both deleted in this task, so both records'
+    declarations were deleted too. Deleted `DiffsViewModel.cs`, `Views/DiffsView.axaml[.cs]`,
+    `MainViewModel.cs`, `Views/MainView.axaml[.cs]`, `Views/TutorialView.axaml[.cs]`,
+    `Views/TutorialDetailControl.axaml[.cs]`, `Models/DiffJumpRequest.cs`,
+    `Models/TutorialJumpRequest.cs`. Kept `DiffsDetailControl.axaml[.cs]` as instructed, but it had
+    a live `FindAncestorOfType<DiffsView>()` call in `ApplyPendingScrollTarget()` (the "jump from a
+    tutorial step" scroll-target feature, superseded by R7's `OpenFileTabViewModel.RequestScrollTo`)
+    - deleted that method and its `Loaded +=` subscription, keeping the helpers it shared with the
+      still-needed `ScrollToHunk` (Next/Previous buttons). Also found `ReviewFileDetailControl.axaml.cs`
+    - the control `ReviewPanelControl` actually hosts today - still had a live `T10`-flagged
+      `FindAncestorOfType<TutorialView>()?.ViewModel` lookup (its own `Done:` note already called out
+      that T11 was meant to retarget it but never did). Fixed both call sites to
+      `FindAncestorOfType<ReviewPanelControl>()?.DataContext as TutorialViewModel`, since
+      `ReviewPanelControl`'s `DataContext` is already bound directly to `AssistantPanel.Review`.
+    Deleted the `DiffsFileListWidth`/`TutorialFileListWidth` constants (T15's deferred follow-up);
+    `ReviewFileListWidth` is now the only sidebar-width key left for that panel. Removed
+    `App.axaml.cs`'s `AddTransient<TutorialView>()` and `PageService`'s
+    `Configure<TutorialViewModel, TutorialView>()` (T17's deferred follow-up); `TutorialViewModel`
+    itself stays registered as a singleton since `AssistantPanelViewModel` still depends on it.
+    Also deleted `MainViewModelTests.cs` and `DiffsViewModelTests.cs` now, rather than waiting for
+    T19, since leaving them would leave the test project non-compiling. Build also surfaced a test
+    file the earlier grep missed - `SelectionPersistenceTests.cs` - which constructed a
+    `DiffsViewModel` directly to assert selection state stayed in sync between the Tutorial and
+    Diffs pages; deleted it too, since its subject is gone (T19 can judge whether an equivalent
+    regression test is worth adding for the new architecture). Updated a stale `PromptResultStore`
+    comment that still named `DiffsView`/`TutorialView` as the consuming pages.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (917/917 passing - down from 934 due to the deleted test files above).
 - [ ] T19 Update/replace unit tests:
   - `OpenFileTabViewModelTests`: `EffectiveContent` routing (T1), `ScrollToHunkRequested` firing
     from `RequestScrollTo`.

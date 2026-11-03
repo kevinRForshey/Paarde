@@ -39,7 +39,7 @@ public class CommandPaletteViewModelTests
         Assert.Contains(sut.Results, c => c.Name == "Run");
         Assert.Contains(sut.Results, c => c.Name == "Stop");
         Assert.Contains(sut.Results, c => c.Name == "Go to Explorer");
-        Assert.Equal(11, sut.Results.Count);
+        Assert.Equal(7, sut.Results.Count);
     }
 
     [Fact]

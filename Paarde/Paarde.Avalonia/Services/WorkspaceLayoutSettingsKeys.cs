@@ -6,11 +6,12 @@ public static class WorkspaceLayoutSettingsKeys
 {
     public const string ExplorerTreeWidth = "Layout.Explorer.TreeWidth";
 
-    // Epic 25, T12: the docked Assistant panel's width on ExplorerView - DiffsFileListWidth/
-    // TutorialFileListWidth are removed in T15 once DiffsView/TutorialView themselves are deleted.
+    // Epic 25, T12: the docked Assistant panel's width on ExplorerView.
     public const string ExplorerAssistantPanelWidth = "Layout.Explorer.AssistantPanelWidth";
-    public const string DiffsFileListWidth = "Layout.Diffs.FileListWidth";
-    public const string TutorialFileListWidth = "Layout.Tutorial.FileListWidth";
+
+    // Epic 25, T11: ReviewPanelControl's own key - the permanent replacement for TutorialView's
+    // sidebar, so it doesn't depend on a key named after the now-deleted TutorialView/DiffsView pages.
+    public const string ReviewFileListWidth = "Layout.Review.FileListWidth";
     public const string HistorySessionListWidth = "Layout.History.SessionListWidth";
     public const string HistoryFileListWidth = "Layout.History.FileListWidth";
 }

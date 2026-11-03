@@ -2,7 +2,6 @@ using System.ComponentModel;
 
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.VisualTree;
 
 using Paarde.Core.Helpers;
 using Paarde.Core.Models;
@@ -15,10 +14,6 @@ public partial class DiffsDetailControl : UserControl
     public DiffsDetailControl()
     {
         InitializeComponent();
-
-        // T8.4.5: applied once this control is attached to DiffsView's visual tree, by which point
-        // DataContext (this control's file) is already set.
-        Loaded += (_, _) => ApplyPendingScrollTarget();
 
         // T8.3.1/T8.3.2: recomputes both views' display rows whenever the file being shown changes
         // (switching files reuses this one control instance) or that file's DiffLines changes (an
@@ -133,35 +128,9 @@ public partial class DiffsDetailControl : UserControl
         }
     }
 
-    // T8.4.5: scrolls to the hunk a DiffJumpRequest targeted, if any. Always switches back to
-    // inline first - the side-by-side view has no equivalent index-based scroll target, and jumping
-    // here from a tutorial step/the diff list is common enough that silently landing on the wrong
-    // mode would be confusing.
-    private void ApplyPendingScrollTarget()
-    {
-        if (this.FindAncestorOfType<DiffsView>()?.ViewModel.TakePendingScrollTarget() is { } target)
-        {
-            SideBySideToggle.IsChecked = false;
-            DiffLinesItemsControl.IsVisible = true;
-            SideBySideScrollViewer.IsVisible = false;
-
-            var displayIndex = FindDisplayIndex(target.SourceRangeStart);
-
-            if (displayIndex >= 0)
-            {
-                DiffLinesItemsControl.ScrollIntoView(displayIndex);
-            }
-
-            // T8.3.4: so a subsequent Next/Previous click continues from the hunk just jumped to,
-            // rather than restarting from "haven't navigated to one yet".
-            _currentHunkIndex = FindHunkIndex(target.SourceRangeStart);
-            UpdateChangeNavigationState();
-        }
-    }
-
     // T8.3.4: scrolls the inline view to one of the current file's hunks by index - shared by the
-    // Next/Previous change buttons. Always switches to inline first, same reasoning as
-    // ApplyPendingScrollTarget.
+    // Next/Previous change buttons. Always switches to inline first - the side-by-side view has no
+    // equivalent index-based scroll target.
     private void ScrollToHunk(int hunkIndex)
     {
         if (hunkIndex < 0 || hunkIndex >= _hunks.Count)

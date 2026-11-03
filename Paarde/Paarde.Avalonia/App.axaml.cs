@@ -210,18 +210,13 @@ public partial class App : Application
             // History silently updates a PromptViewModel/TutorialViewModel nobody is looking at.
             services.AddSingleton<AssistantPanelViewModel>();
             services.AddSingleton<TutorialViewModel>();
-            services.AddTransient<TutorialView>();
             services.AddTransient<HistoryViewModel>();
             services.AddTransient<HistoryView>();
             services.AddTransient<ExplorerViewModel>();
             services.AddTransient<ExplorerView>();
             services.AddTransient<TerminalView>();
-            services.AddTransient<DiffsViewModel>();
-            services.AddTransient<DiffsView>();
             services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
-            services.AddTransient<MainViewModel>();
-            services.AddTransient<MainView>();
             services.AddTransient<ShellView>();
             services.AddTransient<ShellViewModel>();
 
@@ -341,11 +336,11 @@ public partial class App : Application
             // it whenever the user first visits them - a no-op if no run has ever been recorded.
             GetService<IRunSessionStore>().RestoreLastSession();
 
-            GetService<INavigationService>().NavigateTo(typeof(MainViewModel).FullName!);
+            GetService<INavigationService>().NavigateTo(typeof(ExplorerViewModel).FullName!);
         }
         catch (Exception ex)
         {
-            GetService<ILogger<App>>().LogError(ex, "Failed to initialize theme/restore the last session/navigate to the main page on startup.");
+            GetService<ILogger<App>>().LogError(ex, "Failed to initialize theme/restore the last session/navigate to the Explorer page on startup.");
         }
     }
 }

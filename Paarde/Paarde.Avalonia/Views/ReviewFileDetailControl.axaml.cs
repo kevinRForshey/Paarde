@@ -45,9 +45,10 @@ public partial class ReviewFileDetailControl : UserControl
         // still null.
         AttachedToVisualTree += (_, _) =>
         {
-            // T10: still looks up TutorialView, exactly as TutorialDetailControl did - T11 retargets
-            // this to ReviewPanelControl once that control is what actually hosts this one.
-            _owner ??= this.FindAncestorOfType<TutorialView>()?.ViewModel;
+            // T18: ReviewPanelControl's DataContext is bound directly to AssistantPanel.Review
+            // (a TutorialViewModel) - unlike TutorialView, there's no .ViewModel property to go
+            // through, so the owner is just that DataContext.
+            _owner ??= this.FindAncestorOfType<ReviewPanelControl>()?.DataContext as TutorialViewModel;
             RebuildSteps();
         };
 
@@ -79,7 +80,7 @@ public partial class ReviewFileDetailControl : UserControl
     // order matching Hunk's order, which RebuildSteps above already guarantees.
     private void ApplyPendingStepTarget()
     {
-        if (this.FindAncestorOfType<TutorialView>()?.ViewModel.TakePendingStepTarget() is not { } target)
+        if ((this.FindAncestorOfType<ReviewPanelControl>()?.DataContext as TutorialViewModel)?.TakePendingStepTarget() is not { } target)
         {
             return;
         }

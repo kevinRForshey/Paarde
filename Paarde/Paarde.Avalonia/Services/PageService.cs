@@ -14,10 +14,7 @@ public class PageService : IPageService
 
     public PageService()
     {
-        Configure<MainViewModel, MainView>();
         Configure<PromptViewModel, PromptView>();
-        Configure<DiffsViewModel, DiffsView>();
-        Configure<TutorialViewModel, TutorialView>();
         Configure<HistoryViewModel, HistoryView>();
         Configure<ExplorerViewModel, ExplorerView>();
         Configure<TerminalViewModel, TerminalView>();

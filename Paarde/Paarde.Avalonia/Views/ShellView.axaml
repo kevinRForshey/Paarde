@@ -50,16 +50,6 @@
                             PaneDisplayMode="LeftCompact"
                             Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
             <ui:NavigationView.MenuItems>
-                <ui:NavigationViewItem Content="Main" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.MainViewModel">
-                    <ui:NavigationViewItem.IconSource>
-                        <ui:SymbolIconSource Symbol="Home" />
-                    </ui:NavigationViewItem.IconSource>
-                </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Prompt" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.PromptViewModel">
-                    <ui:NavigationViewItem.IconSource>
-                        <ui:SymbolIconSource Symbol="Send" />
-                    </ui:NavigationViewItem.IconSource>
-                </ui:NavigationViewItem>
                 <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.ExplorerViewModel">
                     <ui:NavigationViewItem.IconSource>
                         <ui:SymbolIconSource Symbol="Folder" />
@@ -68,16 +58,6 @@
                 <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
                     <ui:NavigationViewItem.IconSource>
                         <ui:SymbolIconSource Symbol="Play" />
-                    </ui:NavigationViewItem.IconSource>
-                </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Diffs" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.DiffsViewModel">
-                    <ui:NavigationViewItem.IconSource>
-                        <ui:SymbolIconSource Symbol="Code" />
-                    </ui:NavigationViewItem.IconSource>
-                </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Tutorial" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TutorialViewModel">
-                    <ui:NavigationViewItem.IconSource>
-                        <ui:SymbolIconSource Symbol="Document" />
                     </ui:NavigationViewItem.IconSource>
                 </ui:NavigationViewItem>
                 <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
