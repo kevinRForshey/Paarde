@@ -1,6 +1,7 @@
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
+using Paarde.Core.Models;
 using Paarde.Core.Services;
 using Paarde.Core.ViewModels;
 
@@ -394,5 +395,91 @@ public class ExplorerViewModelTests : IDisposable
 
         Assert.Equal(2, sut.OpenTabs.Count);
         Assert.Same(tabC, sut.SelectedTab);
+    }
+
+    // Epic 25, T5 (R4): a prompt run adding to IPromptResultStore.Files opens/activates a tab for
+    // each new file, carrying its proposed change along as PendingChange.
+    [Fact]
+    public async Task PromptResultStoreFilesChanged_NewFileAdded_OpensTabWithPendingChange()
+    {
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        var change = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
+
+        _promptResultStore.SetResult("tutorial", [change], _workingDirectory);
+
+        var tab = Assert.Single(sut.OpenTabs);
+        Assert.Same(tab, sut.SelectedTab);
+        Assert.Same(change, tab.PendingChange);
+    }
+
+    // Epic 25, T5: an already-open tab keeps whichever PendingChange it already had rather than
+    // letting a later, unrelated prompt run's change for the same file clobber it.
+    [Fact]
+    public async Task PromptResultStoreFilesChanged_TabAlreadyHasAPendingChange_DoesNotClobberIt()
+    {
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        var firstChange = new ProposedFileChangeViewModel("a.txt", "first proposed", "original");
+        _promptResultStore.SetResult("tutorial", [firstChange], _workingDirectory);
+        var tab = Assert.Single(sut.OpenTabs);
+        var secondChange = new ProposedFileChangeViewModel("a.txt", "second proposed", "original");
+
+        _promptResultStore.SetResult("tutorial", [secondChange], _workingDirectory);
+
+        Assert.Same(tab, Assert.Single(sut.OpenTabs));
+        Assert.Same(firstChange, tab.PendingChange);
+    }
+
+    // Epic 25, T5 (R10): lets the user pick a working directory from the Explorer page itself.
+    [Fact]
+    public async Task OpenFolderCommand_FolderPicked_SavesSettingUpdatesPathAndRefreshesTree()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        _folderPickerService.FolderToReturn = _workingDirectory;
+        var sut = CreateSut();
+
+        await sut.OpenFolderCommand.ExecuteAsync(null);
+
+        Assert.Equal(_workingDirectory, sut.WorkingDirectoryPath);
+        Assert.Equal("a.txt", Assert.Single(sut.Root!.Children).Name);
+        Assert.Equal(_workingDirectory, await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory));
+    }
+
+    [Fact]
+    public async Task OpenFolderCommand_NoFolderPicked_LeavesWorkingDirectoryUnchanged()
+    {
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        _folderPickerService.FolderToReturn = null;
+
+        await sut.OpenFolderCommand.ExecuteAsync(null);
+
+        Assert.Equal(_workingDirectory, sut.WorkingDirectoryPath);
+    }
+
+    // Epic 25, T5 (R7): Review's file list / a step card's "View in Diff" asks to focus a proposed
+    // change - the tab is asked to scroll to the targeted hunk once it's open.
+    [Fact]
+    public async Task ReviewFileFocusRequested_WithHunk_OpensTabAndForwardsScrollRequest()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        var tab = Assert.Single(sut.OpenTabs);
+        var change = new ProposedFileChangeViewModel("a.txt", "proposed", "original");
+        var hunk = new DiffHunk(1, 1, 1, 1, Array.Empty<DiffLine>(), 0, 1);
+        DiffHunk? received = null;
+        tab.ScrollToHunkRequested += h => received = h;
+
+        sut.AssistantPanel.Review.RequestFileFocus(change, hunk);
+
+        Assert.Same(tab, sut.SelectedTab);
+        Assert.Same(hunk, received);
     }
 }

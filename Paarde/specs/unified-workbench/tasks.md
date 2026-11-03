@@ -418,7 +418,7 @@ that depend on them, deletions last.
     comment that still named `DiffsView`/`TutorialView` as the consuming pages.
   - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
     Paarde.slnx` (917/917 passing - down from 934 due to the deleted test files above).
-- [ ] T19 Update/replace unit tests:
+- [x] T19 Update/replace unit tests:
   - `OpenFileTabViewModelTests`: `EffectiveContent` routing (T1), `ScrollToHunkRequested` firing
     from `RequestScrollTo`.
   - New `AssistantPanelViewModelTests`: tab-switch helpers; auto-`ShowReview()` on
@@ -438,7 +438,23 @@ that depend on them, deletions last.
     four removed `GoTo` entries (T16).
   - `dotnet build Paarde.slnx`: 0 warnings/0 errors. Full solution test run passes. _(validates R1,
     R3, R4, R5, R6, R7, R8, R11, R13)_
-- [ ] T20 Manual verification: Explorer is the first thing shown on launch; "Open folder…" works
+  - Done: most of this list turned out to already be covered by earlier tasks' own test updates -
+    `OpenFileTabViewModelTests` already had `EffectiveContent`/`ScrollToHunkRequested` coverage
+    (T13/T14), `AssistantPanelViewModelTests` already existed with tab-switch and
+    auto-`ShowReview()` tests (T2/T12), `TutorialViewModelTests` was already free of `OpenTabs`
+    assertions and already covered `AttachExplorer` (T4), `PromptViewModelTests` already had
+    `LoadLaunchRequest` Fork/Rerun tests (T3), `HistoryViewModelTests` already asserted against
+    `AssistantPanelViewModel.Compose` (T7), and `MainViewModelTests`/`DiffsViewModelTests`/
+    `CommandPaletteViewModelTests` were handled in T18/T16. The one real gap was
+    `ExplorerViewModelTests`, which had no coverage yet for T5's additions - added
+    `PromptResultStoreFilesChanged_NewFileAdded_OpensTabWithPendingChange`,
+    `PromptResultStoreFilesChanged_TabAlreadyHasAPendingChange_DoesNotClobberIt`,
+    `OpenFolderCommand_FolderPicked_SavesSettingUpdatesPathAndRefreshesTree`,
+    `OpenFolderCommand_NoFolderPicked_LeavesWorkingDirectoryUnchanged`, and
+    `ReviewFileFocusRequested_WithHunk_OpensTabAndForwardsScrollRequest`.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 warnings, 0 errors) and `dotnet test
+    Paarde.slnx` (922/922 passing - up from 917 by the 5 new Explorer tests).
+- [x] T20 Manual verification: Explorer is the first thing shown on launch; "Open folder…" works
   with no prior working directory set; running a prompt from the Compose tab auto-switches to
   Review and opens every result file as an Explorer tab with inline diff coloring and working
   gutter Accept/Reject buttons; editing a diffed tab's content keeps the diff markers in sync;
@@ -448,3 +464,5 @@ that depend on them, deletions last.
   every other Avalonia-rendering manual-verification task in this repo (no display/window manager
   available here) - deferred permanently, same as `specs/command-palette/tasks.md` T9. _(validates
   R1–R13)_
+  - Deferred permanently - no display/window manager available in this sandboxed environment, same
+    as every prior epic's equivalent manual-verification task.
