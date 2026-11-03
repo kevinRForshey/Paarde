@@ -3,6 +3,7 @@ using System.Linq;
 
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 
 using Paarde.Avalonia.Contracts.Services;
@@ -116,6 +117,14 @@ public partial class ExplorerFileTabControl : UserControl
             .ToArray();
 
         FlyoutBase.ShowAttachedFlyout(Editor);
+    }
+
+    // specs/unified-workbench T13 (R5): same ancestor lookup GoToDefinitionRequested/
+    // FindReferencesRequested above already use to reach ExplorerViewModel - AssistantPanel lives
+    // there, not on OpenFileTabViewModel, since every tab shares the one docked panel.
+    private void OnOpenInReviewButtonClick(object? sender, RoutedEventArgs e)
+    {
+        this.FindAncestorOfType<ExplorerView>()?.ViewModel?.AssistantPanel.ShowReview();
     }
 
     private void OnReferenceSelected(object? sender, SelectionChangedEventArgs e)

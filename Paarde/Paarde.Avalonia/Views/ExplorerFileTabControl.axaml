@@ -12,7 +12,7 @@
          TabControl.ContentTemplate), same "separate control instance per tab" shape
          TutorialDetailControl already established for TutorialView's tab strip - each instance
          gets its own CodeEditor, rather than one shared editor whose binding path gets swapped. -->
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <!-- UX pass: a real title for this tab's editor, matching TutorialDetailControl's own
              per-file header (icon + full path) instead of leaving the path as tab-strip-only
              tooltip text. -->
@@ -59,18 +59,46 @@
                    Opacity="0.7"
                    IsVisible="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
+        <!-- specs/unified-workbench T13 (R5): this tab is carrying a proposed change from a
+             prompt run - show which file it's for and a shortcut into the Assistant panel's
+             Review tab, since the editor below is now editing that proposal (EffectiveContent)
+             rather than the file's plain Content. -->
+        <Border Grid.Row="3"
+                Margin="0,0,0,4"
+                Padding="8,4"
+                CornerRadius="4"
+                Background="{DynamicResource SystemAccentColor}"
+                Opacity="0.15"
+                IsVisible="{Binding PendingChange, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ui:SymbolIcon Symbol="Edit" VerticalAlignment="Center" />
+                <TextBlock VerticalAlignment="Center"
+                           Text="{Binding PendingChange.FilePath, StringFormat='Proposed change for {0}'}" />
+                <Button Name="OpenInReviewButton"
+                        Content="Open in Review"
+                        Click="OnOpenInReviewButtonClick"
+                        ToolTip.Tip="Switch the Assistant panel to Review for this file." />
+            </StackPanel>
+        </Border>
+
         <!-- T10.2.1: editable - BindableText is TwoWay by default (T2.2.2), so edits flow straight
              back into Content, where OnContentChanged derives IsDirty. -->
         <!-- Epic 17, T17.1.2/T17.1.3: Diagnostics feeds the underline renderer/hover tooltip;
              GoToDefinitionRequested/FindReferencesRequested (F12/Shift+F12) and the references
              flyout below are wired up in ExplorerFileTabControl.axaml.cs. -->
+        <!-- Epic 25, T13 (R5): EffectiveContent routes through PendingChange.EditedContent when
+             there is one (same editing buffer Review's own ReviewFileDetailControl uses), so an
+             edit made here and one made there stay in sync; DiffLines/DiffHunks are null on a
+             plain tab, where CodeEditor already treats that as "no diff gutter to draw". -->
         <controls:CodeEditor Name="Editor"
-                              Grid.Row="3"
-                              helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"
+                              Grid.Row="4"
+                              helpers:TextEditorExtensions.BindableText="{Binding EffectiveContent, Mode=TwoWay}"
                               FilePath="{Binding FilePath}"
                               GhostTextSuggestion="{Binding GhostTextSuggestion}"
                               CompletionItems="{Binding CompletionItems}"
                               Diagnostics="{Binding Diagnostics}"
+                              DiffLines="{Binding PendingChange.DiffLines}"
+                              DiffHunks="{Binding PendingChange.DiffHunks}"
                               IsReadOnly="False"
                               HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Auto">
@@ -84,7 +112,7 @@
         <!-- T10.1.4: collapsed until there's something to show, so the editor keeps its full
              height while browsing and only gives up space once an explanation has actually been
              requested. -->
-        <Expander Grid.Row="4"
+        <Expander Grid.Row="5"
                    Margin="0,8,0,0"
                    Header="Overview"
                    IsExpanded="True"

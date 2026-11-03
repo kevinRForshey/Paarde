@@ -299,11 +299,23 @@ that depend on them, deletions last.
   - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
     Paarde.slnx` (934/934 passing - no existing test exercises `ExplorerView`'s XAML/code-behind
     directly, so the new column/control/handlers don't change any test outcome).
-- [ ] T13 `ExplorerFileTabControl.axaml`: change
+- [x] T13 `ExplorerFileTabControl.axaml`: change
   `helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"` to
   `="{Binding EffectiveContent, Mode=TwoWay}"`; add `DiffLines="{Binding PendingChange.DiffLines}"`
   and `DiffHunks="{Binding PendingChange.DiffHunks}"`; add the `PendingChange`-gated row (file path
   + "Open in Review" button switching `AssistantPanel.SelectedTabIndex`) per design.md #6. _(R5)_
+  - Done: `Editor`'s `BindableText`/`DiffLines`/`DiffHunks` bindings changed exactly as specified.
+    Added a `Border` row (gated on `PendingChange` via `ObjectConverters.IsNotNull`, same convention
+    `ExplorerView.axaml`'s toolbar toggle already uses) showing `PendingChange.FilePath` and an
+    "Open in Review" button. The button's `Click` handler lives in `ExplorerFileTabControl.axaml.cs`
+    (`OnOpenInReviewButtonClick`) rather than a command on `OpenFileTabViewModel`, since
+    `AssistantPanel` lives on `ExplorerViewModel` - it reuses the same
+    `this.FindAncestorOfType<ExplorerView>()?.ViewModel` lookup `GoToDefinitionRequested`/
+    `FindReferencesRequested` already use, and calls `AssistantPanel.ShowReview()` (sets
+    `SelectedTabIndex` to 1) rather than setting the index directly, since that's the public API
+    `AssistantPanelViewModel` already exposes for it.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing).
 - [ ] T14 `ExplorerFileTabControl.axaml.cs`: wire `Editor.DiffHunkActionRequested` to
   `ViewModel.PendingChange?.SetDiffHunkSelection(...)` (same handler shape
   `TutorialDetailControl.axaml.cs` already has) and `ViewModel.ScrollToHunkRequested` to scroll the
