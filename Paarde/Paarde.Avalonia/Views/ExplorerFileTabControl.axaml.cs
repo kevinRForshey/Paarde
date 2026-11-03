@@ -22,6 +22,13 @@ public partial class ExplorerFileTabControl : UserControl
         public override string ToString() => DisplayText;
     }
 
+    // specs/unified-workbench T14 (R5/R7): one ExplorerFileTabControl instance per open tab
+    // (Epic 23, T23.1.1), but DataContext is still assigned by the TabControl.ContentTemplate
+    // after this constructor runs - tracked here so ScrollToHunkRequested can be unsubscribed if
+    // DataContext is ever reassigned, same caution TutorialDetailControl takes with its own owner
+    // reference even though it's likewise expected to be set once.
+    private OpenFileTabViewModel? _viewModel;
+
     public ExplorerFileTabControl()
     {
         InitializeComponent();
@@ -31,6 +38,17 @@ public partial class ExplorerFileTabControl : UserControl
         // "apply once this control is attached to the visual tree" shape
         // TutorialDetailControl.ApplyPendingStepTarget already needs for its own cross-file jumps.
         Loaded += (_, _) => ApplyPendingCaretTarget();
+
+        // specs/unified-workbench T14 (R7): mirrors TutorialDetailControl.ApplyPendingStepTarget's
+        // jump-to-target feature, adapted from an ItemsControl row index (DiffsDetailControl's
+        // ScrollToHunk) to CodeEditor's own caret API, since this editor shows the file as running
+        // text rather than a row-per-DiffLine list.
+        DataContextChanged += OnDataContextChanged;
+
+        // T13.1.3/T13.2.2 (same handler shape as TutorialDetailControl.OnDiffHunkActionRequested):
+        // the gutter's Accept/Reject buttons forward into PendingChange's own hunk selection -
+        // there's nothing to do on a plain tab with no PendingChange.
+        Editor.DiffHunkActionRequested += OnDiffHunkActionRequested;
 
         // Epic 15: Editor itself has no ILlmRunner - this control's DataContext
         // (OpenFileTabViewModel) owns the ghost-text/completion round trip directly now, since
@@ -160,6 +178,57 @@ public partial class ExplorerFileTabControl : UserControl
         catch (ArgumentOutOfRangeException)
         {
             // Stale position from a file that's since changed on disk - nothing sensible to do but skip it.
+        }
+    }
+
+    // specs/unified-workbench T14 (R5): forwards the gutter's Accept/Reject into the same
+    // PendingChange.SetDiffHunkSelection selection model the step-card checkboxes in Review drive,
+    // so accepting/rejecting from either place stays in sync.
+    private void OnDiffHunkActionRequested(object? sender, DiffHunkAcceptRejectEventArgs e)
+    {
+        if (DataContext is OpenFileTabViewModel tab)
+        {
+            tab.PendingChange?.SetDiffHunkSelection(e.Hunk, e.Accept);
+        }
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_viewModel is not null)
+        {
+            _viewModel.ScrollToHunkRequested -= OnScrollToHunkRequested;
+        }
+
+        _viewModel = DataContext as OpenFileTabViewModel;
+
+        if (_viewModel is not null)
+        {
+            _viewModel.ScrollToHunkRequested += OnScrollToHunkRequested;
+        }
+    }
+
+    // specs/unified-workbench T14 (R7): DiffHunkGutterMargin.RebuildEntries already establishes
+    // "ProposedStartLine, clamped to at least 1" as this editor's line-number convention for a
+    // hunk (it can be a 0-based insertion point per DiffHunk's own doc comment) - reused here
+    // rather than introducing a second interpretation of the same field.
+    private void OnScrollToHunkRequested(DiffHunk hunk)
+    {
+        if (Editor.Document is null)
+        {
+            return;
+        }
+
+        var anchorLine = Math.Min(Math.Max(hunk.ProposedStartLine, 1), Editor.Document.LineCount);
+
+        try
+        {
+            var offset = Editor.Document.GetOffset(anchorLine, 1);
+            Editor.CaretOffset = Math.Clamp(offset, 0, Editor.Document.TextLength);
+            Editor.TextArea.Caret.BringCaretToView();
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // Stale hunk from a file that's since changed - nothing sensible to do but skip it.
         }
     }
 }

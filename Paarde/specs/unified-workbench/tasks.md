@@ -316,11 +316,22 @@ that depend on them, deletions last.
     `AssistantPanelViewModel` already exposes for it.
   - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
     Paarde.slnx` (934/934 passing).
-- [ ] T14 `ExplorerFileTabControl.axaml.cs`: wire `Editor.DiffHunkActionRequested` to
+- [x] T14 `ExplorerFileTabControl.axaml.cs`: wire `Editor.DiffHunkActionRequested` to
   `ViewModel.PendingChange?.SetDiffHunkSelection(...)` (same handler shape
   `TutorialDetailControl.axaml.cs` already has) and `ViewModel.ScrollToHunkRequested` to scroll the
   `CodeEditor` to the hunk's position (adapt `DiffsDetailControl.axaml.cs`'s `ScrollToHunk`
   approach from an `ItemsControl` row index to `CodeEditor`'s own scroll/caret API). _(R5, R7)_
+  - Done: `OnDiffHunkActionRequested` matches `TutorialDetailControl`'s shape exactly, just gated on
+    `tab.PendingChange?.` since a plain tab has none. `ScrollToHunkRequested` is subscribed/
+    unsubscribed via a new `DataContextChanged` handler (tracking the current `OpenFileTabViewModel`
+    in a field) rather than in the constructor, since DataContext isn't assigned until the
+    `TabControl.ContentTemplate` applies it after construction. The scroll target reuses
+    `DiffHunkGutterMargin.RebuildEntries`'s own `Math.Max(hunk.ProposedStartLine, 1)` convention for
+    resolving a hunk to an editor line number (clamped to `Document.LineCount` too, for a hunk
+    that's since gone stale), then positions the caret via `Document.GetOffset`/`BringCaretToView`,
+    the same pair `ApplyPendingCaretTarget` already uses for its own cross-file jumps.
+  - Verified with a from-scratch `dotnet build Paarde.slnx` (0 errors) and `dotnet test
+    Paarde.slnx` (934/934 passing).
 - [ ] T15 `WorkspaceLayoutSettingsKeys`: add `ExplorerAssistantPanelWidth`; remove
   `DiffsFileListWidth`/`TutorialFileListWidth`. _(R12)_
 - [ ] T16 `ShellView.axaml`: remove the Main, Prompt, Diffs, Tutorial `NavigationViewItem`s from
