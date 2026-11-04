@@ -5,6 +5,8 @@
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
+             xmlns:models="using:Paarde.Core.Models"
+             xmlns:views="using:Paarde.Avalonia.Views"
              x:Class="Paarde.Avalonia.Views.ExplorerFileTabControl"
              x:DataType="vm:OpenFileTabViewModel">
 
@@ -90,24 +92,55 @@
              there is one (same editing buffer Review's own ReviewFileDetailControl uses), so an
              edit made here and one made there stay in sync; DiffLines/DiffHunks are null on a
              plain tab, where CodeEditor already treats that as "no diff gutter to draw". -->
-        <controls:CodeEditor Name="Editor"
-                              Grid.Row="4"
-                              helpers:TextEditorExtensions.BindableText="{Binding EffectiveContent, Mode=TwoWay}"
-                              FilePath="{Binding FilePath}"
-                              GhostTextSuggestion="{Binding GhostTextSuggestion}"
-                              CompletionItems="{Binding CompletionItems}"
-                              Diagnostics="{Binding Diagnostics}"
-                              DiffLines="{Binding PendingChange.DiffLines}"
-                              DiffHunks="{Binding PendingChange.DiffHunks}"
-                              IsReadOnly="False"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto">
-            <FlyoutBase.AttachedFlyout>
-                <Flyout Placement="Bottom">
-                    <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
-                </Flyout>
-            </FlyoutBase.AttachedFlyout>
-        </controls:CodeEditor>
+        <!-- specs/editor-intelligence R4: collapsible outline panel bound to the editor's
+             DocumentSymbols root - same ResizablePaneHelper + "drag shut to collapse" convention
+             ExplorerView.axaml's own TreeSplitter already established, persisted separately via
+             OutlinePanelWidth so it doesn't collide with that pane's width. -->
+        <Grid Name="OutlinePanelGrid" Grid.Row="4" ColumnDefinitions="Auto,Auto,*">
+            <TreeView Name="OutlineTreeView"
+                      Grid.Column="0"
+                      ItemsSource="{Binding DocumentSymbols.Children}"
+                      SelectionChanged="OnOutlineSymbolSelected">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate DataType="models:LspDocumentSymbol" ItemsSource="{Binding Children}">
+                        <TextBlock Text="{Binding Name}" />
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+
+            <GridSplitter Grid.Column="1" Name="OutlineSplitter" Width="4" ResizeDirection="Columns" />
+
+            <!-- specs/editor-intelligence R5: breadcrumb bar above CodeEditor, bound to the same
+                 DocumentSymbols as the outline panel plus the editor's own live CaretPosition. -->
+            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+                <views:BreadcrumbBar Grid.Row="0"
+                                      Margin="0,0,0,4"
+                                      DocumentSymbols="{Binding DocumentSymbols}"
+                                      CaretPosition="{Binding #Editor.CaretPosition}"
+                                      SegmentClicked="OnBreadcrumbSegmentClicked" />
+
+                <controls:CodeEditor Name="Editor"
+                                      Grid.Row="1"
+                                      helpers:TextEditorExtensions.BindableText="{Binding EffectiveContent, Mode=TwoWay}"
+                                      FilePath="{Binding FilePath}"
+                                      GhostTextSuggestion="{Binding GhostTextSuggestion}"
+                                      CompletionItems="{Binding CompletionItems}"
+                                      Diagnostics="{Binding Diagnostics}"
+                                      DocumentSymbols="{Binding DocumentSymbols}"
+                                      HoverSuggestion="{Binding HoverSuggestion}"
+                                      DiffLines="{Binding PendingChange.DiffLines}"
+                                      DiffHunks="{Binding PendingChange.DiffHunks}"
+                                      IsReadOnly="False"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                    <FlyoutBase.AttachedFlyout>
+                        <Flyout Placement="Bottom">
+                            <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
+                        </Flyout>
+                    </FlyoutBase.AttachedFlyout>
+                </controls:CodeEditor>
+            </Grid>
+        </Grid>
 
         <!-- T10.1.4: collapsed until there's something to show, so the editor keeps its full
              height while browsing and only gives up space once an explanation has actually been

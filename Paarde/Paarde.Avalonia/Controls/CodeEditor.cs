@@ -47,6 +47,14 @@ public sealed class CompletionRequestedEventArgs(LspPosition position) : EventAr
     public LspPosition Position { get; } = position;
 }
 
+// specs/editor-intelligence R6: raised after the pointer settles over a position with no
+// diagnostic (diagnostics win ties - see OnPointerMovedForHover), carrying just where to ask
+// GetHoverAsync about.
+public sealed class HoverRequestedEventArgs(LspPosition position) : EventArgs
+{
+    public LspPosition Position { get; } = position;
+}
+
 // Thin wrapper around AvaloniaEdit's TextEditor that wires up the three things a code viewer
 // needs out of the box: line numbers, TextMate syntax highlighting picked from the bound file
 // path's extension, and bracket matching (which AvaloniaEdit doesn't provide itself). Two-way
@@ -92,6 +100,19 @@ public class CodeEditor : TextEditor
     public static readonly StyledProperty<LspPosition?> CaretPositionProperty =
         AvaloniaProperty.Register<CodeEditor, LspPosition?>(nameof(CaretPosition));
 
+    // specs/editor-intelligence R3: set by the host ViewModel after a DocumentSymbolsRequested
+    // round trip returns; a single synthetic root (design.md #3), not a list - the outline
+    // TreeView/breadcrumb bar (T4/T5) both bind to this directly.
+    public static readonly StyledProperty<LspDocumentSymbol?> DocumentSymbolsProperty =
+        AvaloniaProperty.Register<CodeEditor, LspDocumentSymbol?>(nameof(DocumentSymbols));
+
+    // specs/editor-intelligence R6: set by the host ViewModel once a HoverRequested round trip
+    // returns; null means "nothing to show" (LspHover's own doc comment), not an error. Same
+    // staleness rule GhostTextSuggestion/CompletionItems already use - OnHoverSuggestionChanged
+    // drops it if the pointer has since moved off the position it was requested for.
+    public static readonly StyledProperty<LspHover?> HoverSuggestionProperty =
+        AvaloniaProperty.Register<CodeEditor, LspHover?>(nameof(HoverSuggestion));
+
     private readonly TextMate.Installation _textMateInstallation;
     private readonly BracketHighlightRenderer _bracketHighlightRenderer;
     private readonly DiffBackgroundRenderer _diffBackgroundRenderer;
@@ -99,9 +120,21 @@ public class CodeEditor : TextEditor
     private readonly DiagnosticsRenderer _diagnosticsRenderer;
     private LspDiagnostic? _shownDiagnosticTooltip;
 
+    // specs/editor-intelligence R6: reuses GhostTextDebouncer's class/delay rather than a third
+    // timer - driven by the same _ghostTextTimer tick as _documentSymbolsDebouncer above.
+    // _currentHoverOffset is -1 whenever the pointer isn't currently over any text offset
+    // (outside the editor, or a diagnostic is showing instead); _pendingHoverRequestOffset is
+    // whichever offset HoverRequested was last raised for, compared against _currentHoverOffset in
+    // OnHoverSuggestionChanged to drop a stale answer if the pointer has since moved on.
+    private readonly GhostTextDebouncer _hoverDebouncer = new(TimeSpan.FromMilliseconds(400));
+    private LspHover? _shownHoverSuggestion;
+    private int _currentHoverOffset = -1;
+    private int _pendingHoverRequestOffset = -1;
+
     private readonly GhostTextRenderer _ghostTextRenderer;
     private readonly GhostTextSuggestionState _ghostTextSuggestionState = new();
     private readonly GhostTextDebouncer _ghostTextDebouncer = new(TimeSpan.FromMilliseconds(400));
+    private readonly GhostTextDebouncer _documentSymbolsDebouncer = new(TimeSpan.FromMilliseconds(400));
     private readonly DispatcherTimer _ghostTextTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private bool _isApplyingGhostTextSuggestion;
     private int _pendingGhostTextRequestOffset = -1;
@@ -160,6 +193,18 @@ public class CodeEditor : TextEditor
         private set => SetValue(CaretPositionProperty, value);
     }
 
+    public LspDocumentSymbol? DocumentSymbols
+    {
+        get => GetValue(DocumentSymbolsProperty);
+        set => SetValue(DocumentSymbolsProperty, value);
+    }
+
+    public LspHover? HoverSuggestion
+    {
+        get => GetValue(HoverSuggestionProperty);
+        set => SetValue(HoverSuggestionProperty, value);
+    }
+
     // T13.1.3: raised when the gutter's Accept/Reject button for a hunk is clicked; the host
     // (TutorialDetailControl) is the one that knows which ProposedFileChangeViewModel owns that
     // hunk's selection, so this control just forwards which DiffHunk and which action.
@@ -185,14 +230,28 @@ public class CodeEditor : TextEditor
     // this codebase never reach into DI directly - only Views' code-behind does).
     public event EventHandler<CompletionRequestedEventArgs>? CompletionRequested;
 
+    // specs/editor-intelligence R3: raised once when FilePath is first set (a fresh tab's initial
+    // load) and again after every settled edit (same 400ms debounce window as GhostTextRequested,
+    // reusing GhostTextDebouncer rather than a second timer). No payload - the host ViewModel
+    // already knows which file this editor is showing.
+    public event EventHandler? DocumentSymbolsRequested;
+
+    // specs/editor-intelligence R6: the host ViewModel is the one that knows how to ask
+    // ILanguageServerSessionManager.GetHoverAsync and sets the answer back via HoverSuggestion -
+    // same "control forwards where the pointer was, host decides what to ask" split every other
+    // request-response event on this control already uses.
+    public event EventHandler<HoverRequestedEventArgs>? HoverRequested;
+
     static CodeEditor()
     {
         FilePathProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.ApplyGrammarForFilePath());
+        FilePathProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.DocumentSymbolsRequested?.Invoke(editor, EventArgs.Empty));
         DiffLinesProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor._diffBackgroundRenderer.UpdateDiffLines(editor.DiffLines));
         DiffHunksProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor._diffHunkGutterMargin.UpdateHunks(editor.DiffHunks));
         GhostTextSuggestionProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.OnGhostTextSuggestionChanged());
         DiagnosticsProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor._diagnosticsRenderer.UpdateDiagnostics(editor.Diagnostics));
         CompletionItemsProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.OnCompletionItemsChanged());
+        HoverSuggestionProperty.Changed.AddClassHandler<CodeEditor>((editor, _) => editor.OnHoverSuggestionChanged());
     }
 
     public CodeEditor()
@@ -222,13 +281,24 @@ public class CodeEditor : TextEditor
         TextArea.LeftMargins.Add(_diffHunkGutterMargin);
 
         _ghostTextRenderer = new GhostTextRenderer(TextArea.TextView);
-        _ghostTextTimer.Tick += (_, _) => OnGhostTextTimerTick();
+        _ghostTextTimer.Tick += (_, _) =>
+        {
+            OnDocumentSymbolsTimerTick();
+            OnHoverTimerTick();
+            OnGhostTextTimerTick();
+        };
         _ghostTextTimer.Start();
         TextChanged += (_, _) => OnCodeEditorTextChanged();
 
         _diagnosticsRenderer = new DiagnosticsRenderer(TextArea.TextView);
-        PointerMoved += OnPointerMovedForDiagnostics;
-        PointerExited += (_, _) => HideDiagnosticTooltip();
+        PointerMoved += OnPointerMovedForHover;
+        PointerExited += (_, _) =>
+        {
+            HideDiagnosticTooltip();
+            HideHoverTooltip();
+            _hoverDebouncer.Cancel();
+            _currentHoverOffset = -1;
+        };
         KeyDown += OnCodeEditorKeyDownForNavigation;
 
         // specs/editor-autocomplete, R1.1: TextEntered fires once per inserted character, after
@@ -280,6 +350,15 @@ public class CodeEditor : TextEditor
 
         DismissGhostTextSuggestion();
         _ghostTextDebouncer.NotifyInput(DateTimeOffset.UtcNow);
+        _documentSymbolsDebouncer.NotifyInput(DateTimeOffset.UtcNow);
+    }
+
+    private void OnDocumentSymbolsTimerTick()
+    {
+        if (_documentSymbolsDebouncer.ShouldFire(DateTimeOffset.UtcNow))
+        {
+            DocumentSymbolsRequested?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private void OnGhostTextTimerTick()
@@ -451,22 +530,44 @@ public class CodeEditor : TextEditor
     // Epic 17, T17.1.2: GetPositionFromPoint (inherited from TextEditor) already translates a
     // point relative to this control into document coordinates, scroll offset included - no manual
     // ScrollOffset adjustment needed here.
-    private void OnPointerMovedForDiagnostics(object? sender, PointerEventArgs e)
+    // specs/editor-intelligence R6: a diagnostic at the hovered position always wins over hover
+    // text (DiagnosticsRenderer doesn't itself hook TextView.PointerHovered - this handler is the
+    // one place both tooltip sources are reconciled).
+    private void OnPointerMovedForHover(object? sender, PointerEventArgs e)
     {
         if (Document is null || GetPositionFromPoint(e.GetPosition(this)) is not { } position)
         {
             HideDiagnosticTooltip();
+            HideHoverTooltip();
+            _hoverDebouncer.Cancel();
+            _currentHoverOffset = -1;
             return;
         }
 
         var offset = Document.GetOffset(position.Location);
         var diagnostic = _diagnosticsRenderer.FindAt(Document, offset);
-        if (diagnostic is null)
+        if (diagnostic is not null)
         {
-            HideDiagnosticTooltip();
+            HideHoverTooltip();
+            _hoverDebouncer.Cancel();
+            _currentHoverOffset = -1;
+            ShowDiagnosticTooltip(diagnostic);
             return;
         }
 
+        HideDiagnosticTooltip();
+
+        if (offset != _currentHoverOffset)
+        {
+            // The previously-shown hover tooltip (if any) belonged to the old position.
+            HideHoverTooltip();
+            _currentHoverOffset = offset;
+            _hoverDebouncer.NotifyInput(DateTimeOffset.UtcNow);
+        }
+    }
+
+    private void ShowDiagnosticTooltip(LspDiagnostic diagnostic)
+    {
         if (diagnostic.Equals(_shownDiagnosticTooltip))
         {
             return;
@@ -490,6 +591,60 @@ public class CodeEditor : TextEditor
         }
 
         _shownDiagnosticTooltip = null;
+        ToolTip.SetIsOpen(this, false);
+    }
+
+    private void OnHoverTimerTick()
+    {
+        if (!_hoverDebouncer.ShouldFire(DateTimeOffset.UtcNow))
+        {
+            return;
+        }
+
+        if (Document is null || HoverRequested is null || _currentHoverOffset < 0)
+        {
+            return;
+        }
+
+        _pendingHoverRequestOffset = _currentHoverOffset;
+        HoverRequested.Invoke(this, new HoverRequestedEventArgs(ToLspPosition(_currentHoverOffset)));
+    }
+
+    // Mirrors OnGhostTextSuggestionChanged's/OnCompletionItemsChanged's staleness check: the round
+    // trip to the host is async, so the pointer may have moved on by the time HoverSuggestion
+    // actually arrives.
+    private void OnHoverSuggestionChanged()
+    {
+        if (HoverSuggestion is not { } hover || _pendingHoverRequestOffset != _currentHoverOffset)
+        {
+            return;
+        }
+
+        ShowHoverTooltip(hover);
+    }
+
+    private void ShowHoverTooltip(LspHover hover)
+    {
+        if (hover.Equals(_shownHoverSuggestion))
+        {
+            return;
+        }
+
+        _shownHoverSuggestion = hover;
+
+        ToolTip.SetIsOpen(this, false);
+        ToolTip.SetTip(this, hover.Contents);
+        ToolTip.SetIsOpen(this, true);
+    }
+
+    private void HideHoverTooltip()
+    {
+        if (_shownHoverSuggestion is null)
+        {
+            return;
+        }
+
+        _shownHoverSuggestion = null;
         ToolTip.SetIsOpen(this, false);
     }
 

@@ -5,6 +5,7 @@
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
+             xmlns:models="using:Paarde.Core.Models"
              x:Class="Paarde.Avalonia.Views.ShellView"
              x:DataType="vm:ShellViewModel">
 
@@ -130,6 +131,43 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:PaletteCommand">
                                 <TextBlock Text="{Binding Name}" IsEnabled="{Binding IsEnabled}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- specs/editor-intelligence R7: Go to Symbol in File - same shape as QuickOpenPopup/
+             CommandPalettePopup above, reachable via Ctrl+Shift+O regardless of the currently
+             navigated page. -->
+        <Popup Name="SymbolQuickPickPopup"
+               Grid.Row="1"
+               PlacementTarget="NavigationFrame"
+               Placement="Center"
+               IsLightDismissEnabled="True"
+               DataContext="{Binding SymbolQuickPickViewModel}"
+               IsOpen="{Binding IsOpen}">
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    MinWidth="420">
+                <StackPanel Spacing="4">
+                    <TextBox Name="SymbolQuickPickQueryBox"
+                             Text="{Binding Query}"
+                             Watermark="Go to symbol..."
+                             KeyDown="OnSymbolQuickPickQueryBoxKeyDown" />
+                    <TextBlock Text="{Binding EmptyStateMessage}"
+                               IsVisible="{Binding EmptyStateMessage, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                    <ListBox Name="SymbolQuickPickResultsList"
+                             MaxHeight="240"
+                             ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedResult}"
+                             DoubleTapped="OnSymbolQuickPickResultDoubleTapped">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:LspDocumentSymbol">
+                                <TextBlock Text="{Binding Name}" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

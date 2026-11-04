@@ -45,4 +45,13 @@ public interface ILanguageServerClient
     // whatever order the server returned (no client-side re-sorting) - CompletionWindow (R3.1)
     // does its own filtering/ordering as the user keeps typing.
     Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
+
+    // specs/editor-intelligence R1: textDocument/documentSymbol - null means the server returned
+    // nothing (unsupported, or a parse the client couldn't make sense of), not an empty-but-valid
+    // outline; see LspDocumentSymbol's own remark on the synthetic-root shape.
+    Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default);
+
+    // specs/editor-intelligence R2: textDocument/hover - null means no hover text applies at this
+    // position (the documented "nothing to show" case, not an error).
+    Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 }

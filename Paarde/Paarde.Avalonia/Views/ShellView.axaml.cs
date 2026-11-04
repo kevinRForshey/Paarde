@@ -81,6 +81,7 @@ public partial class ShellView : UserControl
         // Ctrl+P/Ctrl+Shift+P KeyBinding would leave focus wherever it already was.
         ViewModel.QuickOpenViewModel.PropertyChanged += OnQuickOpenViewModelPropertyChanged;
         ViewModel.CommandPaletteViewModel.PropertyChanged += OnCommandPaletteViewModelPropertyChanged;
+        ViewModel.SymbolQuickPickViewModel.PropertyChanged += OnSymbolQuickPickViewModelPropertyChanged;
 
         AttachedToVisualTree += OnAttachedToVisualTree;
 
@@ -140,6 +141,14 @@ public partial class ShellView : UserControl
             Gesture = new KeyGesture(Key.P, KeyModifiers.Control | KeyModifiers.Shift),
             Command = ViewModel.CommandPaletteViewModel.OpenCommand,
         });
+
+        // specs/editor-intelligence R7: Ctrl+Shift+O, the same keybind VS Code itself uses for Go
+        // to Symbol in File.
+        window.KeyBindings.Add(new KeyBinding
+        {
+            Gesture = new KeyGesture(Key.O, KeyModifiers.Control | KeyModifiers.Shift),
+            Command = ViewModel.SymbolQuickPickViewModel.OpenCommand,
+        });
     }
 
     private void OnQuickOpenViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -155,6 +164,14 @@ public partial class ShellView : UserControl
         if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && ViewModel.CommandPaletteViewModel.IsOpen)
         {
             Dispatcher.UIThread.Post(() => CommandPaletteQueryBox.Focus());
+        }
+    }
+
+    private void OnSymbolQuickPickViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SymbolQuickPickViewModel.IsOpen) && ViewModel.SymbolQuickPickViewModel.IsOpen)
+        {
+            Dispatcher.UIThread.Post(() => SymbolQuickPickQueryBox.Focus());
         }
     }
 
@@ -218,6 +235,35 @@ public partial class ShellView : UserControl
 
     private void OnCommandPaletteResultDoubleTapped(object? sender, TappedEventArgs e) =>
         ViewModel.CommandPaletteViewModel.ExecuteSelectedCommand.Execute(null);
+
+    private void OnSymbolQuickPickQueryBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Escape:
+                ViewModel.SymbolQuickPickViewModel.CloseCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                ViewModel.SymbolQuickPickViewModel.ActivateSelectedCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Down:
+                MoveListBoxSelection(SymbolQuickPickResultsList, 1);
+                e.Handled = true;
+                break;
+
+            case Key.Up:
+                MoveListBoxSelection(SymbolQuickPickResultsList, -1);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnSymbolQuickPickResultDoubleTapped(object? sender, TappedEventArgs e) =>
+        ViewModel.SymbolQuickPickViewModel.ActivateSelectedCommand.Execute(null);
 
     private static void MoveListBoxSelection(ListBox listBox, int delta)
     {

@@ -149,6 +149,12 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
     public Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
         TryGetClient(filePath, out var client) ? client.GetCompletionAsync(filePath, position, cancellationToken) : Task.FromResult<IReadOnlyList<LspCompletionItem>>([]);
 
+    public Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default) =>
+        TryGetClient(filePath, out var client) ? client.GetDocumentSymbolsAsync(filePath, cancellationToken) : Task.FromResult<LspDocumentSymbol?>(null);
+
+    public Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
+        TryGetClient(filePath, out var client) ? client.GetHoverAsync(filePath, position, cancellationToken) : Task.FromResult<LspHover?>(null);
+
     // R2.2/R2.3: no client registered for the file's resolved server group (unmapped extension, or
     // mapped but that language's server never started) is the documented no-op path, not an error.
     private bool TryGetClient(string filePath, out ILanguageServerClient client)

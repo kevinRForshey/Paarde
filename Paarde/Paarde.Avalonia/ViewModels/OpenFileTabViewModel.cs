@@ -60,6 +60,12 @@ public partial class OpenFileTabViewModel : ObservableObject
     private IReadOnlyList<LspCompletionItem>? completionItems;
 
     [ObservableProperty]
+    private LspDocumentSymbol? documentSymbols;
+
+    [ObservableProperty]
+    private LspHover? hoverSuggestion;
+
+    [ObservableProperty]
     private ProposedFileChangeViewModel? pendingChange;
 
     // Raised by TutorialStepViewModel's "View in Diff" action (via TutorialViewModel.FileFocusRequested)
@@ -266,6 +272,37 @@ public partial class OpenFileTabViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Completion request failed for {FilePath}.", FilePath);
+        }
+    }
+
+    // specs/editor-intelligence R3: raised by CodeEditor.DocumentSymbolsRequested on file open and
+    // after every settled edit (its own 400ms debounce) - same round-trip shape RequestCompletionAsync
+    // above already uses.
+    public async Task RequestDocumentSymbolsAsync()
+    {
+        try
+        {
+            DocumentSymbols = await _languageServerSessionManager.GetDocumentSymbolsAsync(FilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Document symbols request failed for {FilePath}.", FilePath);
+        }
+    }
+
+    // specs/editor-intelligence R6: raised by CodeEditor.HoverRequested once its own pointer-hover
+    // debounce settles - same round-trip shape RequestCompletionAsync above already uses.
+    public async Task RequestHoverAsync(LspPosition position)
+    {
+        try
+        {
+            var hover = await _languageServerSessionManager.GetHoverAsync(FilePath, position);
+            HoverSuggestion = null;
+            HoverSuggestion = hover;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Hover request failed for {FilePath}.", FilePath);
         }
     }
 }

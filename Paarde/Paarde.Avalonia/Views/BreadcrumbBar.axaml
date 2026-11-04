@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="using:Paarde.Core.Models"
+             xmlns:views="using:Paarde.Avalonia.Views"
+             x:Class="Paarde.Avalonia.Views.BreadcrumbBar"
+             x:Name="Root">
+
+    <!-- specs/editor-intelligence R5: Segments (computed in code-behind from DocumentSymbols +
+         CaretPosition via BreadcrumbPathBuilder.Build) is this control's own property, not a
+         ViewModel's - bound via ElementName rather than overriding DataContext, so DocumentSymbols/
+         CaretPosition (set on this control from the host's markup) still resolve against the
+         inherited host ViewModel instead of this control itself. -->
+    <ItemsControl ItemsSource="{Binding #Root.Segments}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="4" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="models:LspDocumentSymbol">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Content="{Binding Name}" Tag="{Binding}" Click="OnSegmentButtonClick" Padding="4,0" />
+                    <TextBlock Text="›" Opacity="0.5" VerticalAlignment="Center" />
+                </StackPanel>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

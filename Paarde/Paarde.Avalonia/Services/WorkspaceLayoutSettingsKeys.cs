@@ -14,4 +14,8 @@ public static class WorkspaceLayoutSettingsKeys
     public const string ReviewFileListWidth = "Layout.Review.FileListWidth";
     public const string HistorySessionListWidth = "Layout.History.SessionListWidth";
     public const string HistoryFileListWidth = "Layout.History.FileListWidth";
+
+    // specs/editor-intelligence R4: the outline panel's width on each ExplorerFileTabControl -
+    // shared by every open tab, same as every other pane width above.
+    public const string OutlinePanelWidth = "Layout.Explorer.OutlinePanelWidth";
 }

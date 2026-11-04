@@ -191,6 +191,10 @@ public partial class App : Application
             // page navigation.
             services.AddSingleton<QuickOpenViewModel>();
             services.AddSingleton<CommandPaletteViewModel>();
+
+            // specs/editor-intelligence R7: Go to Symbol in File - same "reachable from anywhere
+            // via a global KeyBinding" reason as the two singletons above.
+            services.AddSingleton<SymbolQuickPickViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
