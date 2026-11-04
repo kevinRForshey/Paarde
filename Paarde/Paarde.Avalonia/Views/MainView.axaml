@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             x:Class="Paarde.Avalonia.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="16" MaxWidth="720">
+
+            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                <Border Width="64" Height="64" CornerRadius="14" Background="#4F46E5">
+                    <TextBlock Text="P"
+                               FontSize="34"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Paarde" FontSize="28" FontWeight="Bold" />
+                    <TextBlock Text="Prompt Assist And Review Development Environment" FontSize="13" Opacity="0.7" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Margin="0,16,0,0" Spacing="8">
+                <TextBlock Text="Quick prompt" FontSize="20" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBox Text="{Binding QuickPromptText, Mode=TwoWay}"
+                              Watermark="Describe what you want built or changed..."
+                              Width="560"
+                              AcceptsReturn="False" />
+                    <Button Content="Send"
+                            Command="{Binding SendQuickPromptCommand}"
+                            ToolTip.Tip="Load this onto the Compose page (with your last-used working directory) to review before sending." />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Margin="0,16,0,0" Spacing="8" IsVisible="{Binding HasRecentRuns}">
+                <TextBlock Text="Recent runs" FontSize="20" FontWeight="SemiBold" />
+                <ListBox ItemsSource="{Binding RecentRuns}"
+                         SelectedItem="{Binding SelectedRecentRun, Mode=TwoWay}"
+                         MaxHeight="220">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HistorySessionRow">
+                            <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <Button Content="Open"
+                        Command="{Binding OpenRecentRunCommand}"
+                        ToolTip.Tip="Load this run's prompt and working directory onto the Compose page to edit before sending." />
+            </StackPanel>
+
+            <StackPanel Margin="0,16,0,0" Spacing="8" IsVisible="{Binding HasRecentProjects}">
+                <TextBlock Text="Recent projects" FontSize="20" FontWeight="SemiBold" />
+                <ListBox ItemsSource="{Binding RecentProjects}"
+                         SelectedItem="{Binding SelectedRecentProject, Mode=TwoWay}"
+                         MaxHeight="220">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <Button Content="Switch to this project"
+                        Command="{Binding OpenRecentProjectCommand}"
+                        ToolTip.Tip="Switch the Compose page's working directory to this project." />
+            </StackPanel>
+
+            <TextBlock Margin="0,16,0,0"
+                       Text="Getting started"
+                       FontSize="20"
+                       FontWeight="SemiBold" />
+
+            <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <TextBlock Text="1." FontWeight="SemiBold" Width="20" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Open the Compose tab and click Browse... to choose the project folder you want Claude Code to work in." />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <TextBlock Text="2." FontWeight="SemiBold" Width="20" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Describe what you want built or changed in the prompt box. Optionally attach context files or folders, pick a preset and tutorial detail level, then click Send to Claude Code." />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <TextBlock Text="3." FontWeight="SemiBold" Width="20" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Once it finishes, you'll be taken to the Review tab to read the explanation, or see the proposed changes file by file." />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <TextBlock Text="4." FontWeight="SemiBold" Width="20" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="On the Review tab, select the files or individual hunks you want - editing the proposed content first if you'd like - then click Apply Selected to write them to disk. Undo Last Apply and Revert All Applied are there if you change your mind." />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <TextBlock Text="5." FontWeight="SemiBold" Width="20" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Visit Settings to point the app at your claude CLI executable, customize the prompt template, switch themes, or switch back to the Editor-focused interface." />
+                </StackPanel>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

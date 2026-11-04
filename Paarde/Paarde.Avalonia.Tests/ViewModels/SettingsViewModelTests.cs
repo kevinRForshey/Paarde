@@ -1,3 +1,4 @@
+using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
@@ -249,5 +250,52 @@ public class SettingsViewModelTests
         sut.ResetPromptTemplateCommand.Execute(null);
 
         Assert.Equal(string.Empty, sut.PromptTemplateOverride);
+    }
+
+    [Fact]
+    public void InterfaceMode_DefaultsToEditorFocused()
+    {
+        var sut = CreateSut();
+
+        Assert.Equal(InterfaceMode.EditorFocused, sut.InterfaceMode);
+    }
+
+    [Fact]
+    public async Task InterfaceMode_WhenChanged_PersistsToSettings()
+    {
+        var sut = CreateSut();
+        sut.InterfaceMode = InterfaceMode.FlowWizard;
+
+        Assert.Equal(InterfaceMode.FlowWizard, await _localSettingsService.ReadSettingAsync<InterfaceMode?>("Interface.Mode"));
+    }
+
+    [Fact]
+    public async Task OnNavigatedTo_RestoresSavedInterfaceMode()
+    {
+        await _localSettingsService.SaveSettingAsync("Interface.Mode", InterfaceMode.FlowWizard);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.Equal(InterfaceMode.FlowWizard, sut.InterfaceMode);
+    }
+
+    [Fact]
+    public async Task InterfaceModeChangeRequiresRestart_FalseUntilChangedAwayFromTheLoadedValue()
+    {
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.False(sut.InterfaceModeChangeRequiresRestart);
+
+        sut.InterfaceMode = InterfaceMode.FlowWizard;
+
+        Assert.True(sut.InterfaceModeChangeRequiresRestart);
+
+        sut.InterfaceMode = InterfaceMode.EditorFocused;
+
+        Assert.False(sut.InterfaceModeChangeRequiresRestart);
     }
 }

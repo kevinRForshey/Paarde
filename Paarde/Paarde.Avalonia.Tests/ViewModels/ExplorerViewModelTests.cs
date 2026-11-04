@@ -16,6 +16,7 @@ public class ExplorerViewModelTests : IDisposable
     private readonly FakeDialogService _dialogService = new();
     private readonly FakeLanguageServerSessionManager _languageServerSessionManager = new();
     private readonly FakeFolderPickerService _folderPickerService = new();
+    private readonly FakeNavigationService _navigationService = new();
     private readonly string _workingDirectory;
 
     public ExplorerViewModelTests()
@@ -40,7 +41,7 @@ public class ExplorerViewModelTests : IDisposable
         var compose = new PromptViewModel(_llmRunner, _localSettingsService, _folderPickerService, new FakeFilePickerService(), _promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
         var review = new TutorialViewModel(_promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), _dialogService, _llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), _localSettingsService, new FakeBuildTestRunner());
 
-        return new AssistantPanelViewModel(compose, review, _promptResultStore);
+        return new AssistantPanelViewModel(compose, review, _promptResultStore, _localSettingsService, _navigationService);
     }
 
     private ExplorerViewModel CreateSut() => new(_localSettingsService, _promptResultStore, _llmRunner, _fileChangeApplyService, _dialogService, _languageServerSessionManager, _folderPickerService, CreateAssistantPanel());

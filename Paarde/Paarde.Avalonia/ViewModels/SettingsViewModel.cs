@@ -6,6 +6,7 @@ using Avalonia.Styling;
 
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Contracts.ViewModels;
+using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
@@ -33,6 +34,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     // its own editable field here since this page doesn't change the working directory, only
     // edits what's configured for whichever one is currently selected on the Prompt page.
     private string _runConfigurationsWorkingDirectoryPath = string.Empty;
+
+    // Epic 26 (specs/interface-mode R1): the value loaded in OnNavigatedTo, compared against the
+    // live InterfaceMode property to decide InterfaceModeChangeRequiresRestart - switching modes
+    // changes which pages/startup view model the shell navigates to, which isn't something that
+    // can be re-applied live the way ThemeVariant can.
+    private InterfaceMode _loadedInterfaceMode;
 
     [ObservableProperty]
     private ThemeVariant _themeVariant;
@@ -86,6 +93,18 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
     [ObservableProperty]
     private string anthropicApiModel = AnthropicModelCatalog.DefaultModelId;
+
+    // Epic 26 (specs/interface-mode R1/R9): which of the two top-level shells the app starts into.
+    // Loaded in OnNavigatedTo/persisted via OnInterfaceModeChanged like SelectedRunnerKind below -
+    // not a live-apply Command like SwitchThemeCommand, since this governs startup navigation and
+    // ShellView's menu items, not something applicable to the already-running shell.
+    [ObservableProperty]
+    private InterfaceMode interfaceMode = InterfaceMode.EditorFocused;
+
+    [ObservableProperty]
+    private bool interfaceModeChangeRequiresRestart;
+
+    public IReadOnlyList<InterfaceMode> AvailableInterfaceModes { get; } = Enum.GetValues<InterfaceMode>();
 
     public IReadOnlyList<LlmRunnerKind> AvailableRunnerKinds { get; } = Enum.GetValues<LlmRunnerKind>();
 
@@ -197,6 +216,10 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
             var savedModel = await _localSettingsService.ReadSettingAsync<string>(AnthropicApiSettingsKeys.Model);
             AnthropicApiModel = string.IsNullOrWhiteSpace(savedModel) ? AnthropicModelCatalog.DefaultModelId : savedModel;
+
+            _loadedInterfaceMode = await _localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
+            InterfaceMode = _loadedInterfaceMode;
+            InterfaceModeChangeRequiresRestart = false;
         }
         catch (Exception ex)
         {
@@ -264,6 +287,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     }
 
     partial void OnSelectedRunnerKindChanged(LlmRunnerKind value) => _localSettingsService.SaveSettingAsync(LlmRunnerSettingsKeys.SelectedRunner, value.ToString());
+
+    partial void OnInterfaceModeChanged(InterfaceMode value)
+    {
+        _localSettingsService.SaveSettingAsync(InterfaceModeSettingsKeys.Mode, value);
+        InterfaceModeChangeRequiresRestart = value != _loadedInterfaceMode;
+    }
 
     partial void OnAnthropicApiKeyChanged(string value) => _secureStorageService.SaveAsync(AnthropicApiSettingsKeys.ApiKey, value);
 

@@ -1,3 +1,5 @@
+using Paarde.Avalonia.Models;
+using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Services;
@@ -24,13 +26,14 @@ public class AssistantPanelViewModelTests
     private readonly FakeDialogService _dialogService = new();
     private readonly FakeFileSavePickerService _fileSavePickerService = new();
     private readonly FakeBuildTestRunner _buildTestRunner = new();
+    private readonly FakeNavigationService _navigationService = new();
 
     private AssistantPanelViewModel CreateSut()
     {
         var compose = new PromptViewModel(_llmRunner, _localSettingsService, _folderPickerService, _filePickerService, _promptResultStore, _promptTemplateProvider, _runSessionStore, _codebaseIndexService, _workingDirectoryContext);
         var review = new TutorialViewModel(_promptResultStore, _applyOrchestrationService, _applyHistoryLog, _dialogService, _llmRunner, _promptTemplateProvider, _fileSavePickerService, _localSettingsService, _buildTestRunner);
 
-        return new AssistantPanelViewModel(compose, review, _promptResultStore);
+        return new AssistantPanelViewModel(compose, review, _promptResultStore, _localSettingsService, _navigationService);
     }
 
     [Fact]
@@ -60,7 +63,7 @@ public class AssistantPanelViewModelTests
         var compose = new PromptViewModel(_llmRunner, _localSettingsService, _folderPickerService, _filePickerService, _promptResultStore, _promptTemplateProvider, _runSessionStore, _codebaseIndexService, _workingDirectoryContext);
         var review = new TutorialViewModel(_promptResultStore, _applyOrchestrationService, _applyHistoryLog, _dialogService, _llmRunner, _promptTemplateProvider, _fileSavePickerService, _localSettingsService, _buildTestRunner);
 
-        var sut = new AssistantPanelViewModel(compose, review, _promptResultStore);
+        var sut = new AssistantPanelViewModel(compose, review, _promptResultStore, _localSettingsService, _navigationService);
 
         Assert.Same(compose, sut.Compose);
         Assert.Same(review, sut.Review);
@@ -87,5 +90,29 @@ public class AssistantPanelViewModelTests
         _promptResultStore.WorkingDirectoryPath = "/tmp/two";
 
         Assert.Equal(0, sut.SelectedTabIndex);
+    }
+
+    [Fact]
+    public async Task PromptResultStore_TutorialChanges_EditorFocusedMode_DoesNotNavigate()
+    {
+        var sut = CreateSut();
+
+        _promptResultStore.SetResult("A finished run's narrative.", [], "/tmp");
+        await Task.Yield();
+
+        Assert.Equal(0, _navigationService.NavigateToCallCount);
+    }
+
+    [Fact]
+    public async Task PromptResultStore_TutorialChanges_FlowWizardMode_NavigatesToReview()
+    {
+        await _localSettingsService.SaveSettingAsync(InterfaceModeSettingsKeys.Mode, InterfaceMode.FlowWizard);
+        var sut = CreateSut();
+
+        _promptResultStore.SetResult("A finished run's narrative.", [], "/tmp");
+        await Task.Yield();
+
+        Assert.Equal(1, _navigationService.NavigateToCallCount);
+        Assert.Equal(typeof(TutorialViewModel).FullName, _navigationService.LastPageKey);
     }
 }

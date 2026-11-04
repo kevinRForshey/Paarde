@@ -3198,6 +3198,51 @@ navigations. Full spec: `specs/unified-workbench/requirements.md`.*
 
 ---
 
+### EPIC 26 — Interface mode: Editor-focused vs. Flow/Wizard
+
+*Why: Epic 25 committed the whole app to a single presentation - Explorer-as-landing-page with a
+docked Assistant panel - on the premise that the page-per-step wizard was itself the problem. That
+premise may be right for a user who already knows what they want to do, but someone earlier in
+learning the tool (or who simply prefers being guided one step at a time) loses the Main
+dashboard, the full-page Compose experience, and the full-page Review narrative entirely. Rather
+than re-litigating which presentation is "correct," this epic makes it a user choice: a persisted
+`InterfaceMode` setting switches between today's Editor-focused shell and a revived Flow/Wizard
+shell (Home → Compose → Review as separate pages), both built on the *exact same* `PromptViewModel`
+/`TutorialViewModel` singletons so there is no duplicated business logic between them - only the
+navigation/menu scaffolding differs. Sequenced right after Epic 25 and before Epics 27-28, since
+those two add depth to Editor-focused mode specifically and should be built knowing a second mode
+exists. Full spec: `specs/interface-mode/requirements.md`.*
+
+---
+
+### EPIC 27 — Editor intelligence depth: outline, breadcrumb, hover
+
+*Why: Epics 17-19 gave the editor go-to-definition, find-references, diagnostics, and completion -
+everything needed to *act* on a symbol, but nothing to see what's *in* the current file or
+*under the cursor* without already knowing where to look. A document outline, a breadcrumb bar
+showing the enclosing symbol chain, and hover tooltips are the next layer of "the editor knows
+about your code" depth, built on the same per-language LSP session infrastructure already running
+- two new request types (`documentSymbol`, `hover`), not new transport or process management.
+Independent of Epic 26's mode toggle; either can land first. Full spec:
+`specs/editor-intelligence/requirements.md`.*
+
+---
+
+### EPIC 28 — Editor-first layout: zen mode, split view, tab polish
+
+*Why: Epic 25 made the editor always-visible; it did not make it the thing the layout defers to.
+Today's `ExplorerView` still splits the window roughly three ways (tree | editor | Assistant
+panel) with no way to go full-width in one action, no way to see two files side by side, and no
+tab affordances (pin, reorder, MRU-switch) beyond "open one at a time." This epic closes that gap:
+a zen/focus-mode toggle that collapses both side panes together, a two-pane split view inside the
+tab area, tab pinning/reordering/`Ctrl+Tab` cycling, and first-run default widths that visibly
+favor the editor instead of splitting the window evenly. Scoped to Editor-focused mode's
+`ExplorerView` only - Flow/Wizard mode's separate Compose/Review pages (Epic 26) have no
+tree/Assistant-panel layout to zen/split. Independent of Epic 27; either can land first. Full
+spec: `specs/editor-focus-layout/requirements.md`.*
+
+---
+
 ## 4. Suggested execution order
 
 1. **Epic 1** — one codebase, or everything after this costs double.
@@ -3285,3 +3330,19 @@ navigations. Full spec: `specs/unified-workbench/requirements.md`.*
     the tabbed Explorer editing (23) its `OpenFileTabViewModel.PendingChange` bridge extends, and
     the command palette (24) whose "Go to `<Page>`" entries shrink once Main/Prompt/Diffs/Tutorial
     stop being separate pages. Full spec: `specs/unified-workbench/`.
+26. **Epic 26** — interface mode: Editor-focused vs. Flow/Wizard. Sequenced immediately after
+    Epic 25, since it's a direct response to that epic's all-in commitment to one presentation,
+    and before Epics 27-28 so those build their editor depth/layout work against a shell that
+    already knows a second mode exists rather than retrofitting it later. Full spec:
+    `specs/interface-mode/`.
+27. **Epic 27** — editor intelligence depth: document outline, breadcrumb bar, hover tooltips.
+    Extends Epics 17-19's LSP session infrastructure with two new request types
+    (`documentSymbol`, `hover`); independent of Epic 26, sequenced here simply because it's the
+    more code-intelligence-flavored half of "editor is a bigger focus" rather than for any
+    dependency reason. Full spec: `specs/editor-intelligence/`.
+28. **Epic 28** — editor-first layout: zen/focus mode, split editor view, tab pinning/reordering/
+    `Ctrl+Tab` switching, first-run default pane widths favoring the editor. Builds on Epic 25's
+    `ResizablePaneHelper` collapse convention and is scoped to Editor-focused mode's `ExplorerView`
+    only (Epic 26's Flow/Wizard mode has no tree/Assistant-panel layout to zen/split). Sequenced
+    last since it's the most purely cosmetic/ergonomic of the three, with no other epic depending
+    on it. Full spec: `specs/editor-focus-layout/`.

@@ -217,6 +217,14 @@ public partial class App : Application
             services.AddTransient<TerminalView>();
             services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
+
+            // Epic 26 (specs/interface-mode R5/R6): FlowWizard mode's Home/Review pages - AddTransient
+            // like every other page-scoped view model/view pair above, since neither is reachable
+            // from outside navigation the way AssistantPanelViewModel/TutorialViewModel are.
+            services.AddTransient<MainViewModel>();
+            services.AddTransient<MainView>();
+            services.AddTransient<ReviewView>();
+
             services.AddTransient<ShellView>();
             services.AddTransient<ShellViewModel>();
 
@@ -336,7 +344,12 @@ public partial class App : Application
             // it whenever the user first visits them - a no-op if no run has ever been recorded.
             GetService<IRunSessionStore>().RestoreLastSession();
 
-            GetService<INavigationService>().NavigateTo(typeof(ExplorerViewModel).FullName!);
+            // Epic 26 (specs/interface-mode R2): which shell the app starts into - EditorFocused
+            // keeps today's Explorer-first behavior, FlowWizard starts on the Home/Compose/Review
+            // flow instead.
+            var interfaceMode = await GetService<ILocalSettingsService>().ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
+            var startupViewModelType = interfaceMode == InterfaceMode.FlowWizard ? typeof(MainViewModel) : typeof(ExplorerViewModel);
+            GetService<INavigationService>().NavigateTo(startupViewModelType.FullName!);
         }
         catch (Exception ex)
         {

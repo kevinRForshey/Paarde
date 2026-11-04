@@ -31,6 +31,21 @@
             </StackPanel>
         </StackPanel>
 
+        <TextBlock Margin="0,16,0,0" Text="Interface" FontSize="20" FontWeight="SemiBold" />
+
+        <StackPanel Margin="0,8,0,0" Spacing="4">
+            <RadioButton Content="Editor-focused"
+                         GroupName="InterfaceMode"
+                         IsChecked="{Binding InterfaceMode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=EditorFocused}" />
+            <RadioButton Content="Flow/Wizard"
+                         GroupName="InterfaceMode"
+                         IsChecked="{Binding InterfaceMode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=FlowWizard}" />
+            <TextBlock Text="Restart Paarde to apply this change."
+                       FontSize="12"
+                       Opacity="0.7"
+                       IsVisible="{Binding InterfaceModeChangeRequiresRestart}" />
+        </StackPanel>
+
         <TextBlock Margin="0,16,0,0" Text="LLM runner" FontSize="20" FontWeight="SemiBold" />
 
         <StackPanel Margin="0,8,0,0" Spacing="4">
