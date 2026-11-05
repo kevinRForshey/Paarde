@@ -1,5 +1,11 @@
+using System.ComponentModel;
+
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
+
+using FluentAvalonia.UI.Controls;
 
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Helpers;
@@ -25,10 +31,26 @@ public partial class ExplorerView : UserControl
     // from InitializeAssistantPanelHelperAsync instead; null until that completes.
     private ResizablePaneHelper? _assistantPanelHelper;
 
-    // Remembers the width the Assistant panel had before the toggle button collapsed it, since
-    // ResizablePaneHelper's own "width 0 is collapsed" convention has no separate flag to restore
-    // from - collapsing from a drag has nothing to remember, but collapsing from this button does.
-    private double _assistantPanelWidthBeforeCollapse = 360;
+    // specs/editor-focus-layout R2: the secondary (split-right) TabView's column - starts
+    // collapsed (no tabs in SecondaryGroupTabs yet) and is driven open/shut purely by
+    // ExplorerViewModel.HasSecondaryGroupTabs, via OnViewModelPropertyChanged below, rather than
+    // a user-facing toggle button like the Assistant panel's.
+    private ResizablePaneHelper? _splitGroupHelper;
+
+    // specs/editor-focus-layout R1: tracks whether zen mode is currently active, plus whether the
+    // tree/Assistant panes were already collapsed *before* zen mode was entered - so turning zen
+    // mode back off only reopens panes zen mode itself closed, not ones the user had already
+    // hidden deliberately.
+    private bool _isZenModeActive;
+    private bool _wasTreeCollapsedBeforeZenMode;
+    private bool _wasAssistantPanelCollapsedBeforeZenMode;
+
+    // specs/editor-focus-layout R1: Ctrl+K then Z - a chord, not a single Window.KeyBindings
+    // gesture like the global Quick Open/Command Palette shortcuts, since this one is page-scoped
+    // to ExplorerViewModel (AddTransient, not a singleton) rather than global. Local KeyDown/KeyUp
+    // handlers + a timeout timer, since Avalonia has no built-in chord recognizer.
+    private readonly DispatcherTimer _chordTimeoutTimer;
+    private bool _isCtrlKArmed;
 
     public ExplorerView()
     {
@@ -44,6 +66,18 @@ public partial class ExplorerView : UserControl
 
         Loaded += async (_, _) => await InitializeAssistantPanelHelperAsync();
         AssistantPanelSplitter.DragCompleted += (_, _) => _assistantPanelHelper?.OnSplitterDragCompleted();
+
+        Loaded += async (_, _) => await InitializeSplitGroupHelperAsync();
+        SplitGroupSplitter.DragCompleted += (_, _) => _splitGroupHelper?.OnSplitterDragCompleted();
+
+        ViewModel.ZenModeToggled += OnZenModeToggled;
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        _chordTimeoutTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+        _chordTimeoutTimer.Tick += (_, _) => DisarmCtrlK();
+
+        KeyDown += OnViewKeyDown;
+        KeyUp += OnViewKeyUp;
     }
 
     // Epic 26 (specs/interface-mode R7): FlowWizard mode has no Compose/Review page reachable
@@ -54,7 +88,11 @@ public partial class ExplorerView : UserControl
     {
         var localSettingsService = App.GetService<ILocalSettingsService>();
         var interfaceMode = await localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
-        var defaultWidth = interfaceMode == InterfaceMode.FlowWizard ? 0 : 360;
+
+        // specs/editor-focus-layout R6: narrower than the 360 this used to default to, so the
+        // editor's * column visibly dominates a first-run window - only affects users with no
+        // saved width yet, same as _paneHelper's own narrower default above.
+        var defaultWidth = interfaceMode == InterfaceMode.FlowWizard ? 0 : 280;
 
         _assistantPanelHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[4], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerAssistantPanelWidth, defaultWidth: defaultWidth);
         await _assistantPanelHelper.RestoreAsync();
@@ -62,18 +100,125 @@ public partial class ExplorerView : UserControl
 
     private void OnToggleAssistantPanelButtonClick(object? sender, RoutedEventArgs e)
     {
-        var column = WorkspaceGrid.ColumnDefinitions[4];
+        _assistantPanelHelper?.ToggleCollapse();
+        _assistantPanelHelper?.OnSplitterDragCompleted();
+    }
 
-        if (column.Width.Value > 0)
+    // The "x" on a TabViewItem only requests a close (so FluentAvalonia can't close a dirty tab
+    // out from under CloseSelectedTabCommand's own unsaved-changes prompt) - select it first, then
+    // run the same confirm/close path the "Close Tab" button already uses.
+    private void OnTabViewTabCloseRequested(TabView? sender, TabViewTabCloseRequestedEventArgs e)
+    {
+        if (e.Item is OpenFileTabViewModel tab)
         {
-            _assistantPanelWidthBeforeCollapse = column.Width.Value;
-            column.Width = new GridLength(0);
+            ViewModel.SelectedTab = tab;
+            ViewModel.CloseSelectedTabCommand.Execute(null);
+        }
+    }
+
+    // specs/editor-focus-layout R2: starts collapsed - ExplorerViewModel.HasSecondaryGroupTabs is
+    // false until a tab is split right, so there's nothing to restore a persisted width into yet.
+    private async Task InitializeSplitGroupHelperAsync()
+    {
+        _splitGroupHelper = new ResizablePaneHelper(SplitGroupGrid.ColumnDefinitions[2], App.GetService<ILocalSettingsService>(), WorkspaceLayoutSettingsKeys.ExplorerSplitGroupWidth, defaultWidth: 320);
+        await _splitGroupHelper.RestoreAsync();
+
+        if (!ViewModel.HasSecondaryGroupTabs)
+        {
+            _splitGroupHelper.Collapse();
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ExplorerViewModel.HasSecondaryGroupTabs) && _splitGroupHelper is { } helper)
+        {
+            if (ViewModel.HasSecondaryGroupTabs)
+            {
+                helper.Restore();
+            }
+            else
+            {
+                helper.Collapse();
+            }
+        }
+    }
+
+    private void OnZenModeToggled()
+    {
+        if (_isZenModeActive)
+        {
+            _isZenModeActive = false;
+
+            if (!_wasTreeCollapsedBeforeZenMode)
+            {
+                _paneHelper.Restore();
+            }
+
+            if (!_wasAssistantPanelCollapsedBeforeZenMode)
+            {
+                _assistantPanelHelper?.Restore();
+            }
         }
         else
         {
-            column.Width = new GridLength(_assistantPanelWidthBeforeCollapse);
+            _isZenModeActive = true;
+            _wasTreeCollapsedBeforeZenMode = _paneHelper.IsCollapsed;
+            _wasAssistantPanelCollapsedBeforeZenMode = _assistantPanelHelper?.IsCollapsed ?? true;
+
+            _paneHelper.Collapse();
+            _assistantPanelHelper?.Collapse();
+        }
+    }
+
+    private void DisarmCtrlK()
+    {
+        _isCtrlKArmed = false;
+        _chordTimeoutTimer.Stop();
+    }
+
+    // specs/editor-focus-layout R1/R5: Ctrl+K then Z toggles zen mode; Ctrl+Tab (held, repeated)
+    // opens/advances the MRU switcher - releasing Ctrl (OnViewKeyUp below) commits whichever tab
+    // is highlighted, same press-and-cycle convention as every mainstream editor's own Ctrl+Tab.
+    private void OnViewKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Tab && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            if (ViewModel.IsMruSwitcherOpen)
+            {
+                ViewModel.AdvanceMruSwitcher();
+            }
+            else
+            {
+                ViewModel.OpenMruSwitcher();
+            }
+
+            e.Handled = true;
+            return;
         }
 
-        _assistantPanelHelper?.OnSplitterDragCompleted();
+        if (_isCtrlKArmed && e.Key == Key.Z)
+        {
+            DisarmCtrlK();
+            ViewModel.ToggleZenModeCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.K && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            _isCtrlKArmed = true;
+            _chordTimeoutTimer.Stop();
+            _chordTimeoutTimer.Start();
+            e.Handled = true;
+        }
+    }
+
+    private void OnViewKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl && ViewModel.IsMruSwitcherOpen)
+        {
+            ViewModel.CommitMruSwitcher();
+        }
     }
 }

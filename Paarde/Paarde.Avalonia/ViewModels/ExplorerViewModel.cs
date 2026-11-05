@@ -73,6 +73,42 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     // already uses for its own tab strip.
     public bool HasOpenTabs => OpenTabs.Count > 0;
 
+    // specs/editor-focus-layout R1: ExplorerView.axaml.cs owns the live ColumnDefinitions this
+    // needs to collapse/restore, so the command just raises an event rather than touching any
+    // layout itself - same "ViewModel raises, View's code-behind that owns the live visual state
+    // reacts" split OnToggleAssistantPanelButtonClick already established for a single pane.
+    public event Action? ZenModeToggled;
+
+    [RelayCommand]
+    private void ToggleZenMode() => ZenModeToggled?.Invoke();
+
+    // specs/editor-focus-layout R2: the active tab's "Split right" action moves it into this
+    // second group; ExplorerView.axaml projects both onto their own TabView. Real, independently
+    // ordered ObservableCollections (not a recomputed LINQ projection over OpenTabs) so each
+    // TabView's native drag-reorder (CanReorderTabs) has a stable list to mutate directly.
+    public ObservableCollection<OpenFileTabViewModel> PrimaryGroupTabs { get; } = new();
+
+    public ObservableCollection<OpenFileTabViewModel> SecondaryGroupTabs { get; } = new();
+
+    // Drives ExplorerView.axaml's split-group column collapsing back to width 0 once its last tab
+    // closes - see design.md's "closing the secondary group's last tab collapses the column back
+    // automatically."
+    public bool HasSecondaryGroupTabs => SecondaryGroupTabs.Count > 0;
+
+    // specs/editor-focus-layout R5: most-recently-activated order, updated on every SelectedTab
+    // change below - separate from OpenTabs'/the group collections' own display order. Not an
+    // ObservableCollection - nothing binds to it directly; MruSwitcherItems below is the live
+    // snapshot the popup actually shows.
+    private readonly List<OpenFileTabViewModel> _mruOrder = [];
+
+    [ObservableProperty]
+    private bool isMruSwitcherOpen;
+
+    public ObservableCollection<OpenFileTabViewModel> MruSwitcherItems { get; } = new();
+
+    [ObservableProperty]
+    private OpenFileTabViewModel? mruSwitcherHighlighted;
+
     public ExplorerViewModel(
         ILocalSettingsService localSettingsService,
         IPromptResultStore promptResultStore,
@@ -100,6 +136,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
         _languageServerSessionManager.DiagnosticsPublished += OnDiagnosticsPublished;
         OpenTabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasOpenTabs));
+        SecondaryGroupTabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSecondaryGroupTabs));
     }
 
     // T10.2.5: IConfirmNavigationAway - checked by NavigationService.OnNavigating before leaving
@@ -145,7 +182,16 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         {
             PendingChange = pendingChange,
         };
+
+        // specs/editor-focus-layout R2/R3: OpenFileTabViewModel raises these for the pin/split
+        // actions it exposes on itself (same "tab raises, ExplorerViewModel reacts" shape
+        // ScrollToHunkRequested already uses) - ExplorerViewModel is the one that owns the group
+        // collections these actually mutate.
+        tab.PinToggled += () => OnTabPinToggled(tab);
+        tab.SplitRightRequested += () => OnTabSplitRightRequested(tab);
+
         OpenTabs.Add(tab);
+        PrimaryGroupTabs.Add(tab);
         SelectedTab = tab;
 
         _ = _languageServerSessionManager.NotifyDocumentOpenedAsync(filePath, content);
@@ -211,6 +257,8 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
         var index = OpenTabs.IndexOf(tab);
         OpenTabs.Remove(tab);
+        GroupCollectionFor(tab).Remove(tab);
+        _mruOrder.Remove(tab);
 
         // Epic 17, T17.2.1: tells the server this file is no longer open - a no-op if the server
         // isn't running for this language.
@@ -221,7 +269,104 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
     private bool CanCloseSelectedTab() => SelectedTab is not null;
 
-    partial void OnSelectedTabChanged(OpenFileTabViewModel? value) => CloseSelectedTabCommand.NotifyCanExecuteChanged();
+    // specs/editor-focus-layout R5: moves the newly-activated tab to the front of the MRU order -
+    // a plain List<T>, not an ObservableCollection, since nothing binds to it directly (only the
+    // Ctrl+Tab popup's own snapshot, MruSwitcherItems, does).
+    partial void OnSelectedTabChanged(OpenFileTabViewModel? value)
+    {
+        CloseSelectedTabCommand.NotifyCanExecuteChanged();
+
+        if (value is not null)
+        {
+            _mruOrder.Remove(value);
+            _mruOrder.Insert(0, value);
+        }
+    }
+
+    private ObservableCollection<OpenFileTabViewModel> GroupCollectionFor(OpenFileTabViewModel tab) =>
+        tab.TabGroup == 1 ? SecondaryGroupTabs : PrimaryGroupTabs;
+
+    // specs/editor-focus-layout R3: pinning clusters a tab with every other already-pinned tab in
+    // its own group, right after the last of them - unpinning leaves its position untouched (only
+    // pinning's effect on ordering is specified/tested).
+    private void OnTabPinToggled(OpenFileTabViewModel tab)
+    {
+        if (!tab.IsPinned)
+        {
+            return;
+        }
+
+        var group = GroupCollectionFor(tab);
+        var currentIndex = group.IndexOf(tab);
+        if (currentIndex < 0)
+        {
+            return;
+        }
+
+        var targetIndex = group.Count(t => t.IsPinned) - 1;
+        if (targetIndex != currentIndex)
+        {
+            group.Move(currentIndex, targetIndex);
+        }
+    }
+
+    // specs/editor-focus-layout R2: "split right" is a one-way move into the second TabView's
+    // group - matches the "split view, not tiling" non-goal, which never asks for a tab to move
+    // back out of the secondary group.
+    private void OnTabSplitRightRequested(OpenFileTabViewModel tab)
+    {
+        if (tab.TabGroup == 1)
+        {
+            return;
+        }
+
+        PrimaryGroupTabs.Remove(tab);
+        tab.TabGroup = 1;
+        SecondaryGroupTabs.Add(tab);
+    }
+
+    // specs/editor-focus-layout R5: opens the Ctrl+Tab popup - ExplorerView.axaml.cs calls this on
+    // the first Ctrl+Tab keydown, then AdvanceMruSwitcher on every repeated Tab while Ctrl stays
+    // held. Highlights the second entry (the previously-active tab) rather than the first (the
+    // still-current tab), matching every mainstream editor's own "Ctrl+Tab jumps to the previous
+    // tab on the very first press" convention.
+    public void OpenMruSwitcher()
+    {
+        if (_mruOrder.Count == 0)
+        {
+            return;
+        }
+
+        MruSwitcherItems.Clear();
+        foreach (var tab in _mruOrder)
+        {
+            MruSwitcherItems.Add(tab);
+        }
+
+        MruSwitcherHighlighted = MruSwitcherItems.Count > 1 ? MruSwitcherItems[1] : MruSwitcherItems[0];
+        IsMruSwitcherOpen = true;
+    }
+
+    public void AdvanceMruSwitcher()
+    {
+        if (MruSwitcherItems.Count == 0)
+        {
+            return;
+        }
+
+        var currentIndex = MruSwitcherHighlighted is null ? -1 : MruSwitcherItems.IndexOf(MruSwitcherHighlighted);
+        MruSwitcherHighlighted = MruSwitcherItems[(currentIndex + 1) % MruSwitcherItems.Count];
+    }
+
+    public void CommitMruSwitcher()
+    {
+        if (MruSwitcherHighlighted is not null)
+        {
+            SelectedTab = MruSwitcherHighlighted;
+        }
+
+        IsMruSwitcherOpen = false;
+    }
 
     // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
     // corrupt settings file (the one thing ReadSettingAsync can actually throw on) is logged

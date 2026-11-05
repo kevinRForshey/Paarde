@@ -68,6 +68,40 @@ public partial class OpenFileTabViewModel : ObservableObject
     [ObservableProperty]
     private ProposedFileChangeViewModel? pendingChange;
 
+    // specs/editor-focus-layout R3: ExplorerViewModel is the one that owns PrimaryGroupTabs/
+    // SecondaryGroupTabs and actually repositions this tab within whichever group it's in -
+    // this just raises the event, same "tab raises, ExplorerViewModel reacts" split
+    // ScrollToHunkRequested below already establishes.
+    [ObservableProperty]
+    private bool isPinned;
+
+    public event Action? PinToggled;
+
+    partial void OnIsPinnedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PinMenuItemLabel));
+        PinToggled?.Invoke();
+    }
+
+    public string PinMenuItemLabel => IsPinned ? "Unpin" : "Pin";
+
+    [RelayCommand]
+    private void TogglePin() => IsPinned = !IsPinned;
+
+    // specs/editor-focus-layout R2: 0 = primary group, 1 = secondary (split) group - at most 2
+    // groups per the epic's non-goals, so this doesn't need to be an enum.
+    [ObservableProperty]
+    private int tabGroup;
+
+    partial void OnTabGroupChanged(int value) => OnPropertyChanged(nameof(CanSplitRight));
+
+    public bool CanSplitRight => TabGroup == 0;
+
+    public event Action? SplitRightRequested;
+
+    [RelayCommand(CanExecute = nameof(CanSplitRight))]
+    private void RequestSplitRight() => SplitRightRequested?.Invoke();
+
     // Raised by TutorialStepViewModel's "View in Diff" action (via TutorialViewModel.FileFocusRequested)
     // once ExplorerViewModel has already opened/focused this tab - ExplorerFileTabControl.axaml.cs
     // subscribes to scroll the CodeEditor's caret to the hunk's SourceRangeStart, the same target

@@ -483,4 +483,188 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Same(tab, sut.SelectedTab);
         Assert.Same(hunk, received);
     }
+
+    // specs/editor-focus-layout R2: every newly opened tab starts out in the primary group, same
+    // as it always has (PrimaryGroupTabs mirrors OpenTabs until something is split right).
+    [Fact]
+    public async Task OpenOrActivateTab_NewTab_AddsToPrimaryGroup()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+
+        sut.SelectedNode = sut.Root!.Children.Single();
+
+        var tab = Assert.Single(sut.OpenTabs);
+        Assert.Same(tab, Assert.Single(sut.PrimaryGroupTabs));
+        Assert.Empty(sut.SecondaryGroupTabs);
+        Assert.False(sut.HasSecondaryGroupTabs);
+    }
+
+    [Fact]
+    public async Task RequestSplitRight_MovesTabFromPrimaryToSecondaryGroup()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single();
+        var tab = Assert.Single(sut.OpenTabs);
+
+        tab.RequestSplitRightCommand.Execute(null);
+
+        Assert.Equal(1, tab.TabGroup);
+        Assert.Empty(sut.PrimaryGroupTabs);
+        Assert.Same(tab, Assert.Single(sut.SecondaryGroupTabs));
+        Assert.True(sut.HasSecondaryGroupTabs);
+    }
+
+    [Fact]
+    public async Task CloseSelectedTabCommand_ClosingTheOnlySecondaryGroupTab_CollapsesHasSecondaryGroupTabs()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single();
+        var tab = sut.SelectedTab!;
+        tab.RequestSplitRightCommand.Execute(null);
+
+        await sut.CloseSelectedTabCommand.ExecuteAsync(null);
+
+        Assert.Empty(sut.SecondaryGroupTabs);
+        Assert.False(sut.HasSecondaryGroupTabs);
+    }
+
+    // specs/editor-focus-layout R3: pinning moves a tab to right after the last already-pinned
+    // tab in its own group - unpinning leaves its position untouched.
+    [Fact]
+    public async Task TogglePin_PinningATab_MovesItBeforeAllUnpinnedTabsInItsGroup()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        File.WriteAllText(Path.Combine(_workingDirectory, "c.txt"), "content c");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "c.txt");
+        var tabC = sut.OpenTabs[2];
+
+        tabC.TogglePinCommand.Execute(null);
+
+        Assert.Equal(["c.txt", "a.txt", "b.txt"], sut.PrimaryGroupTabs.Select(t => t.FileName));
+    }
+
+    [Fact]
+    public async Task TogglePin_UnpinningATab_LeavesItsPositionUnchanged()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+        var tabB = sut.OpenTabs[1];
+        tabB.TogglePinCommand.Execute(null);
+
+        tabB.TogglePinCommand.Execute(null);
+
+        // Pinning tabB already moved it to the front; unpinning doesn't move it back.
+        Assert.Equal(["b.txt", "a.txt"], sut.PrimaryGroupTabs.Select(t => t.FileName));
+        Assert.False(tabB.IsPinned);
+    }
+
+    // specs/editor-focus-layout R1: raises the view's event rather than touching layout itself -
+    // ExplorerView.axaml.cs owns the live ColumnDefinitions.
+    [Fact]
+    public void ToggleZenModeCommand_RaisesZenModeToggled()
+    {
+        var sut = CreateSut();
+        var raisedCount = 0;
+        sut.ZenModeToggled += () => raisedCount++;
+
+        sut.ToggleZenModeCommand.Execute(null);
+
+        Assert.Equal(1, raisedCount);
+    }
+
+    // specs/editor-focus-layout R5: OpenMruSwitcher snapshots the most-recently-activated order
+    // and highlights the second entry (the previously-active tab, not the still-current one) -
+    // matching the "first Ctrl+Tap press jumps to the previous tab" convention.
+    [Fact]
+    public async Task OpenMruSwitcher_HighlightsThePreviouslyActiveTab()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        File.WriteAllText(Path.Combine(_workingDirectory, "c.txt"), "content c");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "c.txt");
+
+        sut.OpenMruSwitcher();
+
+        Assert.True(sut.IsMruSwitcherOpen);
+        Assert.Equal(["c.txt", "b.txt", "a.txt"], sut.MruSwitcherItems.Select(t => t.FileName));
+        Assert.Equal("b.txt", sut.MruSwitcherHighlighted!.FileName);
+    }
+
+    [Fact]
+    public async Task AdvanceMruSwitcher_CyclesThroughEveryEntryAndWrapsAround()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+        sut.OpenMruSwitcher();
+
+        sut.AdvanceMruSwitcher();
+
+        Assert.Equal("b.txt", sut.MruSwitcherHighlighted!.FileName);
+    }
+
+    [Fact]
+    public async Task CommitMruSwitcher_ActivatesTheHighlightedTabAndClosesThePopup()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+        var tabA = sut.OpenTabs[0];
+        sut.OpenMruSwitcher();
+
+        sut.CommitMruSwitcher();
+
+        Assert.Same(tabA, sut.SelectedTab);
+        Assert.False(sut.IsMruSwitcherOpen);
+    }
+
+    [Fact]
+    public async Task ClosingTheMostRecentlyUsedTab_RemovesItFromTheMruOrder()
+    {
+        File.WriteAllText(Path.Combine(_workingDirectory, "a.txt"), "content a");
+        File.WriteAllText(Path.Combine(_workingDirectory, "b.txt"), "content b");
+        await SetSavedWorkingDirectoryAsync(_workingDirectory);
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "a.txt");
+        sut.SelectedNode = sut.Root!.Children.Single(node => node.Name == "b.txt");
+
+        await sut.CloseSelectedTabCommand.ExecuteAsync(null);
+        sut.OpenMruSwitcher();
+
+        Assert.Equal(["a.txt"], sut.MruSwitcherItems.Select(t => t.FileName));
+    }
 }
