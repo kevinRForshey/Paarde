@@ -8,12 +8,21 @@
              xmlns:models="using:Paarde.Core.Models"
              xmlns:views="using:Paarde.Avalonia.Views"
              x:Class="Paarde.Avalonia.Views.ExplorerFileTabControl"
-             x:DataType="vm:OpenFileTabViewModel">
+             x:DataType="vm:OpenFileTabViewModel"
+             x:CompileBindings="False">
 
     <!-- Epic 23, T23.1.1: one instance of this control per open Explorer tab (ExplorerView.axaml's
          TabControl.ContentTemplate), same "separate control instance per tab" shape
          TutorialDetailControl already established for TutorialView's tab strip - each instance
-         gets its own CodeEditor, rather than one shared editor whose binding path gets swapped. -->
+         gets its own CodeEditor, rather than one shared editor whose binding path gets swapped.
+
+         Bug fix (freeze on new tab): this control is TabViewItem's Content, instantiated at the
+         same time as the tab header. When TabView attaches a brand-new tab's container, this whole
+         subtree briefly inherits the TabView's own ExplorerViewModel DataContext before the real
+         per-tab OpenFileTabViewModel is assigned. Any compiled binding here that evaluates during
+         that window throws InvalidCastException unhandled on the dispatcher thread, wedging the
+         whole UI (confirmed via live memory dump). x:CompileBindings="False" makes every binding in
+         this control use reflection, which tolerates the mismatch instead of throwing. -->
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <!-- UX pass: a real title for this tab's editor, matching TutorialDetailControl's own
              per-file header (icon + full path) instead of leaving the path as tab-strip-only

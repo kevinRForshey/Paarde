@@ -128,8 +128,18 @@
                                     IsAddTabButtonVisible="False"
                                     TabCloseRequested="OnTabViewTabCloseRequested">
                             <ui:TabView.TabItemTemplate>
-                                <DataTemplate x:DataType="vm:OpenFileTabViewModel">
-                                    <ui:TabViewItem IsClosable="True">
+                                <!-- Bug fix (freeze on new tab): when TabView attaches a brand-new tab's
+                                     container to the visual tree, everything in this template briefly
+                                     inherits the TabView's own ExplorerViewModel DataContext before the
+                                     real per-tab OpenFileTabViewModel is assigned. Any compiled (strongly-
+                                     typed) binding that evaluates during that window throws
+                                     InvalidCastException unhandled on the dispatcher thread, which wedges
+                                     the whole UI. x:CompileBindings="False" makes every binding in this
+                                     template use reflection instead, which tolerates the mismatch. Applies
+                                     to the whole template (not just one binding) because any binding here
+                                     can be the one whose subscribe happens to fire during the race. -->
+                                <DataTemplate x:DataType="vm:OpenFileTabViewModel" x:CompileBindings="False">
+                                    <ui:TabViewItem x:Name="TabContainer" IsClosable="True">
                                         <ui:TabViewItem.Header>
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <ui:SymbolIcon Symbol="Pin" FontSize="12" IsVisible="{Binding IsPinned}" />
@@ -149,7 +159,22 @@
                                                 <MenuItem Header="Split right" Command="{Binding RequestSplitRightCommand}" IsVisible="{Binding CanSplitRight}" />
                                             </ContextMenu>
                                         </ui:TabViewItem.ContextMenu>
-                                        <views:ExplorerFileTabControl />
+                                        <!-- Bug fix (blank editor on open): FluentAvalonia's TabView
+                                             reparents this control out of the TabViewItem into its own
+                                             TabContentPresenter once this tab is selected (confirmed via
+                                             decompiled TabView.UpdateTabContent()), which severs ordinary
+                                             DataContext *inheritance* since it's a visual-tree reparent.
+                                             A self-referencing DataContext="{Binding}" does NOT fix this: it
+                                             evaluates once, before TabViewItem.DataContext is even assigned
+                                             (Build() sets children first, root's DataContext last), and that
+                                             snapshot never updates afterwards (confirmed via live memory dump:
+                                             its EffectiveValue had no active binding entry, just a dead,
+                                             stale value - ExplorerView's own ExplorerViewModel, not this
+                                             tab's OpenFileTabViewModel). Binding by ElementName instead
+                                             resolves via the template's NameScope, not visual-tree position,
+                                             so it stays correct both before Build() finishes and after the
+                                             reparent. -->
+                                        <views:ExplorerFileTabControl DataContext="{Binding DataContext, ElementName=TabContainer}" />
                                     </ui:TabViewItem>
                                 </DataTemplate>
                             </ui:TabView.TabItemTemplate>
@@ -170,8 +195,11 @@
                                     IsAddTabButtonVisible="False"
                                     TabCloseRequested="OnTabViewTabCloseRequested">
                             <ui:TabView.TabItemTemplate>
-                                <DataTemplate x:DataType="vm:OpenFileTabViewModel">
-                                    <ui:TabViewItem IsClosable="True">
+                                <!-- Bug fix (freeze on new tab): see matching comment on the primary
+                                     TabView's header template above - same compiled-binding DataContext
+                                     race, same fix, applied to the whole template. -->
+                                <DataTemplate x:DataType="vm:OpenFileTabViewModel" x:CompileBindings="False">
+                                    <ui:TabViewItem x:Name="TabContainer" IsClosable="True">
                                         <ui:TabViewItem.Header>
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <ui:SymbolIcon Symbol="Pin" FontSize="12" IsVisible="{Binding IsPinned}" />
@@ -190,7 +218,9 @@
                                                 <MenuItem Header="{Binding PinMenuItemLabel}" Command="{Binding TogglePinCommand}" />
                                             </ContextMenu>
                                         </ui:TabViewItem.ContextMenu>
-                                        <views:ExplorerFileTabControl />
+                                        <!-- Bug fix (blank editor on open): see matching comment on the
+                                             primary TabView's item template above - same fix. -->
+                                        <views:ExplorerFileTabControl DataContext="{Binding DataContext, ElementName=TabContainer}" />
                                     </ui:TabViewItem>
                                 </DataTemplate>
                             </ui:TabView.TabItemTemplate>
@@ -212,7 +242,9 @@
                         MinWidth="260">
                     <ListBox ItemsSource="{Binding MruSwitcherItems}" SelectedItem="{Binding MruSwitcherHighlighted}">
                         <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:OpenFileTabViewModel">
+                            <!-- Bug fix (freeze on new tab): same compiled-binding DataContext race as
+                                 the TabView header templates above. -->
+                            <DataTemplate x:DataType="vm:OpenFileTabViewModel" x:CompileBindings="False">
                                 <TextBlock Text="{Binding FileName}" Margin="8,4" ToolTip.Tip="{Binding FilePath}" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
