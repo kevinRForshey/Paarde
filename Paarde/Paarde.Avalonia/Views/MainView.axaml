@@ -8,7 +8,10 @@
         <StackPanel Margin="24" Spacing="16" MaxWidth="720">
 
             <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-                <Border Width="64" Height="64" CornerRadius="14" Background="#4F46E5">
+                <!-- specs/fluent-design-pass R5: 14 kept literal - this is the app's brand mark, a
+                     deliberately larger/rounder radius than the theme's ControlCornerRadius (3) or
+                     OverlayCornerRadius (5), not a control that should track the active theme. -->
+                <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource SystemAccentColor}">
                     <TextBlock Text="P"
                                FontSize="34"
                                FontWeight="Bold"

@@ -29,13 +29,31 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
-            <Button Grid.Column="1" Margin="8,0,0,0" Content="Build" Command="{Binding BuildCommand}" />
-            <Button Grid.Column="2" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommand}" Classes="accent" />
-            <Button Grid.Column="3" Margin="8,0,0,0" Content="Stop" Command="{Binding StopCommand}" />
-            <TextBlock Grid.Column="4"
-                       Margin="12,0,0,0"
-                       VerticalAlignment="Center"
-                       Text="{Binding StatusMessage}" />
+            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding BuildCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Code" FontSize="14" />
+                    <TextBlock Text="Build" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding RunCommand}" Classes="accent">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Play" FontSize="14" />
+                    <TextBlock Text="Run" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding StopCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Stop" FontSize="14" />
+                    <TextBlock Text="Stop" />
+                </StackPanel>
+            </Button>
+            <ui:InfoBar Grid.Column="4"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center"
+                        Message="{Binding StatusMessage}"
+                        Severity="{Binding StatusSeverity}"
+                        IsClosable="False"
+                        IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         </Grid>
 
         <!-- UX pass: compact icon-rail pane instead of the ~320px labeled sidebar - reclaims
@@ -56,9 +74,11 @@
                         <ui:SymbolIconSource Symbol="Folder" />
                     </ui:NavigationViewItem.IconSource>
                 </ui:NavigationViewItem>
+                <!-- specs/fluent-design-pass R3: Keyboard, not Play, so this nav icon doesn't collide
+                     with the Run buttons' Play icon. -->
                 <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
                     <ui:NavigationViewItem.IconSource>
-                        <ui:SymbolIconSource Symbol="Play" />
+                        <ui:SymbolIconSource Symbol="Keyboard" />
                     </ui:NavigationViewItem.IconSource>
                 </ui:NavigationViewItem>
                 <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
@@ -82,10 +102,7 @@
                IsLightDismissEnabled="True"
                DataContext="{Binding QuickOpenViewModel}"
                IsOpen="{Binding IsOpen}">
-            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1"
-                    Padding="8"
+            <Border Classes="popup-chrome"
                     MinWidth="420">
                 <StackPanel Spacing="4">
                     <TextBox Name="QuickOpenQueryBox"
@@ -113,10 +130,7 @@
                IsLightDismissEnabled="True"
                DataContext="{Binding CommandPaletteViewModel}"
                IsOpen="{Binding IsOpen}">
-            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1"
-                    Padding="8"
+            <Border Classes="popup-chrome"
                     MinWidth="420">
                 <StackPanel Spacing="4">
                     <TextBox Name="CommandPaletteQueryBox"
@@ -148,10 +162,7 @@
                IsLightDismissEnabled="True"
                DataContext="{Binding SymbolQuickPickViewModel}"
                IsOpen="{Binding IsOpen}">
-            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1"
-                    Padding="8"
+            <Border Classes="popup-chrome"
                     MinWidth="420">
                 <StackPanel Spacing="4">
                     <TextBox Name="SymbolQuickPickQueryBox"
@@ -219,16 +230,36 @@
                                       Text="{Binding CommandText}"
                                       Watermark="Type a command to run in the current working directory..."
                                       FontFamily="Cascadia Mono,Consolas,monospace" />
-                            <Button Grid.Column="1" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommandCommand}" Classes="accent" />
-                            <Button Grid.Column="2" Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelCommandCommand}" IsVisible="{Binding IsRunning}" />
-                            <Button Grid.Column="3" Margin="8,0,0,0" Content="Clear" Command="{Binding ClearOutputCommand}" />
+                            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding RunCommandCommand}" Classes="accent">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ui:SymbolIcon Symbol="Play" FontSize="14" />
+                                    <TextBlock Text="Run" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding CancelCommandCommand}" IsVisible="{Binding IsRunning}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ui:SymbolIcon Symbol="Stop" FontSize="14" />
+                                    <TextBlock Text="Cancel" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding ClearOutputCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ui:SymbolIcon Symbol="Clear" FontSize="14" />
+                                    <TextBlock Text="Clear" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                         <controls:TerminalControl Name="DockTerminal"
                                                   Grid.Row="1"
                                                   Margin="0,8,0,0"
                                                   FontSize="14"
                                                   Buffer="{Binding OutputBuffer}" />
-                        <TextBlock Grid.Row="2" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
+                        <ui:InfoBar Grid.Row="2"
+                                    Margin="0,4,0,0"
+                                    Message="{Binding StatusMessage}"
+                                    Severity="{Binding StatusSeverity}"
+                                    IsClosable="False"
+                                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                     </Grid>
                 </TabItem>
             </TabControl>

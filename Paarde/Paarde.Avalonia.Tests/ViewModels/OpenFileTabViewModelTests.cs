@@ -1,3 +1,4 @@
+using FluentAvalonia.UI.Controls;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
@@ -75,6 +76,7 @@ public class OpenFileTabViewModelTests : IDisposable
         Assert.Equal("a.txt", _fileChangeApplyService.LastWriteRawFilePath);
         Assert.Equal("edited", _fileChangeApplyService.LastWriteRawContent);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
     }
 
     [Fact]
@@ -90,6 +92,7 @@ public class OpenFileTabViewModelTests : IDisposable
         Assert.Equal(0, _fileChangeApplyService.WriteRawCallCount);
         Assert.True(sut.IsDirty);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Error, sut.StatusSeverity);
     }
 
     [Fact]
@@ -106,6 +109,7 @@ public class OpenFileTabViewModelTests : IDisposable
         Assert.Equal(0, _fileChangeApplyService.WriteRawCallCount);
         Assert.True(sut.IsDirty);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Warning, sut.StatusSeverity);
     }
 
     [Fact]

@@ -3,6 +3,8 @@ using System.Collections.Specialized;
 
 using Avalonia.Threading;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Services;
@@ -55,6 +57,9 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private InfoBarSeverity statusSeverity = InfoBarSeverity.Informational;
 
     [ObservableProperty]
     private FileTreeNodeViewModel? selectedNode;
@@ -495,6 +500,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         {
             Root = null;
             StatusMessage = "Explorer_NoWorkingDirectory".Resolve();
+            StatusSeverity = InfoBarSeverity.Warning;
             return;
         }
 
@@ -502,6 +508,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         {
             Root = null;
             StatusMessage = string.Format("Explorer_WorkingDirectoryNotFound".Resolve(), WorkingDirectoryPath);
+            StatusSeverity = InfoBarSeverity.Error;
             return;
         }
 
@@ -513,18 +520,21 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
             Root = FileTreeNodeViewModel.FromEntry(FileTreeBuilder.Build(WorkingDirectoryPath), touchedFullPaths);
             StatusMessage = string.Empty;
+            StatusSeverity = InfoBarSeverity.Informational;
         }
         catch (IOException ex)
         {
             _logger.LogWarning(ex, "Failed to read the working directory {WorkingDirectory} while building the Explorer tree.", WorkingDirectoryPath);
             Root = null;
             StatusMessage = string.Format("Explorer_LoadFailed".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
         catch (UnauthorizedAccessException ex)
         {
             _logger.LogWarning(ex, "Failed to read the working directory {WorkingDirectory} while building the Explorer tree.", WorkingDirectoryPath);
             Root = null;
             StatusMessage = string.Format("Explorer_LoadFailed".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
     }
 

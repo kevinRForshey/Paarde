@@ -1,5 +1,7 @@
 using System.ComponentModel;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
@@ -43,6 +45,9 @@ public partial class OpenFileTabViewModel : ObservableObject
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private InfoBarSeverity statusSeverity = InfoBarSeverity.Informational;
 
     [ObservableProperty]
     private string fileOverview = string.Empty;
@@ -198,6 +203,7 @@ public partial class OpenFileTabViewModel : ObservableObject
         if (ProtectedPathChecker.IsProtected(_workingDirectoryPath, relativePath))
         {
             StatusMessage = string.Format("Explorer_SaveBlockedProtectedPath".Resolve(), relativePath);
+            StatusSeverity = InfoBarSeverity.Error;
             return;
         }
 
@@ -208,6 +214,7 @@ public partial class OpenFileTabViewModel : ObservableObject
         if (currentDiskContent != _originalContentOnDisk)
         {
             StatusMessage = string.Format("Explorer_SaveConflict".Resolve(), relativePath);
+            StatusSeverity = InfoBarSeverity.Warning;
             return;
         }
 
@@ -217,10 +224,12 @@ public partial class OpenFileTabViewModel : ObservableObject
             _originalContentOnDisk = Content;
             IsDirty = false;
             StatusMessage = string.Format("Explorer_SaveSucceeded".Resolve(), relativePath);
+            StatusSeverity = InfoBarSeverity.Success;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             StatusMessage = string.Format("Explorer_SaveFailed".Resolve(), relativePath, ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
     }
 

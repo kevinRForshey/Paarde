@@ -1,3 +1,4 @@
+using FluentAvalonia.UI.Controls;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
@@ -69,6 +70,7 @@ public class TerminalViewModelTests
 
         Assert.Empty(_ptyProcessManager.StartCalls);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Warning, sut.StatusSeverity);
     }
 
     [Fact]

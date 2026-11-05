@@ -13,7 +13,12 @@
                        FontWeight="Bold"
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
-            <Button Content="Refresh" Command="{Binding RefreshTreeCommand}" />
+            <Button Command="{Binding RefreshTreeCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Refresh" FontSize="14" />
+                    <TextBlock Text="Refresh" />
+                </StackPanel>
+            </Button>
             <!-- Epic 25, T12 (R10): lets the user pick a working directory from Explorer itself,
                  rather than only ever inheriting whichever one Compose/Prompt last saved. -->
             <Button Command="{Binding OpenFolderCommand}">
@@ -42,12 +47,12 @@
             </Button>
         </StackPanel>
 
-        <TextBlock Grid.Row="1"
-                   Margin="8,0,8,8"
-                   Text="{Binding StatusMessage}"
-                   TextWrapping="Wrap"
-                   Opacity="0.7"
-                   IsVisible="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        <ui:InfoBar Grid.Row="1"
+                    Margin="8,0,8,8"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    IsClosable="False"
+                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
         <!-- T8.1.3: split view - tree on the left, a read-only preview of whatever file is
              selected on the right. The preview reuses CodeEditor (same control Tutorial uses for
@@ -235,10 +240,7 @@
             <Popup IsOpen="{Binding IsMruSwitcherOpen}"
                    PlacementTarget="WorkspaceGrid"
                    Placement="Center">
-                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                        BorderThickness="1"
-                        Padding="8"
+                <Border Classes="popup-chrome"
                         MinWidth="260">
                     <ListBox ItemsSource="{Binding MruSwitcherItems}" SelectedItem="{Binding MruSwitcherHighlighted}">
                         <ListBox.ItemTemplate>

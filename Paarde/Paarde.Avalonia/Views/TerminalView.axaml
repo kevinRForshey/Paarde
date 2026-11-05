@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              x:Class="Paarde.Avalonia.Views.TerminalView"
@@ -16,9 +18,24 @@
                       Text="{Binding CommandText}"
                       Watermark="Type a command to run in the current working directory..."
                       FontFamily="Cascadia Mono,Consolas,monospace" />
-            <Button Grid.Column="1" Margin="8,0,0,0" Content="Run" Command="{Binding RunCommandCommand}" Classes="accent" />
-            <Button Grid.Column="2" Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelCommandCommand}" IsVisible="{Binding IsRunning}" />
-            <Button Grid.Column="3" Margin="8,0,0,0" Content="Clear" Command="{Binding ClearOutputCommand}" />
+            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding RunCommandCommand}" Classes="accent">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Play" FontSize="14" />
+                    <TextBlock Text="Run" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding CancelCommandCommand}" IsVisible="{Binding IsRunning}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Stop" FontSize="14" />
+                    <TextBlock Text="Cancel" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding ClearOutputCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Clear" FontSize="14" />
+                    <TextBlock Text="Clear" />
+                </StackPanel>
+            </Button>
         </Grid>
 
         <!-- specs/terminal-emulation T7: the plain-text TextBox is replaced by TerminalControl,
@@ -31,6 +48,11 @@
                                   FontSize="14"
                                   Buffer="{Binding OutputBuffer}" />
 
-        <TextBlock Grid.Row="3" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
+        <ui:InfoBar Grid.Row="3"
+                    Margin="0,4,0,0"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    IsClosable="False"
+                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
     </Grid>
 </UserControl>

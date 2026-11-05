@@ -1,3 +1,4 @@
+using FluentAvalonia.UI.Controls;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
@@ -58,6 +59,7 @@ public class ExplorerViewModelTests : IDisposable
 
         Assert.Null(sut.Root);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Warning, sut.StatusSeverity);
     }
 
     [Fact]
@@ -70,6 +72,7 @@ public class ExplorerViewModelTests : IDisposable
 
         Assert.Null(sut.Root);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Error, sut.StatusSeverity);
     }
 
     [Fact]
@@ -84,6 +87,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.NotNull(sut.Root);
         Assert.Equal("a.txt", Assert.Single(sut.Root!.Children).Name);
         Assert.Empty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Informational, sut.StatusSeverity);
     }
 
     // Epic 24, R1.4: Quick Open navigates here with the absolute path of the file to open.

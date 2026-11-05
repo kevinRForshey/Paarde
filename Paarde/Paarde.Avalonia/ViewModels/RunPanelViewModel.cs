@@ -3,6 +3,8 @@ using System.Text;
 
 using Avalonia.Threading;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
@@ -58,6 +60,9 @@ public partial class RunPanelViewModel : ObservableObject
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private InfoBarSeverity statusSeverity = InfoBarSeverity.Informational;
 
     public RunPanelViewModel(
         RunConfigurationsProvider runConfigurationsProvider,
@@ -179,6 +184,7 @@ public partial class RunPanelViewModel : ObservableObject
 
         RunOutputBuffer.Feed(ClearScreenSequence);
         StatusMessage = string.Format("RunPanel_Running".Resolve(), configuration.Name);
+        StatusSeverity = InfoBarSeverity.Informational;
 
         try
         {
@@ -191,6 +197,7 @@ public partial class RunPanelViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "Failed to start the run command for {Configuration}.", configuration.Name);
             StatusMessage = string.Format("RunPanel_RunStartError".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
     }
 
@@ -202,6 +209,7 @@ public partial class RunPanelViewModel : ObservableObject
         if (configuration is null)
         {
             StatusMessage = "RunPanel_NoConfiguration".Resolve();
+            StatusSeverity = InfoBarSeverity.Warning;
             return false;
         }
 
@@ -215,6 +223,7 @@ public partial class RunPanelViewModel : ObservableObject
         IsBuilding = true;
         BuildOutputBuffer.Feed(ClearScreenSequence);
         StatusMessage = string.Format("RunPanel_Building".Resolve(), configuration.Name);
+        StatusSeverity = InfoBarSeverity.Informational;
 
         try
         {
@@ -224,6 +233,7 @@ public partial class RunPanelViewModel : ObservableObject
             StatusMessage = result.Succeeded
                 ? string.Format("RunPanel_BuildSucceeded".Resolve(), result.Duration.TotalSeconds)
                 : string.Format("RunPanel_BuildFailed".Resolve(), result.ExitCode, result.Duration.TotalSeconds);
+            StatusSeverity = result.Succeeded ? InfoBarSeverity.Success : InfoBarSeverity.Error;
 
             return result.Succeeded;
         }
@@ -231,6 +241,7 @@ public partial class RunPanelViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "Failed to run the build command for {Configuration}.", configuration.Name);
             StatusMessage = string.Format("RunPanel_BuildError".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
             return false;
         }
         finally
@@ -275,6 +286,7 @@ public partial class RunPanelViewModel : ObservableObject
         {
             IsRunning = false;
             StatusMessage = exitCode is null ? "RunPanel_Stopped".Resolve() : string.Format("RunPanel_Exited".Resolve(), exitCode);
+            StatusSeverity = exitCode is null or 0 ? InfoBarSeverity.Informational : InfoBarSeverity.Error;
         });
 
     partial void OnIsBuildingChanged(bool value)

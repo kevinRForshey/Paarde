@@ -63,12 +63,12 @@
             <ui:ProgressRing Width="18" Height="18" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsLoadingOverview}" />
         </StackPanel>
 
-        <TextBlock Grid.Row="2"
-                   Margin="0,0,0,4"
-                   Text="{Binding StatusMessage}"
-                   TextWrapping="Wrap"
-                   Opacity="0.7"
-                   IsVisible="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        <ui:InfoBar Grid.Row="2"
+                    Margin="0,0,0,4"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    IsClosable="False"
+                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
         <!-- specs/unified-workbench T13 (R5): this tab is carrying a proposed change from a
              prompt run - show which file it's for and a shortcut into the Assistant panel's
@@ -77,7 +77,7 @@
         <Border Grid.Row="3"
                 Margin="0,0,0,4"
                 Padding="8,4"
-                CornerRadius="4"
+                CornerRadius="{DynamicResource ControlCornerRadius}"
                 Background="{DynamicResource SystemAccentColor}"
                 Opacity="0.15"
                 IsVisible="{Binding PendingChange, Converter={x:Static conv:ObjectConverters.IsNotNull}}">

@@ -55,5 +55,15 @@
             <Setter Property="Foreground" Value="{DynamicResource DangerButtonPointerOverBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource DangerButtonPointerOverBrush}" />
         </Style>
+
+        <!-- specs/fluent-design-pass R2: shared chrome for the Quick Open/Command Palette/Go to
+             Symbol/MRU switcher popups, which all used the same inline
+             Background/BorderBrush/BorderThickness/Padding before this. -->
+        <Style Selector="Border.popup-chrome">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8" />
+        </Style>
     </Application.Styles>
 </Application>

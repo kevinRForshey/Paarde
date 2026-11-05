@@ -2,6 +2,8 @@ using System.Text;
 
 using Avalonia.Threading;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Services;
@@ -56,6 +58,9 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
+    [ObservableProperty]
+    private InfoBarSeverity statusSeverity = InfoBarSeverity.Informational;
+
     public TerminalViewModel(
         [FromKeyedServices(PtyProcessManagerKey)] IPtyProcessManager ptyProcessManager,
         ILocalSettingsService localSettingsService,
@@ -100,11 +105,13 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         if (string.IsNullOrWhiteSpace(WorkingDirectoryPath))
         {
             StatusMessage = "Terminal_NoWorkingDirectory".Resolve();
+            StatusSeverity = InfoBarSeverity.Warning;
             return;
         }
 
         OutputBuffer.Feed(ClearScreenSequence);
         StatusMessage = string.Format("Terminal_Running".Resolve(), CommandText);
+        StatusSeverity = InfoBarSeverity.Informational;
 
         try
         {
@@ -118,6 +125,7 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         {
             _logger.LogWarning(ex, "Failed to run a terminal command in {WorkingDirectory}.", WorkingDirectoryPath);
             StatusMessage = string.Format("Terminal_RunStartError".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
     }
 
@@ -157,5 +165,6 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         {
             IsRunning = false;
             StatusMessage = exitCode is null ? "Terminal_Stopped".Resolve() : string.Format("Terminal_Exited".Resolve(), exitCode);
+            StatusSeverity = exitCode is null or 0 ? InfoBarSeverity.Informational : InfoBarSeverity.Error;
         });
 }

@@ -36,9 +36,24 @@
 
         <StackPanel Grid.Row="1" Margin="0,0,0,8" Orientation="Horizontal" Spacing="8"
                     IsVisible="{Binding HasSelectableHunks}">
-            <Button Content="Select all" Command="{Binding SelectAllHunksCommand}" />
-            <Button Content="Select none" Command="{Binding SelectNoHunksCommand}" />
-            <Button Content="Invert selection" Command="{Binding InvertHunkSelectionCommand}" />
+            <Button Command="{Binding SelectAllHunksCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="SelectAll" FontSize="14" />
+                    <TextBlock Text="Select all" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding SelectNoHunksCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="ClearSelection" FontSize="14" />
+                    <TextBlock Text="Select none" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding InvertHunkSelectionCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Switch" FontSize="14" />
+                    <TextBlock Text="Invert selection" />
+                </StackPanel>
+            </Button>
             <TextBlock Text="{Binding SelectionSummary}" VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
@@ -46,10 +61,20 @@
              indicator for tutorials with many steps. Hidden entirely for a file with no resolved
              steps (RebuildSteps leaves Steps empty), same as the select-all row above. -->
         <StackPanel Name="StepNavigationPanel" Grid.Row="2" Margin="0,0,0,8" Orientation="Horizontal" Spacing="8">
-            <Button Name="PreviousStepButton" Content="◀ Previous" Click="OnPreviousStepButtonClick"
-                     ToolTip.Tip="Jump to the previous step." />
-            <Button Name="NextStepButton" Content="Next ▶" Click="OnNextStepButtonClick"
-                     ToolTip.Tip="Jump to the next step." />
+            <Button Name="PreviousStepButton" Click="OnPreviousStepButtonClick"
+                     ToolTip.Tip="Jump to the previous step.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="ChevronLeft" FontSize="14" />
+                    <TextBlock Text="Previous" />
+                </StackPanel>
+            </Button>
+            <Button Name="NextStepButton" Click="OnNextStepButtonClick"
+                     ToolTip.Tip="Jump to the next step.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Next" />
+                    <ui:SymbolIcon Symbol="ChevronRight" FontSize="14" />
+                </StackPanel>
+            </Button>
             <TextBlock Name="StepNavigationLabel" VerticalAlignment="Center" />
             <ProgressBar Name="StepProgressBar" Width="120" Height="6" VerticalAlignment="Center" Minimum="0" />
         </StackPanel>
