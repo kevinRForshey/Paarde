@@ -6,6 +6,14 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
 
 - [x] T1 `MainWindow.axaml`: `TransparencyLevelHint="Mica,AcrylicBlur,None"`,
   `Background="Transparent"`, extended client-area title bar. _(R1)_
+  - Follow-up: the Mica/Acrylic backdrop is now an opt-in Settings toggle
+    (`SettingsViewModel.IsTransparencyEnabled`, persisted via `AppearanceSettingsKeys
+    .TransparencyEnabled`), **off by default** - not something that should change the window's
+    look silently. `MainWindow.axaml` no longer hardcodes `TransparencyLevelHint`/`Background`;
+    `MainWindow.ApplyTransparency(bool)` applies both live, called once at startup
+    (`App.axaml.cs`, alongside theme init) and again whenever the Settings toggle changes. The
+    extended client-area title bar attributes stay unconditional - that's chrome layout, not the
+    backdrop material.
 
 ## F29.2 — Shared chrome
 

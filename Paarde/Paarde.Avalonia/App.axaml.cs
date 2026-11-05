@@ -354,6 +354,11 @@ public partial class App : Application
             var interfaceMode = await GetService<ILocalSettingsService>().ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
             var startupViewModelType = interfaceMode == InterfaceMode.FlowWizard ? typeof(MainViewModel) : typeof(ExplorerViewModel);
             GetService<INavigationService>().NavigateTo(startupViewModelType.FullName!);
+
+            // specs/fluent-design-pass R1: off by default - see AppearanceSettingsKeys/
+            // MainWindow.ApplyTransparency.
+            var transparencyEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
+            (MainWindow as Views.MainWindow)?.ApplyTransparency(transparencyEnabled);
         }
         catch (Exception ex)
         {

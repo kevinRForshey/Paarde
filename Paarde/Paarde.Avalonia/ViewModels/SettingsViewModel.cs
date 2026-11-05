@@ -9,6 +9,7 @@ using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
+using Paarde.Avalonia.Views;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Models;
 
@@ -103,6 +104,13 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
     [ObservableProperty]
     private bool interfaceModeChangeRequiresRestart;
+
+    // specs/fluent-design-pass R1: off by default - the Mica/Acrylic window backdrop is a visual
+    // preference, not something that should turn on silently (same reasoning as AgentToolsEnabled
+    // above). Unlike InterfaceMode, this applies live to the already-running MainWindow instead of
+    // requiring a restart - see OnIsTransparencyEnabledChanged.
+    [ObservableProperty]
+    private bool isTransparencyEnabled;
 
     public IReadOnlyList<InterfaceMode> AvailableInterfaceModes { get; } = Enum.GetValues<InterfaceMode>();
 
@@ -220,6 +228,8 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             _loadedInterfaceMode = await _localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
             InterfaceMode = _loadedInterfaceMode;
             InterfaceModeChangeRequiresRestart = false;
+
+            IsTransparencyEnabled = await _localSettingsService.ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
         }
         catch (Exception ex)
         {
@@ -241,6 +251,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     partial void OnClaudeCliArgumentsChanged(string value) => _localSettingsService.SaveSettingAsync(ClaudeCliSettingsKeys.Arguments, value);
 
     partial void OnAgentToolsEnabledChanged(bool value) => _localSettingsService.SaveSettingAsync(ClaudeCliSettingsKeys.AgentToolsEnabled, value);
+
+    partial void OnIsTransparencyEnabledChanged(bool value)
+    {
+        _localSettingsService.SaveSettingAsync(AppearanceSettingsKeys.TransparencyEnabled, value);
+        (App.MainWindow as MainWindow)?.ApplyTransparency(value);
+    }
 
     partial void OnBuildCommandChanged(string value) => _localSettingsService.SaveSettingAsync(BuildTestSettingsKeys.BuildCommand, value);
 
