@@ -14,7 +14,11 @@ namespace Paarde.Core.Services;
 // feature instead of a script someone has to know to run.
 public class HeadroomService : IHeadroomService
 {
-    private const string WrapMarkerCommand = "headroom wrap selfheal";
+    // Confirmed against the real `headroom init claude` output (v0.37.0): it writes
+    // "... init hook ensure --profile <random-per-project> --marker headroom-init-claude". The
+    // marker flag is the stable, literal part; --profile is randomized per project so can't be
+    // matched on.
+    private const string WrapMarkerCommand = "--marker headroom-init-claude";
     private const string HeadroomPackageSpec = "headroom-ai[all]";
 
     // pip --user and `uv tool install` both default to putting shims here on every platform
@@ -127,7 +131,8 @@ public class HeadroomService : IHeadroomService
                 .Select(check => new HeadroomCheckItem(
                     check["name"]?.Value<string>() ?? string.Empty,
                     check["status"]?.Value<string>() ?? string.Empty,
-                    check["summary"]?.Value<string>() ?? string.Empty))
+                    check["summary"]?.Value<string>() ?? string.Empty,
+                    check["hint"]?.Value<string>()))
                 .ToList();
 
             result = new HeadroomHealthResult(exitCode, checks);

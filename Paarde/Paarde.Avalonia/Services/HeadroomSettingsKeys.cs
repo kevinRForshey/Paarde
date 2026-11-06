@@ -8,4 +8,9 @@ namespace Paarde.Avalonia.Services;
 public static class HeadroomSettingsKeys
 {
     public const string IntegrationEnabled = "Headroom.IntegrationEnabled";
+
+    // "Not now" on the automatic startup check's install/wiring prompt snoozes that prompt for a
+    // while instead of re-asking on every launch - see HeadroomPromptSnoozeStore.
+    public const string InstallPromptSnoozedUntilUtc = "Headroom.InstallPromptSnoozedUntilUtc";
+    public const string WiringPromptSnoozedUntilUtc = "Headroom.WiringPromptSnoozedUntilUtc";
 }

@@ -12,7 +12,7 @@ public class FakeHeadroomCoordinator : IHeadroomCoordinator
 
     public List<string> ProjectPathsChecked { get; } = new();
 
-    public Task<(string Message, InfoBarSeverity Severity)> CheckAndOfferFixesAsync(string projectPath, CancellationToken cancellationToken = default)
+    public Task<(string Message, InfoBarSeverity Severity)> CheckAndOfferFixesAsync(string projectPath, bool isAutomaticCheck, CancellationToken cancellationToken = default)
     {
         ProjectPathsChecked.Add(projectPath);
         return Task.FromResult((MessageToReturn, SeverityToReturn));

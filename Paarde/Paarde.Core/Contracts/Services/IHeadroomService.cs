@@ -23,9 +23,9 @@ public interface IHeadroomService
     Task<HeadroomHealthResult> CheckHealthAsync(CancellationToken cancellationToken = default);
 
     // Reads {projectPath}/.claude/settings.local.json and settings.json (first one found wins)
-    // for an existing SessionStart hook whose command contains "headroom wrap selfheal" - the
-    // marker `headroom init claude` installs. Never throws: a missing/malformed file or missing
-    // project directory just means "not wired" (false).
+    // for an existing SessionStart hook whose command contains "--marker headroom-init-claude" -
+    // the marker `headroom init claude` installs. Never throws: a missing/malformed file or
+    // missing project directory just means "not wired" (false).
     Task<bool> IsProjectWiredAsync(string projectPath);
 
     // Runs `uv tool install "headroom-ai[all]"` - uv manages its own isolated venv for the tool,

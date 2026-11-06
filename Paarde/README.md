@@ -80,6 +80,10 @@ Paarde.slnx
   ```
   Not required to run Paarde — if it's missing, those three features are simply inactive and
   everything else works as normal.
+- *(Optional)* [Headroom](https://github.com/chopratejas/headroom) and [`uv`](https://github.com/astral-sh/uv)
+  for the Headroom integration (Settings page). Not required to run Paarde — the integration is off
+  by default, and if `headroom`/`uv` are missing Paarde offers to install Headroom via `uv` rather
+  than requiring it up front.
 
 ## Building and running
 
@@ -241,6 +245,14 @@ Every run is persisted automatically. Select a past session from the list to see
   **Reset to default** restores the built-in template.
 - **Code intelligence** — override the language server's executable path and arguments if
   `csharp-ls` isn't on your `PATH`, or swap in a different LSP-speaking server entirely.
+- **Headroom integration** — optional integration with [Headroom](https://github.com/chopratejas/headroom),
+  a token-savings proxy for Claude Code. When enabled, Paarde checks on startup, and on demand via
+  **Check Headroom status now**, whether the `headroom` CLI is installed, healthy, and the current
+  project is durably wired for it — offering (never forcing) to install it via [`uv`](https://github.com/astral-sh/uv)
+  or wire the project when something's missing. Off by default, since it can prompt to install
+  software and spawn external processes. Declining a prompt during an automatic startup check snoozes
+  it for 24 hours instead of re-asking on every launch; the manual **Check Headroom status now**
+  button always re-prompts regardless of that snooze.
 
 ## Project status
 

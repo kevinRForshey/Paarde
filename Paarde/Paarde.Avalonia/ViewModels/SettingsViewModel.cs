@@ -295,7 +295,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             return;
         }
 
-        var (message, severity) = await _headroomCoordinator.CheckAndOfferFixesAsync(workingDirectoryPath);
+        var (message, severity) = await _headroomCoordinator.CheckAndOfferFixesAsync(workingDirectoryPath, isAutomaticCheck: false);
         HeadroomStatusMessage = message;
         HeadroomStatusSeverity = severity;
     }

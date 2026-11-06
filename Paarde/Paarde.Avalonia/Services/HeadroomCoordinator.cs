@@ -16,21 +16,23 @@ public class HeadroomCoordinator : IHeadroomCoordinator
 {
     private readonly IHeadroomService _headroomService;
     private readonly IDialogService _dialogService;
+    private readonly IHeadroomPromptSnoozeStore _promptSnoozeStore;
 
-    public HeadroomCoordinator(IHeadroomService headroomService, IDialogService dialogService)
+    public HeadroomCoordinator(IHeadroomService headroomService, IDialogService dialogService, IHeadroomPromptSnoozeStore promptSnoozeStore)
     {
         _headroomService = headroomService;
         _dialogService = dialogService;
+        _promptSnoozeStore = promptSnoozeStore;
     }
 
-    public async Task<(string Message, InfoBarSeverity Severity)> CheckAndOfferFixesAsync(string projectPath, CancellationToken cancellationToken = default)
+    public async Task<(string Message, InfoBarSeverity Severity)> CheckAndOfferFixesAsync(string projectPath, bool isAutomaticCheck, CancellationToken cancellationToken = default)
     {
         var notes = new List<string>();
         var severity = InfoBarSeverity.Success;
 
         if (!_headroomService.IsInstalled())
         {
-            var (installed, installNote, installSeverity) = await TryInstallAsync(cancellationToken);
+            var (installed, installNote, installSeverity) = await TryInstallAsync(isAutomaticCheck, cancellationToken);
             notes.Add(installNote);
             Escalate(ref severity, installSeverity);
 
@@ -57,18 +59,23 @@ public class HeadroomCoordinator : IHeadroomCoordinator
             Escalate(ref severity, InfoBarSeverity.Informational);
         }
 
-        var (wiringNote, wiringSeverity) = await CheckProjectWiringAsync(projectPath, cancellationToken);
+        var (wiringNote, wiringSeverity) = await CheckProjectWiringAsync(projectPath, isAutomaticCheck, cancellationToken);
         notes.Add(wiringNote);
         Escalate(ref severity, wiringSeverity);
 
         return (string.Join(" ", notes), severity);
     }
 
-    private async Task<(bool Installed, string Note, InfoBarSeverity Severity)> TryInstallAsync(CancellationToken cancellationToken)
+    private async Task<(bool Installed, string Note, InfoBarSeverity Severity)> TryInstallAsync(bool isAutomaticCheck, CancellationToken cancellationToken)
     {
         if (!_headroomService.IsUvAvailable())
         {
             return (false, "Headroom isn't installed, and uv isn't available to install it automatically.", InfoBarSeverity.Warning);
+        }
+
+        if (isAutomaticCheck && await _promptSnoozeStore.IsSnoozedAsync(HeadroomPromptKind.Install))
+        {
+            return (false, "Headroom isn't installed - snoozed, use 'Check Headroom status now' to retry.", InfoBarSeverity.Warning);
         }
 
         var confirmed = await _dialogService.ConfirmAsync(
@@ -79,6 +86,11 @@ public class HeadroomCoordinator : IHeadroomCoordinator
 
         if (!confirmed)
         {
+            if (isAutomaticCheck)
+            {
+                await _promptSnoozeStore.SnoozeAsync(HeadroomPromptKind.Install);
+            }
+
             return (false, "Headroom isn't installed - skipped installation.", InfoBarSeverity.Warning);
         }
 
@@ -89,11 +101,16 @@ public class HeadroomCoordinator : IHeadroomCoordinator
             : (false, $"Failed to install Headroom (exit code {result.ExitCode}): {Truncate(result.StandardError)}", InfoBarSeverity.Error);
     }
 
-    private async Task<(string Note, InfoBarSeverity Severity)> CheckProjectWiringAsync(string projectPath, CancellationToken cancellationToken)
+    private async Task<(string Note, InfoBarSeverity Severity)> CheckProjectWiringAsync(string projectPath, bool isAutomaticCheck, CancellationToken cancellationToken)
     {
         if (await _headroomService.IsProjectWiredAsync(projectPath))
         {
             return ("This project already has durable Headroom wiring.", InfoBarSeverity.Success);
+        }
+
+        if (isAutomaticCheck && await _promptSnoozeStore.IsSnoozedAsync(HeadroomPromptKind.Wiring))
+        {
+            return ("This project isn't wired for Headroom - snoozed, use 'Check Headroom status now' to retry.", InfoBarSeverity.Warning);
         }
 
         var confirmed = await _dialogService.ConfirmAsync(
@@ -104,6 +121,11 @@ public class HeadroomCoordinator : IHeadroomCoordinator
 
         if (!confirmed)
         {
+            if (isAutomaticCheck)
+            {
+                await _promptSnoozeStore.SnoozeAsync(HeadroomPromptKind.Wiring);
+            }
+
             return ("Skipped wiring this project for Headroom.", InfoBarSeverity.Warning);
         }
 
@@ -141,7 +163,9 @@ public class HeadroomCoordinator : IHeadroomCoordinator
     {
         var warnings = checks
             .Where(check => !string.Equals(check.Status, "pass", StringComparison.OrdinalIgnoreCase))
-            .Select(check => Truncate($"{check.Name}: {check.Summary}", 120))
+            .Select(check => Truncate(string.IsNullOrWhiteSpace(check.Hint)
+                ? $"{check.Name}: {check.Summary}"
+                : $"{check.Name}: {check.Summary} (hint: {check.Hint})", 120))
             .ToList();
 
         return warnings.Count > 0 ? string.Join(" | ", warnings) : "run 'headroom doctor' for details.";

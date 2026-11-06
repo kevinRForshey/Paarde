@@ -1,5 +1,6 @@
 using FluentAvalonia.UI.Controls;
 
+using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Core.Models;
@@ -10,15 +11,16 @@ public class HeadroomCoordinatorTests
 {
     private readonly FakeHeadroomService _headroomService = new();
     private readonly FakeDialogService _dialogService = new();
+    private readonly FakeHeadroomPromptSnoozeStore _promptSnoozeStore = new();
 
-    private HeadroomCoordinator CreateSut() => new(_headroomService, _dialogService);
+    private HeadroomCoordinator CreateSut() => new(_headroomService, _dialogService, _promptSnoozeStore);
 
     [Fact]
     public async Task CheckAndOfferFixesAsync_WhenInstalledHealthyAndWired_ReturnsSuccessWithNoPrompts()
     {
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(0, _dialogService.ConfirmCallCount);
         Assert.Equal(InfoBarSeverity.Success, severity);
@@ -33,7 +35,7 @@ public class HeadroomCoordinatorTests
         _dialogService.ConfirmResultToReturn = true;
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(1, _headroomService.InstallCallCount);
         Assert.Equal(InfoBarSeverity.Success, severity);
@@ -47,7 +49,7 @@ public class HeadroomCoordinatorTests
         _dialogService.ConfirmResultToReturn = false;
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(0, _headroomService.InstallCallCount);
         Assert.Equal(InfoBarSeverity.Warning, severity);
@@ -62,7 +64,7 @@ public class HeadroomCoordinatorTests
         _headroomService.IsUvAvailableResult = false;
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(0, _dialogService.ConfirmCallCount);
         Assert.Equal(InfoBarSeverity.Warning, severity);
@@ -76,7 +78,7 @@ public class HeadroomCoordinatorTests
         _dialogService.ConfirmResultToReturn = true;
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(["/some/project"], _headroomService.InitClaudeProjectPaths);
         Assert.Equal(InfoBarSeverity.Success, severity);
@@ -90,7 +92,7 @@ public class HeadroomCoordinatorTests
         _dialogService.ConfirmResultToReturn = false;
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Empty(_headroomService.InitClaudeProjectPaths);
         Assert.Equal(InfoBarSeverity.Warning, severity);
@@ -106,11 +108,24 @@ public class HeadroomCoordinatorTests
         ]);
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(InfoBarSeverity.Informational, severity);
         Assert.Contains("budget: no budget configured", message);
         Assert.DoesNotContain("proxy: running", message);
+    }
+
+    [Fact]
+    public async Task CheckAndOfferFixesAsync_WhenHealthWarningHasHint_IncludesHintInMessage()
+    {
+        _headroomService.HealthResult = new HeadroomHealthResult(1, [
+            new HeadroomCheckItem("codex", "warn", "not routed (no ~/.codex/config.toml)", "wrap it: headroom wrap codex"),
+        ]);
+        var sut = CreateSut();
+
+        var (message, _) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+
+        Assert.Contains("codex: not routed (no ~/.codex/config.toml) (hint: wrap it: headroom wrap codex)", message);
     }
 
     [Fact]
@@ -119,10 +134,76 @@ public class HeadroomCoordinatorTests
         _headroomService.HealthResult = new HeadroomHealthResult(2, []);
         var sut = CreateSut();
 
-        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project");
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
 
         Assert.Equal(InfoBarSeverity.Error, severity);
         Assert.Contains("appears to be down", message);
         Assert.Contains("already has durable", message);
+    }
+
+    [Fact]
+    public async Task CheckAndOfferFixesAsync_AutomaticCheck_WhenInstallDeclined_SnoozesInstallPromptOnNextAutomaticCheck()
+    {
+        _headroomService.IsInstalledResult = false;
+        _dialogService.ConfirmResultToReturn = false;
+        var sut = CreateSut();
+
+        await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+        Assert.Equal(1, _dialogService.ConfirmCallCount);
+
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+
+        Assert.Equal(1, _dialogService.ConfirmCallCount);
+        Assert.Equal(InfoBarSeverity.Warning, severity);
+        Assert.Contains("snoozed", message);
+    }
+
+    [Fact]
+    public async Task CheckAndOfferFixesAsync_ManualCheck_IgnoresInstallPromptSnooze()
+    {
+        _headroomService.IsInstalledResult = false;
+        _dialogService.ConfirmResultToReturn = true;
+        await _promptSnoozeStore.SnoozeAsync(HeadroomPromptKind.Install);
+        var sut = CreateSut();
+
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: false);
+
+        Assert.Equal(1, _dialogService.ConfirmCallCount);
+        Assert.Equal(1, _headroomService.InstallCallCount);
+        Assert.Equal(InfoBarSeverity.Success, severity);
+        Assert.Contains("Installed Headroom.", message);
+    }
+
+    [Fact]
+    public async Task CheckAndOfferFixesAsync_ManualDecline_DoesNotSnoozeFutureAutomaticChecks()
+    {
+        _headroomService.IsInstalledResult = false;
+        _dialogService.ConfirmResultToReturn = false;
+        var sut = CreateSut();
+
+        await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: false);
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+
+        Assert.Equal(2, _dialogService.ConfirmCallCount);
+        Assert.Equal(InfoBarSeverity.Warning, severity);
+        Assert.DoesNotContain("snoozed", message);
+    }
+
+    [Fact]
+    public async Task CheckAndOfferFixesAsync_AutomaticCheck_WhenWiringDeclined_SnoozesWiringPromptOnNextAutomaticCheck()
+    {
+        _headroomService.IsProjectWiredResult = false;
+        _dialogService.ConfirmResultToReturn = false;
+        var sut = CreateSut();
+
+        await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+        Assert.Equal(1, _dialogService.ConfirmCallCount);
+
+        var (message, severity) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+
+        Assert.Equal(1, _dialogService.ConfirmCallCount);
+        Assert.Equal(InfoBarSeverity.Warning, severity);
+        Assert.Contains("snoozed", message);
+        Assert.Empty(_headroomService.InitClaudeProjectPaths);
     }
 }

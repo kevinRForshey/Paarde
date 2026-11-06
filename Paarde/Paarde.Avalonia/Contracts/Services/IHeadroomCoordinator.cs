@@ -9,5 +9,9 @@ namespace Paarde.Avalonia.Contracts.Services;
 // behavior instead of duplicating the prompt sequencing.
 public interface IHeadroomCoordinator
 {
-    Task<(string Message, InfoBarSeverity Severity)> CheckAndOfferFixesAsync(string projectPath, CancellationToken cancellationToken = default);
+    // isAutomaticCheck distinguishes the unattended startup hook from the user explicitly
+    // clicking "Check now": only the automatic path consults/sets prompt snoozing (see
+    // IHeadroomPromptSnoozeStore) so it stops re-asking on every launch, while an explicit
+    // manual check always prompts.
+    Task<(string Message, InfoBarSeverity Severity)> CheckAndOfferFixesAsync(string projectPath, bool isAutomaticCheck, CancellationToken cancellationToken = default);
 }

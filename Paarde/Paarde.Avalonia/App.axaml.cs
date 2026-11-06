@@ -136,6 +136,7 @@ public partial class App : Application
             services.AddTransient<IHeadroomService, HeadroomService>();
             services.AddTransient<IHeadroomCoordinator, HeadroomCoordinator>();
             services.AddSingleton<IHeadroomStatusStore, HeadroomStatusStore>();
+            services.AddTransient<IHeadroomPromptSnoozeStore, HeadroomPromptSnoozeStore>();
 
             // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
             // prompts in the same session instead of re-tokenizing the whole project on every
@@ -372,7 +373,7 @@ public partial class App : Application
 
             if (headroomIntegrationEnabled && !string.IsNullOrWhiteSpace(savedWorkingDirectory))
             {
-                var (message, severity) = await GetService<IHeadroomCoordinator>().CheckAndOfferFixesAsync(savedWorkingDirectory);
+                var (message, severity) = await GetService<IHeadroomCoordinator>().CheckAndOfferFixesAsync(savedWorkingDirectory, isAutomaticCheck: true);
                 GetService<IHeadroomStatusStore>().SetResult(message, severity);
             }
         }
