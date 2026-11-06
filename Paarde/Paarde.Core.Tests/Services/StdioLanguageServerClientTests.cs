@@ -111,6 +111,67 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
                             {"label": "NoInsertText"},
                         ],
                     })
+            elif method == "textDocument/documentSymbol":
+                uri = message["params"]["textDocument"]["uri"]
+                if uri.endswith("flat-symbols.cs"):
+                    write_message({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": [
+                            {
+                                "name": "Foo",
+                                "kind": 5,
+                                "location": {"uri": uri, "range": {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 1}}},
+                            },
+                            {
+                                "name": "Bar",
+                                "kind": 6,
+                                "containerName": "Foo",
+                                "location": {"uri": uri, "range": {"start": {"line": 1, "character": 4}, "end": {"line": 2, "character": 5}}},
+                            },
+                        ],
+                    })
+                else:
+                    write_message({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": [
+                            {
+                                "name": "Foo",
+                                "kind": 5,
+                                "range": {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 1}},
+                                "selectionRange": {"start": {"line": 0, "character": 6}, "end": {"line": 0, "character": 9}},
+                                "children": [
+                                    {
+                                        "name": "Bar",
+                                        "kind": 6,
+                                        "range": {"start": {"line": 1, "character": 4}, "end": {"line": 2, "character": 5}},
+                                        "selectionRange": {"start": {"line": 1, "character": 8}, "end": {"line": 1, "character": 11}},
+                                        "children": [],
+                                    },
+                                ],
+                            },
+                        ],
+                    })
+            elif method == "textDocument/hover":
+                position = message["params"]["position"]
+                if position["character"] == 50:
+                    write_message({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": {
+                            "contents": [
+                                {"language": "csharp", "value": "void Foo()"},
+                                "a plain string entry",
+                            ],
+                        },
+                    })
+                else:
+                    write_message({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": {"contents": {"kind": "markdown", "value": "**Foo**: a method"}},
+                    })
             elif method == "shutdown":
                 write_message({"jsonrpc": "2.0", "id": msg_id, "result": None})
             elif method == "exit":
@@ -303,6 +364,87 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
         var item = Assert.Single(items);
         Assert.Equal("WrappedLabel", item.Label);
         Assert.Equal("WrappedInsertText", item.InsertText);
+    }
+
+    [Fact]
+    public async Task GetDocumentSymbolsAsync_ServerRespondsWithHierarchicalShape_ReturnsSingleSyntheticRootWrappingIt()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var filePath = Path.Combine(Path.GetTempPath(), "hierarchical-symbols.cs");
+        var root = await _client.GetDocumentSymbolsAsync(filePath);
+
+        Assert.NotNull(root);
+        Assert.Equal("hierarchical-symbols.cs", root!.Name);
+        Assert.Equal(LspSymbolKind.File, root.Kind);
+
+        var foo = Assert.Single(root.Children);
+        Assert.Equal("Foo", foo.Name);
+        Assert.Equal(LspSymbolKind.Class, foo.Kind);
+        Assert.Equal(0, foo.SelectionRange.Start.Line);
+        Assert.Equal(6, foo.SelectionRange.Start.Character);
+
+        var bar = Assert.Single(foo.Children);
+        Assert.Equal("Bar", bar.Name);
+        Assert.Equal(LspSymbolKind.Method, bar.Kind);
+    }
+
+    [Fact]
+    public async Task GetDocumentSymbolsAsync_ServerRespondsWithFlatShape_ReconstructsNestingFromContainerName()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var filePath = Path.Combine(Path.GetTempPath(), "flat-symbols.cs");
+        var root = await _client.GetDocumentSymbolsAsync(filePath);
+
+        Assert.NotNull(root);
+        var foo = Assert.Single(root!.Children);
+        Assert.Equal("Foo", foo.Name);
+
+        var bar = Assert.Single(foo.Children);
+        Assert.Equal("Bar", bar.Name);
+    }
+
+    [Fact]
+    public async Task GetHoverAsync_ServerRespondsWithMarkupContent_ReturnsItsValue()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var hover = await _client.GetHoverAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 0));
+
+        Assert.NotNull(hover);
+        Assert.Equal("**Foo**: a method", hover!.Contents);
+    }
+
+    [Fact]
+    public async Task GetHoverAsync_ServerRespondsWithMarkedStringArray_FlattensEveryEntry()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var hover = await _client.GetHoverAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 50));
+
+        Assert.NotNull(hover);
+        Assert.Contains("void Foo()", hover!.Contents);
+        Assert.Contains("a plain string entry", hover.Contents);
+    }
+
+    [Fact]
+    public async Task StartAsync_SendsInitializeRequestDeclaringDocumentSymbolAndHoverCapabilities()
+    {
+        await _client.StartAsync(Path.GetTempPath());
+
+        var initializeMessage = await WaitForReceivedMessageAsync("initialize");
+
+        var textDocumentCapabilities = initializeMessage["params"]?["capabilities"]?["textDocument"];
+        Assert.NotNull(textDocumentCapabilities);
+
+        var documentSymbolCapability = textDocumentCapabilities!["documentSymbol"];
+        Assert.NotNull(documentSymbolCapability);
+        Assert.Equal(true, documentSymbolCapability!["hierarchicalDocumentSymbolSupport"]?.ToObject<bool>());
+
+        var hoverCapability = textDocumentCapabilities!["hover"];
+        Assert.NotNull(hoverCapability);
+        Assert.NotNull(hoverCapability!["contentFormat"]);
     }
 
     [Fact]

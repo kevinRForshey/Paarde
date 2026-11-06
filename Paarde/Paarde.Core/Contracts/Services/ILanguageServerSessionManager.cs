@@ -48,4 +48,12 @@ public interface ILanguageServerSessionManager
     // specs/editor-autocomplete: same no-client/unmapped-extension no-op rule as every other
     // request above.
     Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
+
+    // specs/editor-intelligence R1: same no-client/unmapped-extension no-op rule - returns null
+    // (not an empty outline) when there's no client to ask, same "null means nothing to show"
+    // convention ILanguageServerClient.GetDocumentSymbolsAsync itself documents.
+    Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default);
+
+    // specs/editor-intelligence R2: same no-client/unmapped-extension no-op rule.
+    Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 }

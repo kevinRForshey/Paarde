@@ -52,12 +52,8 @@ public partial class CommandPaletteViewModel : ObservableObject
             new("Build", () => runPanelViewModel.BuildCommand.CanExecute(null), () => runPanelViewModel.BuildCommand.Execute(null)),
             new("Run", () => runPanelViewModel.RunCommand.CanExecute(null), () => runPanelViewModel.RunCommand.Execute(null)),
             new("Stop", () => runPanelViewModel.StopCommand.CanExecute(null), () => runPanelViewModel.StopCommand.Execute(null)),
-            GoTo("Main", typeof(MainViewModel)),
-            GoTo("Prompt", typeof(PromptViewModel)),
             GoTo("Explorer", typeof(ExplorerViewModel)),
             GoTo("Terminal", typeof(TerminalViewModel)),
-            GoTo("Diffs", typeof(DiffsViewModel)),
-            GoTo("Tutorial", typeof(TutorialViewModel)),
             GoTo("History", typeof(HistoryViewModel)),
             GoTo("Settings", typeof(SettingsViewModel)),
         };

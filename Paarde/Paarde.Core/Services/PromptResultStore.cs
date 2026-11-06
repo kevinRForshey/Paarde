@@ -7,7 +7,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Paarde.Core.Services;
 
-// In-memory hand-off between PromptView (produces results) and DiffsView/TutorialView (display them). Both
+// In-memory hand-off between PromptView (produces results) and the Assistant panel's Review tab
+// (TutorialViewModel, which displays them). Both
 // consuming view models are transient, so this singleton is what lets the parsed results survive navigation
 // between pages. Tutorial/WorkingDirectoryPath are ObservableObject properties and Files is a fixed
 // ObservableCollection instance mutated in place (not reassigned) on SetResult, so anything subscribed to

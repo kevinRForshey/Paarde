@@ -13,7 +13,12 @@
                        FontWeight="Bold"
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
-            <Button Content="Refresh" Command="{Binding RefreshTreeCommand}" />
+            <Button Command="{Binding RefreshTreeCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Refresh" FontSize="14" />
+                    <TextBlock Text="Refresh" />
+                </StackPanel>
+            </Button>
             <!-- Epic 25, T12 (R10): lets the user pick a working directory from Explorer itself,
                  rather than only ever inheriting whichever one Compose/Prompt last saved. -->
             <Button Command="{Binding OpenFolderCommand}">
@@ -31,14 +36,23 @@
                     <TextBlock Text="Assistant" />
                 </StackPanel>
             </Button>
+            <!-- specs/editor-focus-layout R1: hides the tree + Assistant panel for a
+                 distraction-free view of the editor(s) alone. Ctrl+K Z does the same thing - see
+                 ExplorerView.axaml.cs's OnViewKeyDown. -->
+            <Button Command="{Binding ToggleZenModeCommand}" ToolTip.Tip="Toggle zen mode (Ctrl+K, Z).">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="FullScreen" FontSize="14" />
+                    <TextBlock Text="Zen mode" />
+                </StackPanel>
+            </Button>
         </StackPanel>
 
-        <TextBlock Grid.Row="1"
-                   Margin="8,0,8,8"
-                   Text="{Binding StatusMessage}"
-                   TextWrapping="Wrap"
-                   Opacity="0.7"
-                   IsVisible="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        <ui:InfoBar Grid.Row="1"
+                    Margin="8,0,8,8"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    IsClosable="False"
+                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
         <!-- T8.1.3: split view - tree on the left, a read-only preview of whatever file is
              selected on the right. The preview reuses CodeEditor (same control Tutorial uses for
@@ -51,11 +65,11 @@
              convention as TreeSplitter, persisted separately via ExplorerAssistantPanelWidth. -->
         <Grid Grid.Row="2" Margin="8" Name="WorkspaceGrid">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="220" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="360" />
+                <ColumnDefinition Width="280" />
             </Grid.ColumnDefinitions>
 
             <TreeView Grid.Column="0"
@@ -95,32 +109,150 @@
                              Margin="8,0,0,4"
                              Command="{Binding CloseSelectedTabCommand}"
                              ToolTip.Tip="Close the active tab." />
-                    <TabControl Grid.Row="1"
-                                Margin="8,0,0,0"
-                                ItemsSource="{Binding OpenTabs}"
-                                SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
-                        <TabControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:OpenFileTabViewModel">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <TextBlock Text="{Binding FileName}"
-                                               MaxWidth="200"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip.Tip="{Binding FilePath}" />
-                                    <TextBlock Text="*"
-                                               FontWeight="Bold"
-                                               IsVisible="{Binding IsDirty}"
-                                               ToolTip.Tip="This file has unsaved edits." />
-                                </StackPanel>
-                            </DataTemplate>
-                        </TabControl.ItemTemplate>
-                        <TabControl.ContentTemplate>
-                            <DataTemplate x:DataType="vm:OpenFileTabViewModel">
-                                <views:ExplorerFileTabControl />
-                            </DataTemplate>
-                        </TabControl.ContentTemplate>
-                    </TabControl>
+
+                    <!-- specs/editor-focus-layout R2/R3/R4: FluentAvalonia's ui:TabView (native
+                         CanDragTabs/CanReorderTabs, vs. the plain TabControl this used to be) -
+                         two instances, one per group, each bound to its own real
+                         ObservableCollection (PrimaryGroupTabs/SecondaryGroupTabs) rather than a
+                         LINQ projection, so drag-reorder can mutate the list directly. The
+                         secondary TabView/splitter column collapses to width 0 automatically
+                         (ExplorerView.axaml.cs's OnViewModelPropertyChanged) once its last tab
+                         closes. -->
+                    <Grid Grid.Row="1" Margin="8,0,0,0" Name="SplitGroupGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="320" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TabView Grid.Column="0"
+                                    TabItems="{Binding PrimaryGroupTabs}"
+                                    SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                                    CanDragTabs="True"
+                                    CanReorderTabs="True"
+                                    IsAddTabButtonVisible="False"
+                                    TabCloseRequested="OnTabViewTabCloseRequested">
+                            <ui:TabView.TabItemTemplate>
+                                <!-- Bug fix (freeze on new tab): when TabView attaches a brand-new tab's
+                                     container to the visual tree, everything in this template briefly
+                                     inherits the TabView's own ExplorerViewModel DataContext before the
+                                     real per-tab OpenFileTabViewModel is assigned. Any compiled (strongly-
+                                     typed) binding that evaluates during that window throws
+                                     InvalidCastException unhandled on the dispatcher thread, which wedges
+                                     the whole UI. x:CompileBindings="False" makes every binding in this
+                                     template use reflection instead, which tolerates the mismatch. Applies
+                                     to the whole template (not just one binding) because any binding here
+                                     can be the one whose subscribe happens to fire during the race. -->
+                                <DataTemplate x:DataType="vm:OpenFileTabViewModel" x:CompileBindings="False">
+                                    <ui:TabViewItem x:Name="TabContainer" IsClosable="True">
+                                        <ui:TabViewItem.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <ui:SymbolIcon Symbol="Pin" FontSize="12" IsVisible="{Binding IsPinned}" />
+                                                <TextBlock Text="{Binding FileName}"
+                                                           MaxWidth="200"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip.Tip="{Binding FilePath}" />
+                                                <TextBlock Text="*"
+                                                           FontWeight="Bold"
+                                                           IsVisible="{Binding IsDirty}"
+                                                           ToolTip.Tip="This file has unsaved edits." />
+                                            </StackPanel>
+                                        </ui:TabViewItem.Header>
+                                        <ui:TabViewItem.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding PinMenuItemLabel}" Command="{Binding TogglePinCommand}" />
+                                                <MenuItem Header="Split right" Command="{Binding RequestSplitRightCommand}" IsVisible="{Binding CanSplitRight}" />
+                                            </ContextMenu>
+                                        </ui:TabViewItem.ContextMenu>
+                                        <!-- Bug fix (blank editor on open): FluentAvalonia's TabView
+                                             reparents this control out of the TabViewItem into its own
+                                             TabContentPresenter once this tab is selected (confirmed via
+                                             decompiled TabView.UpdateTabContent()), which severs ordinary
+                                             DataContext *inheritance* since it's a visual-tree reparent.
+                                             A self-referencing DataContext="{Binding}" does NOT fix this: it
+                                             evaluates once, before TabViewItem.DataContext is even assigned
+                                             (Build() sets children first, root's DataContext last), and that
+                                             snapshot never updates afterwards (confirmed via live memory dump:
+                                             its EffectiveValue had no active binding entry, just a dead,
+                                             stale value - ExplorerView's own ExplorerViewModel, not this
+                                             tab's OpenFileTabViewModel). Binding by ElementName instead
+                                             resolves via the template's NameScope, not visual-tree position,
+                                             so it stays correct both before Build() finishes and after the
+                                             reparent. -->
+                                        <views:ExplorerFileTabControl DataContext="{Binding DataContext, ElementName=TabContainer}" />
+                                    </ui:TabViewItem>
+                                </DataTemplate>
+                            </ui:TabView.TabItemTemplate>
+                        </ui:TabView>
+
+                        <GridSplitter Grid.Column="1"
+                                      Name="SplitGroupSplitter"
+                                      Width="4"
+                                      ResizeDirection="Columns"
+                                      IsVisible="{Binding HasSecondaryGroupTabs}" />
+
+                        <ui:TabView Grid.Column="2"
+                                    IsVisible="{Binding HasSecondaryGroupTabs}"
+                                    TabItems="{Binding SecondaryGroupTabs}"
+                                    SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                                    CanDragTabs="True"
+                                    CanReorderTabs="True"
+                                    IsAddTabButtonVisible="False"
+                                    TabCloseRequested="OnTabViewTabCloseRequested">
+                            <ui:TabView.TabItemTemplate>
+                                <!-- Bug fix (freeze on new tab): see matching comment on the primary
+                                     TabView's header template above - same compiled-binding DataContext
+                                     race, same fix, applied to the whole template. -->
+                                <DataTemplate x:DataType="vm:OpenFileTabViewModel" x:CompileBindings="False">
+                                    <ui:TabViewItem x:Name="TabContainer" IsClosable="True">
+                                        <ui:TabViewItem.Header>
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <ui:SymbolIcon Symbol="Pin" FontSize="12" IsVisible="{Binding IsPinned}" />
+                                                <TextBlock Text="{Binding FileName}"
+                                                           MaxWidth="200"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip.Tip="{Binding FilePath}" />
+                                                <TextBlock Text="*"
+                                                           FontWeight="Bold"
+                                                           IsVisible="{Binding IsDirty}"
+                                                           ToolTip.Tip="This file has unsaved edits." />
+                                            </StackPanel>
+                                        </ui:TabViewItem.Header>
+                                        <ui:TabViewItem.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding PinMenuItemLabel}" Command="{Binding TogglePinCommand}" />
+                                            </ContextMenu>
+                                        </ui:TabViewItem.ContextMenu>
+                                        <!-- Bug fix (blank editor on open): see matching comment on the
+                                             primary TabView's item template above - same fix. -->
+                                        <views:ExplorerFileTabControl DataContext="{Binding DataContext, ElementName=TabContainer}" />
+                                    </ui:TabViewItem>
+                                </DataTemplate>
+                            </ui:TabView.TabItemTemplate>
+                        </ui:TabView>
+                    </Grid>
                 </Grid>
             </Grid>
+
+            <!-- specs/editor-focus-layout R5: Ctrl+Tab MRU switcher - same Popup+ListBox shape
+                 ShellView.axaml's Quick Open already uses. Opened/advanced on KeyDown, committed
+                 on Ctrl's KeyUp - see ExplorerView.axaml.cs's OnViewKeyDown/OnViewKeyUp. -->
+            <Popup IsOpen="{Binding IsMruSwitcherOpen}"
+                   PlacementTarget="WorkspaceGrid"
+                   Placement="Center">
+                <Border Classes="popup-chrome"
+                        MinWidth="260">
+                    <ListBox ItemsSource="{Binding MruSwitcherItems}" SelectedItem="{Binding MruSwitcherHighlighted}">
+                        <ListBox.ItemTemplate>
+                            <!-- Bug fix (freeze on new tab): same compiled-binding DataContext race as
+                                 the TabView header templates above. -->
+                            <DataTemplate x:DataType="vm:OpenFileTabViewModel" x:CompileBindings="False">
+                                <TextBlock Text="{Binding FileName}" Margin="8,4" ToolTip.Tip="{Binding FilePath}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </Popup>
 
             <GridSplitter Grid.Column="3" Name="AssistantPanelSplitter" Width="4" ResizeDirection="Columns" />
 

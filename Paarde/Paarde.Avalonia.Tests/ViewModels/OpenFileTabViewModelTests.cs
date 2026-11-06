@@ -1,3 +1,4 @@
+using FluentAvalonia.UI.Controls;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
@@ -75,6 +76,7 @@ public class OpenFileTabViewModelTests : IDisposable
         Assert.Equal("a.txt", _fileChangeApplyService.LastWriteRawFilePath);
         Assert.Equal("edited", _fileChangeApplyService.LastWriteRawContent);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
     }
 
     [Fact]
@@ -90,6 +92,7 @@ public class OpenFileTabViewModelTests : IDisposable
         Assert.Equal(0, _fileChangeApplyService.WriteRawCallCount);
         Assert.True(sut.IsDirty);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Error, sut.StatusSeverity);
     }
 
     [Fact]
@@ -106,6 +109,7 @@ public class OpenFileTabViewModelTests : IDisposable
         Assert.Equal(0, _fileChangeApplyService.WriteRawCallCount);
         Assert.True(sut.IsDirty);
         Assert.NotEmpty(sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Warning, sut.StatusSeverity);
     }
 
     [Fact]
@@ -226,5 +230,60 @@ public class OpenFileTabViewModelTests : IDisposable
         sut.RequestScrollTo(hunk);
 
         Assert.Same(hunk, received);
+    }
+
+    [Fact]
+    public void TogglePinCommand_RaisesPinToggledAndFlipsIsPinned()
+    {
+        var sut = CreateSut("a.txt", "original");
+        var raisedCount = 0;
+        sut.PinToggled += () => raisedCount++;
+
+        sut.TogglePinCommand.Execute(null);
+
+        Assert.True(sut.IsPinned);
+        Assert.Equal(1, raisedCount);
+
+        sut.TogglePinCommand.Execute(null);
+
+        Assert.False(sut.IsPinned);
+        Assert.Equal(2, raisedCount);
+    }
+
+    [Fact]
+    public void PinMenuItemLabel_ReflectsIsPinned()
+    {
+        var sut = CreateSut("a.txt", "original");
+
+        Assert.Equal("Pin", sut.PinMenuItemLabel);
+
+        sut.IsPinned = true;
+
+        Assert.Equal("Unpin", sut.PinMenuItemLabel);
+    }
+
+    [Fact]
+    public void RequestSplitRightCommand_RaisesSplitRightRequested()
+    {
+        var sut = CreateSut("a.txt", "original");
+        var raisedCount = 0;
+        sut.SplitRightRequested += () => raisedCount++;
+
+        sut.RequestSplitRightCommand.Execute(null);
+
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
+    public void CanSplitRight_FalseOnceInTheSecondaryGroup()
+    {
+        var sut = CreateSut("a.txt", "original");
+
+        Assert.True(sut.CanSplitRight);
+
+        sut.TabGroup = 1;
+
+        Assert.False(sut.CanSplitRight);
+        Assert.False(sut.RequestSplitRightCommand.CanExecute(null));
     }
 }

@@ -18,7 +18,7 @@ public partial class ReviewPanelControl : UserControl
     {
         InitializeComponent();
 
-        _paneHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[0], App.GetService<ILocalSettingsService>(), WorkspaceLayoutSettingsKeys.TutorialFileListWidth, defaultWidth: 280);
+        _paneHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[0], App.GetService<ILocalSettingsService>(), WorkspaceLayoutSettingsKeys.ReviewFileListWidth, defaultWidth: 280);
         Loaded += async (_, _) => await _paneHelper.RestoreAsync();
         FileListSplitter.DragCompleted += (_, _) => _paneHelper.OnSplitterDragCompleted();
     }

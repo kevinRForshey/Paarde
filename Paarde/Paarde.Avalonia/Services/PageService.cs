@@ -14,14 +14,15 @@ public class PageService : IPageService
 
     public PageService()
     {
-        Configure<MainViewModel, MainView>();
         Configure<PromptViewModel, PromptView>();
-        Configure<DiffsViewModel, DiffsView>();
-        Configure<TutorialViewModel, TutorialView>();
         Configure<HistoryViewModel, HistoryView>();
         Configure<ExplorerViewModel, ExplorerView>();
         Configure<TerminalViewModel, TerminalView>();
         Configure<SettingsViewModel, SettingsView>();
+
+        // Epic 26 (specs/interface-mode R5/R6): FlowWizard mode's Home/Review pages.
+        Configure<MainViewModel, MainView>();
+        Configure<TutorialViewModel, ReviewView>();
     }
 
     public Type GetPageType(string key)

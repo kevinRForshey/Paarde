@@ -1,3 +1,6 @@
+using Paarde.Avalonia.Contracts.Services;
+using Paarde.Avalonia.Models;
+using Paarde.Avalonia.Services;
 using Paarde.Core.Contracts.Services;
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -11,6 +14,9 @@ namespace Paarde.Avalonia.ViewModels;
 // ExplorerView ever having been constructed.
 public partial class AssistantPanelViewModel : ObservableObject
 {
+    private readonly ILocalSettingsService _localSettingsService;
+    private readonly INavigationService _navigationService;
+
     [ObservableProperty]
     private int selectedTabIndex; // 0 = Compose, 1 = Review
 
@@ -18,18 +24,29 @@ public partial class AssistantPanelViewModel : ObservableObject
 
     public TutorialViewModel Review { get; }
 
-    public AssistantPanelViewModel(PromptViewModel compose, TutorialViewModel review, IPromptResultStore promptResultStore)
+    public AssistantPanelViewModel(PromptViewModel compose, TutorialViewModel review, IPromptResultStore promptResultStore, ILocalSettingsService localSettingsService, INavigationService navigationService)
     {
         Compose = compose;
         Review = review;
+        _localSettingsService = localSettingsService;
+        _navigationService = navigationService;
 
         // A finished run (successful or not - IPromptResultStore.Tutorial is set either way)
         // should put the narrative in front of the user without them having to click anything.
-        promptResultStore.PropertyChanged += (_, e) =>
+        // In EditorFocused mode ShowReview() alone is enough (the docked panel already lives on
+        // whichever page is open); in FlowWizard mode (Epic 26, specs/interface-mode R8) there is
+        // no docked panel, so this also has to navigate to the separate Review page.
+        promptResultStore.PropertyChanged += async (_, e) =>
         {
             if (e.PropertyName == nameof(IPromptResultStore.Tutorial))
             {
                 ShowReview();
+
+                var interfaceMode = await _localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
+                if (interfaceMode == InterfaceMode.FlowWizard)
+                {
+                    _navigationService.NavigateTo(typeof(TutorialViewModel).FullName!);
+                }
             }
         };
     }

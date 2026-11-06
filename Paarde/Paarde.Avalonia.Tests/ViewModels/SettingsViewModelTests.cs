@@ -1,3 +1,6 @@
+using FluentAvalonia.UI.Controls;
+
+using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
@@ -16,6 +19,8 @@ public class SettingsViewModelTests
     private readonly FakeProjectTypeDetector _projectTypeDetector = new();
     private readonly FakeRunConfigurationDetector _runConfigurationDetector = new();
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
+    private readonly FakeHeadroomCoordinator _headroomCoordinator = new();
+    private readonly HeadroomStatusStore _headroomStatusStore = new();
 
     public SettingsViewModelTests()
     {
@@ -23,7 +28,7 @@ public class SettingsViewModelTests
         _runConfigurationsProvider = new RunConfigurationsProvider(_localSettingsService, _projectTypeDetector, _runConfigurationDetector);
     }
 
-    private SettingsViewModel CreateSut() => new(_themeSelectorService, _localSettingsService, _secureStorageService, _promptTemplateProvider, _languageServerOptionsProvider, _runConfigurationsProvider);
+    private SettingsViewModel CreateSut() => new(_themeSelectorService, _localSettingsService, _secureStorageService, _promptTemplateProvider, _languageServerOptionsProvider, _runConfigurationsProvider, _headroomCoordinator, _headroomStatusStore);
 
     [Fact]
     public void ClaudeCliSettings_DefaultToClaudeAndDashP()
@@ -249,5 +254,124 @@ public class SettingsViewModelTests
         sut.ResetPromptTemplateCommand.Execute(null);
 
         Assert.Equal(string.Empty, sut.PromptTemplateOverride);
+    }
+
+    [Fact]
+    public void InterfaceMode_DefaultsToEditorFocused()
+    {
+        var sut = CreateSut();
+
+        Assert.Equal(InterfaceMode.EditorFocused, sut.InterfaceMode);
+    }
+
+    [Fact]
+    public async Task InterfaceMode_WhenChanged_PersistsToSettings()
+    {
+        var sut = CreateSut();
+        sut.InterfaceMode = InterfaceMode.FlowWizard;
+
+        Assert.Equal(InterfaceMode.FlowWizard, await _localSettingsService.ReadSettingAsync<InterfaceMode?>("Interface.Mode"));
+    }
+
+    [Fact]
+    public async Task OnNavigatedTo_RestoresSavedInterfaceMode()
+    {
+        await _localSettingsService.SaveSettingAsync("Interface.Mode", InterfaceMode.FlowWizard);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.Equal(InterfaceMode.FlowWizard, sut.InterfaceMode);
+    }
+
+    [Fact]
+    public async Task InterfaceModeChangeRequiresRestart_FalseUntilChangedAwayFromTheLoadedValue()
+    {
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.False(sut.InterfaceModeChangeRequiresRestart);
+
+        sut.InterfaceMode = InterfaceMode.FlowWizard;
+
+        Assert.True(sut.InterfaceModeChangeRequiresRestart);
+
+        sut.InterfaceMode = InterfaceMode.EditorFocused;
+
+        Assert.False(sut.InterfaceModeChangeRequiresRestart);
+    }
+
+    [Fact]
+    public async Task IsHeadroomIntegrationEnabled_DefaultsToFalse()
+    {
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.False(sut.IsHeadroomIntegrationEnabled);
+    }
+
+    [Fact]
+    public async Task IsHeadroomIntegrationEnabled_WhenChanged_PersistsToSettings()
+    {
+        var sut = CreateSut();
+
+        sut.IsHeadroomIntegrationEnabled = true;
+
+        Assert.True(await _localSettingsService.ReadSettingAsync<bool?>(HeadroomSettingsKeys.IntegrationEnabled));
+    }
+
+    [Fact]
+    public async Task OnNavigatedTo_RestoresSavedHeadroomIntegrationEnabled()
+    {
+        await _localSettingsService.SaveSettingAsync(HeadroomSettingsKeys.IntegrationEnabled, true);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.True(sut.IsHeadroomIntegrationEnabled);
+    }
+
+    [Fact]
+    public async Task OnNavigatedTo_RestoresHeadroomStatusFromStore()
+    {
+        _headroomStatusStore.SetResult("Headroom is healthy.", InfoBarSeverity.Success);
+        var sut = CreateSut();
+
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.Equal("Headroom is healthy.", sut.HeadroomStatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.HeadroomStatusSeverity);
+    }
+
+    [Fact]
+    public async Task CheckHeadroomNowCommand_CallsCoordinatorWithSavedWorkingDirectoryAndUpdatesStatus()
+    {
+        await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, "/some/project");
+        _headroomCoordinator.MessageToReturn = "Headroom is healthy.";
+        _headroomCoordinator.SeverityToReturn = InfoBarSeverity.Success;
+        var sut = CreateSut();
+
+        await sut.CheckHeadroomNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(["/some/project"], _headroomCoordinator.ProjectPathsChecked);
+        Assert.Equal("Headroom is healthy.", sut.HeadroomStatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.HeadroomStatusSeverity);
+    }
+
+    [Fact]
+    public async Task CheckHeadroomNowCommand_NoWorkingDirectorySaved_ReturnsWarningWithoutCallingCoordinator()
+    {
+        var sut = CreateSut();
+
+        await sut.CheckHeadroomNowCommand.ExecuteAsync(null);
+
+        Assert.Empty(_headroomCoordinator.ProjectPathsChecked);
+        Assert.Equal(InfoBarSeverity.Warning, sut.HeadroomStatusSeverity);
     }
 }

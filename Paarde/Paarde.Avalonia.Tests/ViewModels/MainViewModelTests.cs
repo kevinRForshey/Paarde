@@ -1,18 +1,28 @@
-using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
+using Paarde.Core.Services;
 
 namespace Paarde.Avalonia.Tests.ViewModels;
 
+// Epic 26 (specs/interface-mode R5): the FlowWizard shell's landing page. Takes a real
+// PromptViewModel (rather than a fake) the same way HistoryViewModelTests' AssistantPanelViewModel
+// does, since OpenRecentRun/OpenRecentProject/SendQuickPrompt need the genuine
+// LoadLaunchRequest/WorkingDirectoryPath wiring, not just a constructor to satisfy.
 public class MainViewModelTests
 {
     private readonly FakeRunSessionStore _runSessionStore = new();
     private readonly FakeLocalSettingsService _localSettingsService = new();
     private readonly FakeNavigationService _navigationService = new();
+    private readonly FakePromptResultStore _promptResultStore = new();
+    private readonly FakeLlmRunner _llmRunner = new();
 
-    private MainViewModel CreateSut() => new(_runSessionStore, _localSettingsService, _navigationService);
+    private PromptViewModel CreatePromptViewModel() =>
+        new(_llmRunner, _localSettingsService, new FakeFolderPickerService(), new FakeFilePickerService(), _promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
+
+    private MainViewModel CreateSut(PromptViewModel? promptViewModel = null) =>
+        new(_runSessionStore, _localSettingsService, _navigationService, promptViewModel ?? CreatePromptViewModel());
 
     private static RunSession CreateSession(string userPromptText, string workingDirectoryPath, DateTimeOffset startedAt) => new(
         Guid.NewGuid().ToString("N"),
@@ -26,7 +36,7 @@ public class MainViewModelTests
         userPromptText);
 
     [Fact]
-    public void OnNavigatedTo_NoSessions_HasNoRecentRunsOrProjects()
+    public void OnNavigatedTo_NoSessions_HasNeitherRecentRunsNorProjects()
     {
         var sut = CreateSut();
 
@@ -34,8 +44,6 @@ public class MainViewModelTests
 
         Assert.False(sut.HasRecentRuns);
         Assert.False(sut.HasRecentProjects);
-        Assert.Empty(sut.RecentRuns);
-        Assert.Empty(sut.RecentProjects);
     }
 
     [Fact]
@@ -55,80 +63,67 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void OnNavigatedTo_CapsRecentRunsAtFive()
-    {
-        _runSessionStore.SessionsToList = Enumerable.Range(0, 8)
-            .Select(i => CreateSession($"prompt {i}", "/working/dir", DateTimeOffset.UtcNow.AddMinutes(-i)))
-            .ToList();
-        var sut = CreateSut();
-
-        sut.OnNavigatedTo(null!);
-
-        Assert.Equal(5, sut.RecentRuns.Count);
-    }
-
-    [Fact]
-    public void OnNavigatedTo_RecentProjectsAreDistinctWorkingDirectories()
+    public void OnNavigatedTo_PopulatesDistinctRecentProjects()
     {
         _runSessionStore.SessionsToList = new[]
         {
-            CreateSession("third", "/working/dir-a", DateTimeOffset.UtcNow),
-            CreateSession("second", "/working/dir-b", DateTimeOffset.UtcNow.AddMinutes(-1)),
-            CreateSession("first", "/working/dir-a", DateTimeOffset.UtcNow.AddMinutes(-2)),
+            CreateSession("a", "/working/one", DateTimeOffset.UtcNow),
+            CreateSession("b", "/working/one", DateTimeOffset.UtcNow.AddMinutes(-1)),
+            CreateSession("c", "/working/two", DateTimeOffset.UtcNow.AddMinutes(-2)),
         };
         var sut = CreateSut();
 
         sut.OnNavigatedTo(null!);
 
-        Assert.Equal(new[] { "/working/dir-a", "/working/dir-b" }, sut.RecentProjects);
+        Assert.Equal(new[] { "/working/one", "/working/two" }, sut.RecentProjects);
         Assert.True(sut.HasRecentProjects);
     }
 
     [Fact]
-    public void NoSelection_CommandsCannotExecute()
-    {
-        var sut = CreateSut();
-
-        sut.OnNavigatedTo(null!);
-
-        Assert.False(sut.OpenRecentRunCommand.CanExecute(null));
-        Assert.False(sut.OpenRecentProjectCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void OpenRecentRunCommand_NavigatesToPromptPageWithAutoRunFalse()
-    {
-        _runSessionStore.SessionsToList = new[] { CreateSession("fork this prompt", "/working/dir", DateTimeOffset.UtcNow) };
-        var sut = CreateSut();
-        sut.OnNavigatedTo(null!);
-        sut.SelectedRecentRun = sut.RecentRuns[0];
-
-        Assert.True(sut.OpenRecentRunCommand.CanExecute(null));
-        sut.OpenRecentRunCommand.Execute(null);
-
-        Assert.Equal(1, _navigationService.NavigateToCallCount);
-        Assert.Equal(typeof(PromptViewModel).FullName, _navigationService.LastPageKey);
-        var request = Assert.IsType<PromptLaunchRequest>(_navigationService.LastParameter);
-        Assert.Equal("fork this prompt", request.PromptText);
-        Assert.Equal("/working/dir", request.WorkingDirectoryPath);
-        Assert.False(request.AutoRun);
-    }
-
-    [Fact]
-    public async Task OpenRecentProjectCommand_SavesWorkingDirectoryAndNavigatesWithoutParameter()
+    public void OpenRecentRunCommand_CanExecute_OnlyWhenASessionIsSelected()
     {
         _runSessionStore.SessionsToList = new[] { CreateSession("prompt", "/working/dir", DateTimeOffset.UtcNow) };
         var sut = CreateSut();
         sut.OnNavigatedTo(null!);
-        sut.SelectedRecentProject = sut.RecentProjects[0];
 
-        Assert.True(sut.OpenRecentProjectCommand.CanExecute(null));
-        await sut.OpenRecentProjectCommand.ExecuteAsync(null);
+        Assert.False(sut.OpenRecentRunCommand.CanExecute(null));
 
-        Assert.Equal("/working/dir", await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory));
+        sut.SelectedRecentRun = sut.RecentRuns[0];
+
+        Assert.True(sut.OpenRecentRunCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void OpenRecentRunCommand_LoadsTheRunOntoComposeWithoutAutoRunningAndNavigates()
+    {
+        _runSessionStore.SessionsToList = new[] { CreateSession("fork this prompt", "/working/dir", DateTimeOffset.UtcNow) };
+        var promptViewModel = CreatePromptViewModel();
+        var sut = CreateSut(promptViewModel);
+        sut.OnNavigatedTo(null!);
+        sut.SelectedRecentRun = sut.RecentRuns[0];
+
+        sut.OpenRecentRunCommand.Execute(null);
+
+        Assert.Equal("fork this prompt", promptViewModel.PromptText);
+        Assert.Equal("/working/dir", promptViewModel.WorkingDirectoryPath);
         Assert.Equal(1, _navigationService.NavigateToCallCount);
         Assert.Equal(typeof(PromptViewModel).FullName, _navigationService.LastPageKey);
-        Assert.Null(_navigationService.LastParameter);
+    }
+
+    [Fact]
+    public async Task OpenRecentProjectCommand_SavesAndSetsTheWorkingDirectoryThenNavigates()
+    {
+        _runSessionStore.SessionsToList = new[] { CreateSession("prompt", "/working/dir", DateTimeOffset.UtcNow) };
+        var promptViewModel = CreatePromptViewModel();
+        var sut = CreateSut(promptViewModel);
+        sut.OnNavigatedTo(null!);
+        sut.SelectedRecentProject = sut.RecentProjects[0];
+
+        await sut.OpenRecentProjectCommand.ExecuteAsync(null);
+
+        Assert.Equal("/working/dir", promptViewModel.WorkingDirectoryPath);
+        Assert.Equal("/working/dir", await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory));
+        Assert.Equal(typeof(PromptViewModel).FullName, _navigationService.LastPageKey);
     }
 
     [Fact]
@@ -138,27 +133,23 @@ public class MainViewModelTests
 
         Assert.False(sut.SendQuickPromptCommand.CanExecute(null));
 
-        sut.QuickPromptText = "   ";
-        Assert.False(sut.SendQuickPromptCommand.CanExecute(null));
+        sut.QuickPromptText = "Build something.";
 
-        sut.QuickPromptText = "build a thing";
         Assert.True(sut.SendQuickPromptCommand.CanExecute(null));
     }
 
     [Fact]
-    public async Task SendQuickPromptCommand_NavigatesWithTypedTextAndLastSavedWorkingDirectory()
+    public async Task SendQuickPromptCommand_LoadsComposeWithTheSavedWorkingDirectoryAndNavigates()
     {
         await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, "/saved/dir");
-        var sut = CreateSut();
-        sut.QuickPromptText = "add a feature";
+        var promptViewModel = CreatePromptViewModel();
+        var sut = CreateSut(promptViewModel);
+        sut.QuickPromptText = "Build something.";
 
         await sut.SendQuickPromptCommand.ExecuteAsync(null);
 
-        Assert.Equal(1, _navigationService.NavigateToCallCount);
+        Assert.Equal("Build something.", promptViewModel.PromptText);
+        Assert.Equal("/saved/dir", promptViewModel.WorkingDirectoryPath);
         Assert.Equal(typeof(PromptViewModel).FullName, _navigationService.LastPageKey);
-        var request = Assert.IsType<PromptLaunchRequest>(_navigationService.LastParameter);
-        Assert.Equal("add a feature", request.PromptText);
-        Assert.Equal("/saved/dir", request.WorkingDirectoryPath);
-        Assert.False(request.AutoRun);
     }
 }

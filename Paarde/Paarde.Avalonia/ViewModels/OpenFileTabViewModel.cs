@@ -1,5 +1,7 @@
 using System.ComponentModel;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Strings;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Helpers;
@@ -45,6 +47,9 @@ public partial class OpenFileTabViewModel : ObservableObject
     private string statusMessage = string.Empty;
 
     [ObservableProperty]
+    private InfoBarSeverity statusSeverity = InfoBarSeverity.Informational;
+
+    [ObservableProperty]
     private string fileOverview = string.Empty;
 
     [ObservableProperty]
@@ -60,7 +65,47 @@ public partial class OpenFileTabViewModel : ObservableObject
     private IReadOnlyList<LspCompletionItem>? completionItems;
 
     [ObservableProperty]
+    private LspDocumentSymbol? documentSymbols;
+
+    [ObservableProperty]
+    private LspHover? hoverSuggestion;
+
+    [ObservableProperty]
     private ProposedFileChangeViewModel? pendingChange;
+
+    // specs/editor-focus-layout R3: ExplorerViewModel is the one that owns PrimaryGroupTabs/
+    // SecondaryGroupTabs and actually repositions this tab within whichever group it's in -
+    // this just raises the event, same "tab raises, ExplorerViewModel reacts" split
+    // ScrollToHunkRequested below already establishes.
+    [ObservableProperty]
+    private bool isPinned;
+
+    public event Action? PinToggled;
+
+    partial void OnIsPinnedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PinMenuItemLabel));
+        PinToggled?.Invoke();
+    }
+
+    public string PinMenuItemLabel => IsPinned ? "Unpin" : "Pin";
+
+    [RelayCommand]
+    private void TogglePin() => IsPinned = !IsPinned;
+
+    // specs/editor-focus-layout R2: 0 = primary group, 1 = secondary (split) group - at most 2
+    // groups per the epic's non-goals, so this doesn't need to be an enum.
+    [ObservableProperty]
+    private int tabGroup;
+
+    partial void OnTabGroupChanged(int value) => OnPropertyChanged(nameof(CanSplitRight));
+
+    public bool CanSplitRight => TabGroup == 0;
+
+    public event Action? SplitRightRequested;
+
+    [RelayCommand(CanExecute = nameof(CanSplitRight))]
+    private void RequestSplitRight() => SplitRightRequested?.Invoke();
 
     // Raised by TutorialStepViewModel's "View in Diff" action (via TutorialViewModel.FileFocusRequested)
     // once ExplorerViewModel has already opened/focused this tab - ExplorerFileTabControl.axaml.cs
@@ -158,6 +203,7 @@ public partial class OpenFileTabViewModel : ObservableObject
         if (ProtectedPathChecker.IsProtected(_workingDirectoryPath, relativePath))
         {
             StatusMessage = string.Format("Explorer_SaveBlockedProtectedPath".Resolve(), relativePath);
+            StatusSeverity = InfoBarSeverity.Error;
             return;
         }
 
@@ -168,6 +214,7 @@ public partial class OpenFileTabViewModel : ObservableObject
         if (currentDiskContent != _originalContentOnDisk)
         {
             StatusMessage = string.Format("Explorer_SaveConflict".Resolve(), relativePath);
+            StatusSeverity = InfoBarSeverity.Warning;
             return;
         }
 
@@ -177,10 +224,12 @@ public partial class OpenFileTabViewModel : ObservableObject
             _originalContentOnDisk = Content;
             IsDirty = false;
             StatusMessage = string.Format("Explorer_SaveSucceeded".Resolve(), relativePath);
+            StatusSeverity = InfoBarSeverity.Success;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             StatusMessage = string.Format("Explorer_SaveFailed".Resolve(), relativePath, ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
     }
 
@@ -266,6 +315,37 @@ public partial class OpenFileTabViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Completion request failed for {FilePath}.", FilePath);
+        }
+    }
+
+    // specs/editor-intelligence R3: raised by CodeEditor.DocumentSymbolsRequested on file open and
+    // after every settled edit (its own 400ms debounce) - same round-trip shape RequestCompletionAsync
+    // above already uses.
+    public async Task RequestDocumentSymbolsAsync()
+    {
+        try
+        {
+            DocumentSymbols = await _languageServerSessionManager.GetDocumentSymbolsAsync(FilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Document symbols request failed for {FilePath}.", FilePath);
+        }
+    }
+
+    // specs/editor-intelligence R6: raised by CodeEditor.HoverRequested once its own pointer-hover
+    // debounce settles - same round-trip shape RequestCompletionAsync above already uses.
+    public async Task RequestHoverAsync(LspPosition position)
+    {
+        try
+        {
+            var hover = await _languageServerSessionManager.GetHoverAsync(FilePath, position);
+            HoverSuggestion = null;
+            HoverSuggestion = hover;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Hover request failed for {FilePath}.", FilePath);
         }
     }
 }

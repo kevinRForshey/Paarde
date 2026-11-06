@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              x:Class="Paarde.Avalonia.Views.PromptView"
              x:DataType="vm:PromptViewModel">
@@ -182,7 +183,12 @@
             </ScrollViewer>
         </Expander>
 
-        <TextBlock Grid.Row="7" Margin="0,4,0,0" Text="{Binding StatusMessage}" />
+        <ui:InfoBar Grid.Row="7"
+                    Margin="0,4,0,0"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    IsClosable="False"
+                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         <TextBlock Grid.Row="7" Margin="0,24,0,0" HorizontalAlignment="Right" Text="{Binding UsageSummary}" Opacity="0.7" FontSize="12" />
     </Grid>
 </UserControl>

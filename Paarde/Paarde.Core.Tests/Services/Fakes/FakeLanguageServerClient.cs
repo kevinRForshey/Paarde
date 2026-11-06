@@ -62,6 +62,16 @@ public class FakeLanguageServerClient : ILanguageServerClient
     public Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<LspCompletionItem>>([]);
 
+    public LspDocumentSymbol? DocumentSymbolsToReturn { get; set; }
+
+    public Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DocumentSymbolsToReturn);
+
+    public LspHover? HoverToReturn { get; set; }
+
+    public Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
+        Task.FromResult(HoverToReturn);
+
     public void RaiseDiagnosticsPublished(string filePath, IReadOnlyList<LspDiagnostic> diagnostics) =>
         DiagnosticsPublished?.Invoke(filePath, diagnostics);
 }

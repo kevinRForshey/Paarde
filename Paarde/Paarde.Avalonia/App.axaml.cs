@@ -133,6 +133,9 @@ public partial class App : Application
 
             services.AddTransient<IGitStatusService, GitStatusService>();
             services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
+            services.AddTransient<IHeadroomService, HeadroomService>();
+            services.AddTransient<IHeadroomCoordinator, HeadroomCoordinator>();
+            services.AddSingleton<IHeadroomStatusStore, HeadroomStatusStore>();
 
             // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
             // prompts in the same session instead of re-tokenizing the whole project on every
@@ -191,6 +194,10 @@ public partial class App : Application
             // page navigation.
             services.AddSingleton<QuickOpenViewModel>();
             services.AddSingleton<CommandPaletteViewModel>();
+
+            // specs/editor-intelligence R7: Go to Symbol in File - same "reachable from anywhere
+            // via a global KeyBinding" reason as the two singletons above.
+            services.AddSingleton<SymbolQuickPickViewModel>();
             services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
@@ -210,18 +217,21 @@ public partial class App : Application
             // History silently updates a PromptViewModel/TutorialViewModel nobody is looking at.
             services.AddSingleton<AssistantPanelViewModel>();
             services.AddSingleton<TutorialViewModel>();
-            services.AddTransient<TutorialView>();
             services.AddTransient<HistoryViewModel>();
             services.AddTransient<HistoryView>();
             services.AddTransient<ExplorerViewModel>();
             services.AddTransient<ExplorerView>();
             services.AddTransient<TerminalView>();
-            services.AddTransient<DiffsViewModel>();
-            services.AddTransient<DiffsView>();
             services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
+
+            // Epic 26 (specs/interface-mode R5/R6): FlowWizard mode's Home/Review pages - AddTransient
+            // like every other page-scoped view model/view pair above, since neither is reachable
+            // from outside navigation the way AssistantPanelViewModel/TutorialViewModel are.
             services.AddTransient<MainViewModel>();
             services.AddTransient<MainView>();
+            services.AddTransient<ReviewView>();
+
             services.AddTransient<ShellView>();
             services.AddTransient<ShellViewModel>();
 
@@ -341,11 +351,34 @@ public partial class App : Application
             // it whenever the user first visits them - a no-op if no run has ever been recorded.
             GetService<IRunSessionStore>().RestoreLastSession();
 
-            GetService<INavigationService>().NavigateTo(typeof(MainViewModel).FullName!);
+            // Epic 26 (specs/interface-mode R2): which shell the app starts into - EditorFocused
+            // keeps today's Explorer-first behavior, FlowWizard starts on the Home/Compose/Review
+            // flow instead.
+            var interfaceMode = await GetService<ILocalSettingsService>().ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
+            var startupViewModelType = interfaceMode == InterfaceMode.FlowWizard ? typeof(MainViewModel) : typeof(ExplorerViewModel);
+            GetService<INavigationService>().NavigateTo(startupViewModelType.FullName!);
+
+            // specs/fluent-design-pass R1: off by default - see AppearanceSettingsKeys/
+            // MainWindow.ApplyTransparency.
+            var transparencyEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
+            (MainWindow as Views.MainWindow)?.ApplyTransparency(transparencyEnabled);
+
+            // Off by default, same reasoning as TransparencyEnabled above - see
+            // HeadroomSettingsKeys. Skipped entirely if no project has ever been opened (nothing
+            // to check yet) - the Prompt page hasn't navigated at this point, so
+            // WorkingDirectorySettingsKeys is the only source for "the current project" this early.
+            var headroomIntegrationEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(HeadroomSettingsKeys.IntegrationEnabled) ?? false;
+            var savedWorkingDirectory = await GetService<ILocalSettingsService>().ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory);
+
+            if (headroomIntegrationEnabled && !string.IsNullOrWhiteSpace(savedWorkingDirectory))
+            {
+                var (message, severity) = await GetService<IHeadroomCoordinator>().CheckAndOfferFixesAsync(savedWorkingDirectory);
+                GetService<IHeadroomStatusStore>().SetResult(message, severity);
+            }
         }
         catch (Exception ex)
         {
-            GetService<ILogger<App>>().LogError(ex, "Failed to initialize theme/restore the last session/navigate to the main page on startup.");
+            GetService<ILogger<App>>().LogError(ex, "Failed to initialize theme/restore the last session/navigate to the Explorer page on startup.");
         }
     }
 }

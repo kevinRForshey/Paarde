@@ -4,6 +4,8 @@ using System.Text;
 
 using Avalonia.Threading;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
@@ -61,6 +63,9 @@ public partial class PromptViewModel : ObservableRecipient
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private InfoBarSeverity statusSeverity = InfoBarSeverity.Informational;
 
     [ObservableProperty]
     private string cliOutput = string.Empty;
@@ -251,6 +256,7 @@ public partial class PromptViewModel : ObservableRecipient
             }
 
             StatusMessage = string.Empty;
+            StatusSeverity = InfoBarSeverity.Informational;
 
             // T8.2.4: newest-first (IRunSessionStore.ListSessions' own contract), same
             // Distinct()-keeps-most-recent approach as MainViewModel's Recent Projects.
@@ -270,6 +276,7 @@ public partial class PromptViewModel : ObservableRecipient
         {
             _logger.LogError(ex, "Failed to load saved settings for the Compose panel.");
             StatusMessage = string.Format("Prompt_LoadSettingsFailed".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
     }
 
@@ -295,6 +302,7 @@ public partial class PromptViewModel : ObservableRecipient
         await _localSettingsService.SaveSettingAsync(PromptSettingsKey, PromptText);
 
         StatusMessage = "Prompt_Saved".Resolve();
+        StatusSeverity = InfoBarSeverity.Success;
     }
 
     [RelayCommand]
@@ -447,6 +455,7 @@ public partial class PromptViewModel : ObservableRecipient
             // longer assume it's specifically the CLI that's missing - could just as easily be a
             // blank Anthropic API key.
             StatusMessage = "Prompt_LlmRunnerNotAvailable".Resolve();
+            StatusSeverity = InfoBarSeverity.Error;
             return;
         }
 
@@ -456,6 +465,7 @@ public partial class PromptViewModel : ObservableRecipient
         UsageSummary = string.Empty;
         ToolActivityLog.Clear();
         StatusMessage = "Prompt_Running".Resolve();
+        StatusSeverity = InfoBarSeverity.Informational;
 
         _runCancellationTokenSource = new CancellationTokenSource();
         _timeoutCancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
@@ -552,10 +562,12 @@ public partial class PromptViewModel : ObservableRecipient
                 StatusMessage = parseResult.UsedFallback
                     ? completionMessage + " " + "Prompt_FallbackParseNotice".Resolve()
                     : completionMessage;
+                StatusSeverity = InfoBarSeverity.Success;
             }
             else
             {
                 StatusMessage = string.Format("Prompt_RunFailed".Resolve(), result.ExitCode);
+                StatusSeverity = InfoBarSeverity.Error;
             }
 
             // T7.1.1: persist this run (the prompt actually sent, its raw output, the parsed
@@ -578,6 +590,7 @@ public partial class PromptViewModel : ObservableRecipient
             StatusMessage = _timeoutCancellationTokenSource.IsCancellationRequested
                 ? string.Format("Prompt_RunTimedOut".Resolve(), TimeoutSeconds)
                 : "Prompt_RunCancelled".Resolve();
+            StatusSeverity = InfoBarSeverity.Warning;
         }
         catch (Exception ex)
         {
@@ -588,6 +601,7 @@ public partial class PromptViewModel : ObservableRecipient
             // it happened to be.
             _logger.LogError(ex, "Prompt run failed.");
             StatusMessage = string.Format("Prompt_RunError".Resolve(), ex.Message);
+            StatusSeverity = InfoBarSeverity.Error;
         }
         finally
         {

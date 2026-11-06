@@ -22,7 +22,7 @@ public class HistoryViewModelTests
         var compose = new PromptViewModel(_llmRunner, _localSettingsService, new FakeFolderPickerService(), new FakeFilePickerService(), _promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
         var review = new TutorialViewModel(_promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), _llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), _localSettingsService, new FakeBuildTestRunner());
 
-        return new AssistantPanelViewModel(compose, review, _promptResultStore);
+        return new AssistantPanelViewModel(compose, review, _promptResultStore, _localSettingsService, _navigationService);
     }
 
     private HistoryViewModel CreateSut() => new(_runSessionStore, _navigationService, CreateAssistantPanel());

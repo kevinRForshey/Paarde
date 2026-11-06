@@ -1,3 +1,4 @@
+using FluentAvalonia.UI.Controls;
 using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Tests.Fakes;
@@ -38,6 +39,7 @@ public class PromptViewModelTests
 
         Assert.False(sut.IsRunning);
         Assert.Equal("Claude Code finished.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
         Assert.Equal(1, _promptResultStore.SetResultCallCount);
         Assert.Empty(_promptResultStore.Files);
     }
@@ -62,6 +64,7 @@ public class PromptViewModelTests
         await sut.RunPromptCommand.ExecuteAsync(null);
 
         Assert.Equal("Claude Code finished. 1 file(s) ready to review on the Diffs page.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
         Assert.Single(_promptResultStore.Files);
         Assert.Equal("Foo.cs", _promptResultStore.Files[0].FilePath);
     }
@@ -139,6 +142,7 @@ public class PromptViewModelTests
             await sut.RunPromptCommand.ExecuteAsync(null);
 
             Assert.Equal("Claude Code finished. 1 file(s) ready to review on the Diffs page.", sut.StatusMessage);
+            Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
             var file = Assert.Single(_promptResultStore.Files);
             Assert.Equal("class Foo\n{\n    int Bar() => 2;\n}", file.ProposedContent);
             Assert.Equal("class Foo\n{\n    int Bar() => 1;\n}", file.OriginalContent);
@@ -160,6 +164,7 @@ public class PromptViewModelTests
 
         Assert.False(sut.IsRunning);
         Assert.Equal("Claude Code exited with code 1.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Error, sut.StatusSeverity);
         Assert.Equal("boom", sut.CliOutput);
         Assert.Equal(0, _promptResultStore.SetResultCallCount);
     }
@@ -175,6 +180,7 @@ public class PromptViewModelTests
 
         Assert.False(sut.IsRunning);
         Assert.Equal("Failed to run Claude Code: claude not found", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Error, sut.StatusSeverity);
         Assert.Equal(0, _promptResultStore.SetResultCallCount);
     }
 
@@ -258,6 +264,7 @@ public class PromptViewModelTests
 
         Assert.False(sut.IsRunning);
         Assert.Equal("Cancelled.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Warning, sut.StatusSeverity);
         Assert.True(_llmRunner.LastCancellationToken.IsCancellationRequested);
     }
 
@@ -292,6 +299,7 @@ public class PromptViewModelTests
 
         Assert.False(sut.IsRunning);
         Assert.Equal("Timed out after 0 second(s). You can increase the timeout on the Settings page.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Warning, sut.StatusSeverity);
         Assert.True(_llmRunner.LastCancellationToken.IsCancellationRequested);
     }
 
@@ -727,6 +735,7 @@ public class PromptViewModelTests
 
         Assert.False(sut.IsRunning);
         Assert.Equal("The selected runner isn't available. Check its settings on the Settings page.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Error, sut.StatusSeverity);
         Assert.Equal(0, _llmRunner.CallCount);
     }
 
@@ -749,6 +758,7 @@ public class PromptViewModelTests
 
         Assert.Equal(2, _llmRunner.CallCount);
         Assert.Equal("Claude Code finished. 1 file(s) ready to review on the Diffs page.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
         Assert.Single(_promptResultStore.Files);
         Assert.Equal("Foo.cs", _promptResultStore.Files[0].FilePath);
     }
@@ -793,6 +803,7 @@ public class PromptViewModelTests
 
         Assert.Equal(2, _llmRunner.CallCount);
         Assert.Contains("wasn't valid structured JSON", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
         Assert.Single(_promptResultStore.Files);
         Assert.Equal("Foo.cs", _promptResultStore.Files[0].FilePath);
     }
@@ -823,6 +834,7 @@ public class PromptViewModelTests
 
         Assert.Equal(2, _llmRunner.CallCount);
         Assert.Contains("wasn't valid structured JSON", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
         Assert.Single(_promptResultStore.Files);
         Assert.Equal(markdown, sut.CliOutput);
     }
@@ -880,6 +892,7 @@ public class PromptViewModelTests
         await sut.SavePromptCommand.ExecuteAsync(null);
 
         Assert.Equal("Prompt saved.", sut.StatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.StatusSeverity);
         Assert.Equal("Remember me", await _localSettingsService.ReadSettingAsync<string>("SavedPrompt"));
     }
 

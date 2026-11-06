@@ -12,4 +12,16 @@ public interface IActiveEditorContext
     event Action<LspPosition?>? Changed;
 
     void SetCaretPosition(LspPosition? position);
+
+    // specs/editor-intelligence R7: the same "whichever CodeEditor host currently has focus
+    // reports here" shape as Changed/SetCaretPosition above, so SymbolQuickPickViewModel (a DI
+    // singleton, like StatusBarViewModel) can read the focused tab's own file/outline and jump
+    // its caret without depending on the page-scoped ExplorerViewModel.
+    event Action<string?, LspDocumentSymbol?>? DocumentChanged;
+
+    void SetActiveDocument(string? filePath, LspDocumentSymbol? documentSymbols);
+
+    event Action<LspPosition>? NavigationRequested;
+
+    void RequestNavigation(LspPosition position);
 }

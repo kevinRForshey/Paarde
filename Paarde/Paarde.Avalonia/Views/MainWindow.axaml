@@ -3,5 +3,8 @@
         x:Class="Paarde.Avalonia.Views.MainWindow"
         Title="Paarde"
         Width="1200"
-        Height="800">
+        Height="800"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
 </Window>

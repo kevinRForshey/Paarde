@@ -5,14 +5,25 @@
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
+             xmlns:models="using:Paarde.Core.Models"
+             xmlns:views="using:Paarde.Avalonia.Views"
              x:Class="Paarde.Avalonia.Views.ExplorerFileTabControl"
-             x:DataType="vm:OpenFileTabViewModel">
+             x:DataType="vm:OpenFileTabViewModel"
+             x:CompileBindings="False">
 
     <!-- Epic 23, T23.1.1: one instance of this control per open Explorer tab (ExplorerView.axaml's
          TabControl.ContentTemplate), same "separate control instance per tab" shape
          TutorialDetailControl already established for TutorialView's tab strip - each instance
-         gets its own CodeEditor, rather than one shared editor whose binding path gets swapped. -->
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+         gets its own CodeEditor, rather than one shared editor whose binding path gets swapped.
+
+         Bug fix (freeze on new tab): this control is TabViewItem's Content, instantiated at the
+         same time as the tab header. When TabView attaches a brand-new tab's container, this whole
+         subtree briefly inherits the TabView's own ExplorerViewModel DataContext before the real
+         per-tab OpenFileTabViewModel is assigned. Any compiled binding here that evaluates during
+         that window throws InvalidCastException unhandled on the dispatcher thread, wedging the
+         whole UI (confirmed via live memory dump). x:CompileBindings="False" makes every binding in
+         this control use reflection, which tolerates the mismatch instead of throwing. -->
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <!-- UX pass: a real title for this tab's editor, matching TutorialDetailControl's own
              per-file header (icon + full path) instead of leaving the path as tab-strip-only
              tooltip text. -->
@@ -52,39 +63,98 @@
             <ui:ProgressRing Width="18" Height="18" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsLoadingOverview}" />
         </StackPanel>
 
-        <TextBlock Grid.Row="2"
-                   Margin="0,0,0,4"
-                   Text="{Binding StatusMessage}"
-                   TextWrapping="Wrap"
-                   Opacity="0.7"
-                   IsVisible="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        <ui:InfoBar Grid.Row="2"
+                    Margin="0,0,0,4"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    IsClosable="False"
+                    IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+        <!-- specs/unified-workbench T13 (R5): this tab is carrying a proposed change from a
+             prompt run - show which file it's for and a shortcut into the Assistant panel's
+             Review tab, since the editor below is now editing that proposal (EffectiveContent)
+             rather than the file's plain Content. -->
+        <Border Grid.Row="3"
+                Margin="0,0,0,4"
+                Padding="8,4"
+                CornerRadius="{DynamicResource ControlCornerRadius}"
+                Background="{DynamicResource SystemAccentColor}"
+                Opacity="0.15"
+                IsVisible="{Binding PendingChange, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ui:SymbolIcon Symbol="Edit" VerticalAlignment="Center" />
+                <TextBlock VerticalAlignment="Center"
+                           Text="{Binding PendingChange.FilePath, StringFormat='Proposed change for {0}'}" />
+                <Button Name="OpenInReviewButton"
+                        Content="Open in Review"
+                        Click="OnOpenInReviewButtonClick"
+                        ToolTip.Tip="Switch the Assistant panel to Review for this file." />
+            </StackPanel>
+        </Border>
 
         <!-- T10.2.1: editable - BindableText is TwoWay by default (T2.2.2), so edits flow straight
              back into Content, where OnContentChanged derives IsDirty. -->
         <!-- Epic 17, T17.1.2/T17.1.3: Diagnostics feeds the underline renderer/hover tooltip;
              GoToDefinitionRequested/FindReferencesRequested (F12/Shift+F12) and the references
              flyout below are wired up in ExplorerFileTabControl.axaml.cs. -->
-        <controls:CodeEditor Name="Editor"
-                              Grid.Row="3"
-                              helpers:TextEditorExtensions.BindableText="{Binding Content, Mode=TwoWay}"
-                              FilePath="{Binding FilePath}"
-                              GhostTextSuggestion="{Binding GhostTextSuggestion}"
-                              CompletionItems="{Binding CompletionItems}"
-                              Diagnostics="{Binding Diagnostics}"
-                              IsReadOnly="False"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto">
-            <FlyoutBase.AttachedFlyout>
-                <Flyout Placement="Bottom">
-                    <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
-                </Flyout>
-            </FlyoutBase.AttachedFlyout>
-        </controls:CodeEditor>
+        <!-- Epic 25, T13 (R5): EffectiveContent routes through PendingChange.EditedContent when
+             there is one (same editing buffer Review's own ReviewFileDetailControl uses), so an
+             edit made here and one made there stay in sync; DiffLines/DiffHunks are null on a
+             plain tab, where CodeEditor already treats that as "no diff gutter to draw". -->
+        <!-- specs/editor-intelligence R4: collapsible outline panel bound to the editor's
+             DocumentSymbols root - same ResizablePaneHelper + "drag shut to collapse" convention
+             ExplorerView.axaml's own TreeSplitter already established, persisted separately via
+             OutlinePanelWidth so it doesn't collide with that pane's width. -->
+        <Grid Name="OutlinePanelGrid" Grid.Row="4" ColumnDefinitions="Auto,Auto,*">
+            <TreeView Name="OutlineTreeView"
+                      Grid.Column="0"
+                      ItemsSource="{Binding DocumentSymbols.Children}"
+                      SelectionChanged="OnOutlineSymbolSelected">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate DataType="models:LspDocumentSymbol" ItemsSource="{Binding Children}">
+                        <TextBlock Text="{Binding Name}" />
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+
+            <GridSplitter Grid.Column="1" Name="OutlineSplitter" Width="4" ResizeDirection="Columns" />
+
+            <!-- specs/editor-intelligence R5: breadcrumb bar above CodeEditor, bound to the same
+                 DocumentSymbols as the outline panel plus the editor's own live CaretPosition. -->
+            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+                <views:BreadcrumbBar Grid.Row="0"
+                                      Margin="0,0,0,4"
+                                      DocumentSymbols="{Binding DocumentSymbols}"
+                                      CaretPosition="{Binding #Editor.CaretPosition}"
+                                      SegmentClicked="OnBreadcrumbSegmentClicked" />
+
+                <controls:CodeEditor Name="Editor"
+                                      Grid.Row="1"
+                                      helpers:TextEditorExtensions.BindableText="{Binding EffectiveContent, Mode=TwoWay}"
+                                      FilePath="{Binding FilePath}"
+                                      GhostTextSuggestion="{Binding GhostTextSuggestion}"
+                                      CompletionItems="{Binding CompletionItems}"
+                                      Diagnostics="{Binding Diagnostics}"
+                                      DocumentSymbols="{Binding DocumentSymbols}"
+                                      HoverSuggestion="{Binding HoverSuggestion}"
+                                      DiffLines="{Binding PendingChange.DiffLines}"
+                                      DiffHunks="{Binding PendingChange.DiffHunks}"
+                                      IsReadOnly="False"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                    <FlyoutBase.AttachedFlyout>
+                        <Flyout Placement="Bottom">
+                            <ListBox Name="ReferencesListBox" MaxHeight="240" MinWidth="320" SelectionChanged="OnReferenceSelected" />
+                        </Flyout>
+                    </FlyoutBase.AttachedFlyout>
+                </controls:CodeEditor>
+            </Grid>
+        </Grid>
 
         <!-- T10.1.4: collapsed until there's something to show, so the editor keeps its full
              height while browsing and only gives up space once an explanation has actually been
              requested. -->
-        <Expander Grid.Row="4"
+        <Expander Grid.Row="5"
                    Margin="0,8,0,0"
                    Header="Overview"
                    IsExpanded="True"

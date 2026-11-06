@@ -4,10 +4,14 @@ using System.Windows.Input;
 
 using Avalonia.Styling;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Contracts.ViewModels;
+using Paarde.Avalonia.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.Strings;
+using Paarde.Avalonia.Views;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Models;
 
@@ -26,6 +30,8 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     private readonly ISecureStorageService _secureStorageService;
     private readonly LanguageServerOptionsProvider _languageServerOptionsProvider;
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
+    private readonly IHeadroomCoordinator _headroomCoordinator;
+    private readonly IHeadroomStatusStore _headroomStatusStore;
     private readonly ILogger<SettingsViewModel> _logger;
 
     // Epic 20 (specs/build-and-run R2.6): the working directory Run configurations below belong
@@ -33,6 +39,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     // its own editable field here since this page doesn't change the working directory, only
     // edits what's configured for whichever one is currently selected on the Prompt page.
     private string _runConfigurationsWorkingDirectoryPath = string.Empty;
+
+    // Epic 26 (specs/interface-mode R1): the value loaded in OnNavigatedTo, compared against the
+    // live InterfaceMode property to decide InterfaceModeChangeRequiresRestart - switching modes
+    // changes which pages/startup view model the shell navigates to, which isn't something that
+    // can be re-applied live the way ThemeVariant can.
+    private InterfaceMode _loadedInterfaceMode;
 
     [ObservableProperty]
     private ThemeVariant _themeVariant;
@@ -87,6 +99,39 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private string anthropicApiModel = AnthropicModelCatalog.DefaultModelId;
 
+    // Epic 26 (specs/interface-mode R1/R9): which of the two top-level shells the app starts into.
+    // Loaded in OnNavigatedTo/persisted via OnInterfaceModeChanged like SelectedRunnerKind below -
+    // not a live-apply Command like SwitchThemeCommand, since this governs startup navigation and
+    // ShellView's menu items, not something applicable to the already-running shell.
+    [ObservableProperty]
+    private InterfaceMode interfaceMode = InterfaceMode.EditorFocused;
+
+    [ObservableProperty]
+    private bool interfaceModeChangeRequiresRestart;
+
+    // specs/fluent-design-pass R1: off by default - the Mica/Acrylic window backdrop is a visual
+    // preference, not something that should turn on silently (same reasoning as AgentToolsEnabled
+    // above). Unlike InterfaceMode, this applies live to the already-running MainWindow instead of
+    // requiring a restart - see OnIsTransparencyEnabledChanged.
+    [ObservableProperty]
+    private bool isTransparencyEnabled;
+
+    // HeadroomSettingsKeys.IntegrationEnabled: off by default, same reasoning as
+    // IsTransparencyEnabled - this spawns external processes and can prompt to install software,
+    // so it must never activate silently on startup.
+    [ObservableProperty]
+    private bool isHeadroomIntegrationEnabled;
+
+    // Reflects the most recent IHeadroomCoordinator result, whether that came from the automatic
+    // startup check (via IHeadroomStatusStore) or from CheckHeadroomNowCommand below.
+    [ObservableProperty]
+    private string headroomStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private InfoBarSeverity headroomStatusSeverity = InfoBarSeverity.Informational;
+
+    public IReadOnlyList<InterfaceMode> AvailableInterfaceModes { get; } = Enum.GetValues<InterfaceMode>();
+
     public IReadOnlyList<LlmRunnerKind> AvailableRunnerKinds { get; } = Enum.GetValues<LlmRunnerKind>();
 
     public IReadOnlyList<AnthropicModelInfo> AvailableModels { get; } = AnthropicModelCatalog.Models;
@@ -122,13 +167,15 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
         get;
     }
 
-    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, RunConfigurationsProvider runConfigurationsProvider, ILogger<SettingsViewModel>? logger = null)
+    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, RunConfigurationsProvider runConfigurationsProvider, IHeadroomCoordinator headroomCoordinator, IHeadroomStatusStore headroomStatusStore, ILogger<SettingsViewModel>? logger = null)
     {
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
         _secureStorageService = secureStorageService;
         _languageServerOptionsProvider = languageServerOptionsProvider;
         _runConfigurationsProvider = runConfigurationsProvider;
+        _headroomCoordinator = headroomCoordinator;
+        _headroomStatusStore = headroomStatusStore;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _themeVariant = _themeSelectorService.Theme;
         _versionDescription = GetVersionDescription();
@@ -197,6 +244,16 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
             var savedModel = await _localSettingsService.ReadSettingAsync<string>(AnthropicApiSettingsKeys.Model);
             AnthropicApiModel = string.IsNullOrWhiteSpace(savedModel) ? AnthropicModelCatalog.DefaultModelId : savedModel;
+
+            _loadedInterfaceMode = await _localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
+            InterfaceMode = _loadedInterfaceMode;
+            InterfaceModeChangeRequiresRestart = false;
+
+            IsTransparencyEnabled = await _localSettingsService.ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
+
+            IsHeadroomIntegrationEnabled = await _localSettingsService.ReadSettingAsync<bool?>(HeadroomSettingsKeys.IntegrationEnabled) ?? false;
+            HeadroomStatusMessage = _headroomStatusStore.Message;
+            HeadroomStatusSeverity = _headroomStatusStore.Severity;
         }
         catch (Exception ex)
         {
@@ -218,6 +275,30 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     partial void OnClaudeCliArgumentsChanged(string value) => _localSettingsService.SaveSettingAsync(ClaudeCliSettingsKeys.Arguments, value);
 
     partial void OnAgentToolsEnabledChanged(bool value) => _localSettingsService.SaveSettingAsync(ClaudeCliSettingsKeys.AgentToolsEnabled, value);
+
+    partial void OnIsTransparencyEnabledChanged(bool value)
+    {
+        _localSettingsService.SaveSettingAsync(AppearanceSettingsKeys.TransparencyEnabled, value);
+        (App.MainWindow as MainWindow)?.ApplyTransparency(value);
+    }
+
+    partial void OnIsHeadroomIntegrationEnabledChanged(bool value) => _localSettingsService.SaveSettingAsync(HeadroomSettingsKeys.IntegrationEnabled, value);
+
+    [RelayCommand]
+    private async Task CheckHeadroomNowAsync()
+    {
+        var workingDirectoryPath = await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory);
+        if (string.IsNullOrWhiteSpace(workingDirectoryPath))
+        {
+            HeadroomStatusMessage = "Open a project before checking Headroom status.";
+            HeadroomStatusSeverity = InfoBarSeverity.Warning;
+            return;
+        }
+
+        var (message, severity) = await _headroomCoordinator.CheckAndOfferFixesAsync(workingDirectoryPath);
+        HeadroomStatusMessage = message;
+        HeadroomStatusSeverity = severity;
+    }
 
     partial void OnBuildCommandChanged(string value) => _localSettingsService.SaveSettingAsync(BuildTestSettingsKeys.BuildCommand, value);
 
@@ -264,6 +345,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     }
 
     partial void OnSelectedRunnerKindChanged(LlmRunnerKind value) => _localSettingsService.SaveSettingAsync(LlmRunnerSettingsKeys.SelectedRunner, value.ToString());
+
+    partial void OnInterfaceModeChanged(InterfaceMode value)
+    {
+        _localSettingsService.SaveSettingAsync(InterfaceModeSettingsKeys.Mode, value);
+        InterfaceModeChangeRequiresRestart = value != _loadedInterfaceMode;
+    }
 
     partial void OnAnthropicApiKeyChanged(string value) => _secureStorageService.SaveAsync(AnthropicApiSettingsKeys.ApiKey, value);
 

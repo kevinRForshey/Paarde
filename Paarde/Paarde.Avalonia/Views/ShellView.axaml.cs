@@ -7,7 +7,13 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 
+using Paarde.Avalonia.Contracts.Services;
+using Paarde.Avalonia.Helpers;
+using Paarde.Avalonia.Models;
+using Paarde.Avalonia.Services;
 using Paarde.Avalonia.ViewModels;
+
+using FluentAvalonia.UI.Controls;
 
 namespace Paarde.Avalonia.Views;
 
@@ -75,8 +81,42 @@ public partial class ShellView : UserControl
         // Ctrl+P/Ctrl+Shift+P KeyBinding would leave focus wherever it already was.
         ViewModel.QuickOpenViewModel.PropertyChanged += OnQuickOpenViewModelPropertyChanged;
         ViewModel.CommandPaletteViewModel.PropertyChanged += OnCommandPaletteViewModelPropertyChanged;
+        ViewModel.SymbolQuickPickViewModel.PropertyChanged += OnSymbolQuickPickViewModelPropertyChanged;
 
         AttachedToVisualTree += OnAttachedToVisualTree;
+
+        InsertFlowWizardMenuItemsIfNeededAsync();
+    }
+
+    // Epic 26 (specs/interface-mode R3): FlowWizard mode gets Home/Compose/Review menu items ahead
+    // of EditorFocused mode's Explorer/Terminal/History - inserted here (rather than in XAML) since
+    // which set applies is a runtime setting, not something the Avalonia XAML compiler can branch
+    // on. Fire-and-forget async, same shape every other constructor-kickoff read in this codebase
+    // uses (e.g. PromptViewModel.LoadSavedStateAsync) rather than blocking the constructor on the
+    // read - NavigationViewService.GetSelectedItem re-reads NavigationViewControl.MenuItems live on
+    // every navigation, so the only effect of this resolving slightly after the first navigation is
+    // that navigation's selected-item highlight, which self-corrects on the next one.
+    private async void InsertFlowWizardMenuItemsIfNeededAsync()
+    {
+        var localSettingsService = App.GetService<ILocalSettingsService>();
+        var interfaceMode = await localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
+        if (interfaceMode != InterfaceMode.FlowWizard)
+        {
+            return;
+        }
+
+        var homeItem = new NavigationViewItem { Content = "Home", IconSource = new SymbolIconSource { Symbol = Symbol.Home } };
+        NavigationHelper.SetNavigateTo(homeItem, typeof(MainViewModel).FullName);
+
+        var composeItem = new NavigationViewItem { Content = "Compose", IconSource = new SymbolIconSource { Symbol = Symbol.Send } };
+        NavigationHelper.SetNavigateTo(composeItem, typeof(PromptViewModel).FullName);
+
+        var reviewItem = new NavigationViewItem { Content = "Review", IconSource = new SymbolIconSource { Symbol = Symbol.Document } };
+        NavigationHelper.SetNavigateTo(reviewItem, typeof(TutorialViewModel).FullName);
+
+        NavigationViewControl.MenuItems.Insert(0, reviewItem);
+        NavigationViewControl.MenuItems.Insert(0, composeItem);
+        NavigationViewControl.MenuItems.Insert(0, homeItem);
     }
 
     // Epic 24, R3.1: Ctrl+P/Ctrl+Shift+P must work regardless of which control has focus - the
@@ -101,6 +141,14 @@ public partial class ShellView : UserControl
             Gesture = new KeyGesture(Key.P, KeyModifiers.Control | KeyModifiers.Shift),
             Command = ViewModel.CommandPaletteViewModel.OpenCommand,
         });
+
+        // specs/editor-intelligence R7: Ctrl+Shift+O, the same keybind VS Code itself uses for Go
+        // to Symbol in File.
+        window.KeyBindings.Add(new KeyBinding
+        {
+            Gesture = new KeyGesture(Key.O, KeyModifiers.Control | KeyModifiers.Shift),
+            Command = ViewModel.SymbolQuickPickViewModel.OpenCommand,
+        });
     }
 
     private void OnQuickOpenViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -116,6 +164,14 @@ public partial class ShellView : UserControl
         if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && ViewModel.CommandPaletteViewModel.IsOpen)
         {
             Dispatcher.UIThread.Post(() => CommandPaletteQueryBox.Focus());
+        }
+    }
+
+    private void OnSymbolQuickPickViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SymbolQuickPickViewModel.IsOpen) && ViewModel.SymbolQuickPickViewModel.IsOpen)
+        {
+            Dispatcher.UIThread.Post(() => SymbolQuickPickQueryBox.Focus());
         }
     }
 
@@ -179,6 +235,35 @@ public partial class ShellView : UserControl
 
     private void OnCommandPaletteResultDoubleTapped(object? sender, TappedEventArgs e) =>
         ViewModel.CommandPaletteViewModel.ExecuteSelectedCommand.Execute(null);
+
+    private void OnSymbolQuickPickQueryBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Escape:
+                ViewModel.SymbolQuickPickViewModel.CloseCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                ViewModel.SymbolQuickPickViewModel.ActivateSelectedCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case Key.Down:
+                MoveListBoxSelection(SymbolQuickPickResultsList, 1);
+                e.Handled = true;
+                break;
+
+            case Key.Up:
+                MoveListBoxSelection(SymbolQuickPickResultsList, -1);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnSymbolQuickPickResultDoubleTapped(object? sender, TappedEventArgs e) =>
+        ViewModel.SymbolQuickPickViewModel.ActivateSelectedCommand.Execute(null);
 
     private static void MoveListBoxSelection(ListBox listBox, int delta)
     {

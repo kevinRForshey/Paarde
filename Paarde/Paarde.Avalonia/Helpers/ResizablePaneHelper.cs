@@ -15,6 +15,7 @@ public sealed class ResizablePaneHelper
     private readonly ILocalSettingsService _settingsService;
     private readonly string _widthSettingKey;
     private readonly double _defaultWidth;
+    private double? _widthBeforeCollapse;
 
     public ResizablePaneHelper(ColumnDefinition column, ILocalSettingsService settingsService, string widthSettingKey, double defaultWidth)
     {
@@ -31,4 +32,39 @@ public sealed class ResizablePaneHelper
     }
 
     public async void OnSplitterDragCompleted() => await _settingsService.SaveSettingAsync(_widthSettingKey, _column.Width.Value);
+
+    public bool IsCollapsed => _column.Width.Value <= 0;
+
+    // specs/editor-focus-layout R1: a reusable collapse/remember-width/restore toggle, replacing
+    // the "remembered width" field each caller (e.g. ExplorerView.axaml.cs's Assistant panel
+    // button) used to keep ad-hoc - zen mode needs the same mechanism applied to two panes at
+    // once, so it's a method on this class rather than duplicated per call site.
+    public void Collapse()
+    {
+        if (IsCollapsed)
+        {
+            return;
+        }
+
+        _widthBeforeCollapse = _column.Width.Value;
+        _column.Width = new GridLength(0);
+    }
+
+    public void Restore()
+    {
+        _column.Width = new GridLength(_widthBeforeCollapse ?? _defaultWidth);
+        _widthBeforeCollapse = null;
+    }
+
+    public void ToggleCollapse()
+    {
+        if (IsCollapsed)
+        {
+            Restore();
+        }
+        else
+        {
+            Collapse();
+        }
+    }
 }

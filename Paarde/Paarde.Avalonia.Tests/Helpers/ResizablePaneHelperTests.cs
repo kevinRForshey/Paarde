@@ -72,4 +72,100 @@ public class ResizablePaneHelperTests
 
         Assert.Equal(0, await _settingsService.ReadSettingAsync<double?>("Layout.Test.Width"));
     }
+
+    [Fact]
+    public void Collapse_WhenOpen_SetsWidthToZeroAndMarksCollapsed()
+    {
+        var sut = CreateSut();
+        _column.Width = new GridLength(250);
+
+        sut.Collapse();
+
+        Assert.Equal(0, _column.Width.Value);
+        Assert.True(sut.IsCollapsed);
+    }
+
+    [Fact]
+    public void Collapse_AlreadyCollapsed_IsANoOp()
+    {
+        var sut = CreateSut();
+        _column.Width = new GridLength(0);
+
+        sut.Collapse();
+
+        Assert.Equal(0, _column.Width.Value);
+        Assert.True(sut.IsCollapsed);
+    }
+
+    [Fact]
+    public void Restore_AfterCollapse_RestoresTheWidthItHadBeforeCollapsing()
+    {
+        var sut = CreateSut();
+        _column.Width = new GridLength(250);
+        sut.Collapse();
+
+        sut.Restore();
+
+        Assert.Equal(250, _column.Width.Value);
+        Assert.False(sut.IsCollapsed);
+    }
+
+    [Fact]
+    public void Restore_WithoutHavingCollapsedFirst_UsesTheDefaultWidth()
+    {
+        var sut = CreateSut(defaultWidth: 280);
+
+        sut.Restore();
+
+        Assert.Equal(280, _column.Width.Value);
+    }
+
+    [Fact]
+    public void ToggleCollapse_WhenOpen_Collapses()
+    {
+        var sut = CreateSut();
+        _column.Width = new GridLength(250);
+
+        sut.ToggleCollapse();
+
+        Assert.True(sut.IsCollapsed);
+    }
+
+    [Fact]
+    public void ToggleCollapse_WhenCollapsed_Restores()
+    {
+        var sut = CreateSut();
+        _column.Width = new GridLength(250);
+        sut.ToggleCollapse();
+
+        sut.ToggleCollapse();
+
+        Assert.Equal(250, _column.Width.Value);
+        Assert.False(sut.IsCollapsed);
+    }
+
+    // specs/editor-focus-layout R1: zen mode collapses two independent panes as a pair - this
+    // just confirms two ResizablePaneHelper instances don't interfere with each other, since each
+    // one owns its own ColumnDefinition/settings key.
+    [Fact]
+    public void Collapse_TwoIndependentHelpers_EachTracksItsOwnPreCollapseWidth()
+    {
+        var secondColumn = new ColumnDefinition();
+        var sut1 = CreateSut();
+        var sut2 = new ResizablePaneHelper(secondColumn, _settingsService, "Layout.Test.Width2", defaultWidth: 280);
+
+        _column.Width = new GridLength(220);
+        secondColumn.Width = new GridLength(360);
+
+        sut1.Collapse();
+        sut2.Collapse();
+        sut1.Restore();
+
+        Assert.Equal(220, _column.Width.Value);
+        Assert.True(sut2.IsCollapsed);
+
+        sut2.Restore();
+
+        Assert.Equal(360, secondColumn.Width.Value);
+    }
 }

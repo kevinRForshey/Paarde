@@ -11,9 +11,13 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Paarde.Avalonia.ViewModels;
 
-// T8.2.1: the landing page's dashboard - recent runs and recent projects pulled from the same
-// IRunSessionStore the History page (F7.2) already reads, plus a quick-prompt entry point that
-// hands off to the Prompt page rather than duplicating its folder-picking/CLI-invocation logic here.
+// Epic 26 (specs/interface-mode R5): the FlowWizard shell's landing page - recent runs and recent
+// projects pulled from the same IRunSessionStore the History page (F7.2) already reads, plus a
+// quick-prompt entry point that hands off to the Compose page (PromptViewModel) rather than
+// duplicating its folder-picking/CLI-invocation logic here. Takes PromptViewModel directly
+// (instead of routing through a nav parameter) because PromptViewModel no longer implements
+// INavigationAware (removed by Epic 25) - the same direct-call pattern HistoryViewModel.Launch
+// already uses for Fork/Rerun.
 public partial class MainViewModel : ObservableRecipient, INavigationAware
 {
     // Keeps the dashboard to a glance-able size rather than reproducing the full History page here.
@@ -23,6 +27,7 @@ public partial class MainViewModel : ObservableRecipient, INavigationAware
     private readonly IRunSessionStore _runSessionStore;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly INavigationService _navigationService;
+    private readonly PromptViewModel _promptViewModel;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendQuickPromptCommand))]
@@ -43,11 +48,12 @@ public partial class MainViewModel : ObservableRecipient, INavigationAware
 
     public ObservableCollection<string> RecentProjects { get; } = new();
 
-    public MainViewModel(IRunSessionStore runSessionStore, ILocalSettingsService localSettingsService, INavigationService navigationService)
+    public MainViewModel(IRunSessionStore runSessionStore, ILocalSettingsService localSettingsService, INavigationService navigationService, PromptViewModel promptViewModel)
     {
         _runSessionStore = runSessionStore;
         _localSettingsService = localSettingsService;
         _navigationService = navigationService;
+        _promptViewModel = promptViewModel;
 
         RecentRuns.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentRuns));
         RecentProjects.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentProjects));
@@ -88,7 +94,7 @@ public partial class MainViewModel : ObservableRecipient, INavigationAware
 
     public bool HasRecentProjects => RecentProjects.Count > 0;
 
-    // Reopens a past run on the Prompt page for editing (same semantics as HistoryViewModel.Fork) -
+    // Reopens a past run on the Compose page for editing (same semantics as HistoryViewModel.Fork) -
     // not an immediate re-run, since landing on this page is the app's first screen and sending a
     // prompt to the CLI without a chance to review it first would be surprising here.
     [RelayCommand(CanExecute = nameof(CanOpenRecentRun))]
@@ -99,19 +105,18 @@ public partial class MainViewModel : ObservableRecipient, INavigationAware
             return;
         }
 
-        _navigationService.NavigateTo(
-            typeof(PromptViewModel).FullName!,
-            new PromptLaunchRequest(row.Session.UserPromptText, row.Session.WorkingDirectoryPath, AutoRun: false));
+        _promptViewModel.LoadLaunchRequest(new PromptLaunchRequest(row.Session.UserPromptText, row.Session.WorkingDirectoryPath, AutoRun: false));
+        _navigationService.NavigateTo(typeof(PromptViewModel).FullName!);
     }
 
     private bool CanOpenRecentRun() => SelectedRecentRun is not null;
 
-    // Fast project switching (T8.2.1's dashboard miniature of this; T8.2.4 added the Prompt
-    // page's own recent-working-directories dropdown, via PromptViewModel.RecentWorkingDirectories,
-    // for switching without leaving that page): persists the chosen path as the saved working
-    // directory - the same setting PromptViewModel/ExplorerViewModel already read - then hands
-    // off, rather than clearing whatever draft prompt text is already saved the way a
-    // PromptLaunchRequest would.
+    // Fast project switching (this page's dashboard miniature of HistoryViewModel's own working-
+    // directory handling): persists the chosen path as the saved working directory - the same
+    // setting PromptViewModel/ExplorerViewModel already read - and also sets it directly on
+    // PromptViewModel (a singleton that only reads the saved setting once, at construction, so
+    // saving alone wouldn't be picked up by the already-running instance), rather than clearing
+    // whatever draft prompt text is already there the way a PromptLaunchRequest would.
     [RelayCommand(CanExecute = nameof(CanOpenRecentProject))]
     private async Task OpenRecentProjectAsync()
     {
@@ -121,6 +126,7 @@ public partial class MainViewModel : ObservableRecipient, INavigationAware
         }
 
         await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, workingDirectoryPath);
+        _promptViewModel.WorkingDirectoryPath = workingDirectoryPath;
         _navigationService.NavigateTo(typeof(PromptViewModel).FullName!);
     }
 
@@ -134,9 +140,8 @@ public partial class MainViewModel : ObservableRecipient, INavigationAware
     {
         var workingDirectoryPath = await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory) ?? string.Empty;
 
-        _navigationService.NavigateTo(
-            typeof(PromptViewModel).FullName!,
-            new PromptLaunchRequest(QuickPromptText, workingDirectoryPath, AutoRun: false));
+        _promptViewModel.LoadLaunchRequest(new PromptLaunchRequest(QuickPromptText, workingDirectoryPath, AutoRun: false));
+        _navigationService.NavigateTo(typeof(PromptViewModel).FullName!);
     }
 
     private bool CanSendQuickPrompt() => !string.IsNullOrWhiteSpace(QuickPromptText);

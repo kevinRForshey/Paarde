@@ -3,6 +3,8 @@
              xmlns:styling="using:Avalonia.Styling"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:models="using:Paarde.Core.Models"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
              x:Class="Paarde.Avalonia.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -29,6 +31,39 @@
                              CommandParameter="{x:Static styling:ThemeVariant.Default}"
                              IsChecked="{Binding ThemeVariant, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Default, Mode=OneWay}" />
             </StackPanel>
+        </StackPanel>
+
+        <StackPanel Margin="0,8,0,0" Spacing="4">
+            <CheckBox Content="Transparent window backdrop (Mica/Acrylic)" IsChecked="{Binding IsTransparencyEnabled, Mode=TwoWay}"
+                      ToolTip.Tip="Lets the desktop's window-manager backdrop material show through the window chrome. Off by default - falls back to a solid background on platforms that don't support it." />
+        </StackPanel>
+
+        <TextBlock Margin="0,16,0,0" Text="Headroom" FontSize="20" FontWeight="SemiBold" />
+
+        <StackPanel Margin="0,8,0,0" Spacing="4">
+            <CheckBox Content="Automatically check Headroom on startup" IsChecked="{Binding IsHeadroomIntegrationEnabled, Mode=TwoWay}"
+                      ToolTip.Tip="Off by default. When enabled, checks on startup whether the Headroom CLI is installed, healthy, and this project is wired for it, offering to fix anything missing." />
+            <Button Content="Check Headroom status now" Command="{Binding CheckHeadroomNowCommand}" HorizontalAlignment="Left" />
+            <ui:InfoBar Margin="0,4,0,0"
+                        Message="{Binding HeadroomStatusMessage}"
+                        Severity="{Binding HeadroomStatusSeverity}"
+                        IsClosable="False"
+                        IsOpen="{Binding HeadroomStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <TextBlock Margin="0,16,0,0" Text="Interface" FontSize="20" FontWeight="SemiBold" />
+
+        <StackPanel Margin="0,8,0,0" Spacing="4">
+            <RadioButton Content="Editor-focused"
+                         GroupName="InterfaceMode"
+                         IsChecked="{Binding InterfaceMode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=EditorFocused}" />
+            <RadioButton Content="Flow/Wizard"
+                         GroupName="InterfaceMode"
+                         IsChecked="{Binding InterfaceMode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=FlowWizard}" />
+            <TextBlock Text="Restart Paarde to apply this change."
+                       FontSize="12"
+                       Opacity="0.7"
+                       IsVisible="{Binding InterfaceModeChangeRequiresRestart}" />
         </StackPanel>
 
         <TextBlock Margin="0,16,0,0" Text="LLM runner" FontSize="20" FontWeight="SemiBold" />
@@ -110,7 +145,7 @@
         <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding LanguageServerRows}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Margin="0,0,0,8" Padding="12" CornerRadius="6" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                    <Border Margin="0,0,0,8" Padding="12" CornerRadius="{DynamicResource OverlayCornerRadius}" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
                         <StackPanel Spacing="6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="{Binding LanguageId}" FontWeight="SemiBold" />
@@ -144,7 +179,7 @@
         <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding RunConfigurationRows}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Margin="0,0,0,8" Padding="12" CornerRadius="6" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                    <Border Margin="0,0,0,8" Padding="12" CornerRadius="{DynamicResource OverlayCornerRadius}" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
                         <StackPanel Spacing="6">
                             <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">

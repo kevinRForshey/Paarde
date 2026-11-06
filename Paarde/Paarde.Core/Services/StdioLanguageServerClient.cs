@@ -97,6 +97,10 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
                     {
                         ["completionItem"] = new JObject { ["snippetSupport"] = false },
                     },
+
+                    // specs/editor-intelligence R1/R2.
+                    ["documentSymbol"] = new JObject { ["hierarchicalDocumentSymbolSupport"] = true },
+                    ["hover"] = new JObject { ["contentFormat"] = new JArray("markdown", "plaintext") },
                 },
             },
         }, cancellationToken);
@@ -275,6 +279,22 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
         return ParseCompletionItems(result);
     }
 
+    public async Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        var result = await SendRequestAsync("textDocument/documentSymbol", new JObject
+        {
+            ["textDocument"] = new JObject { ["uri"] = PathToUri(filePath) },
+        }, cancellationToken);
+
+        return ParseDocumentSymbols(filePath, result);
+    }
+
+    public async Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default)
+    {
+        var result = await SendRequestAsync("textDocument/hover", TextDocumentPositionParams(filePath, position), cancellationToken);
+        return ParseHover(result);
+    }
+
     private static JObject TextDocumentPositionParams(string filePath, LspPosition position) => new()
     {
         ["textDocument"] = new JObject { ["uri"] = PathToUri(filePath) },
@@ -340,6 +360,136 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
 
         return items;
     }
+
+    // null result (no response, or nothing returned) means "nothing to show" per
+    // ILanguageServerClient.GetDocumentSymbolsAsync's own doc comment - an empty array is still a
+    // valid (if symbol-less) outline, so it still produces a root rather than null.
+    private static LspDocumentSymbol? ParseDocumentSymbols(string filePath, JToken? result)
+    {
+        if (result is not JArray entries)
+        {
+            return null;
+        }
+
+        var objects = entries.OfType<JObject>().ToList();
+
+        // design.md #3: a hierarchical DocumentSymbol[] entry has its own "range"; a flat
+        // SymbolInformation[] entry instead nests its range under "location". Checking the first
+        // entry is enough - a server returns one shape consistently, never a mix.
+        var isHierarchical = objects.Count > 0 && objects[0]["range"] is JObject;
+
+        var children = isHierarchical
+            ? objects.Select(ParseHierarchicalSymbol).ToList()
+            : ParseFlatSymbols(objects);
+
+        return new LspDocumentSymbol(Path.GetFileName(filePath), LspSymbolKind.File, EmptyRange, EmptyRange, children);
+    }
+
+    private static LspDocumentSymbol ParseHierarchicalSymbol(JObject symbol)
+    {
+        var range = ParseRange(symbol["range"] as JObject) ?? EmptyRange;
+        var selectionRange = ParseRange(symbol["selectionRange"] as JObject) ?? range;
+        var children = symbol["children"] is JArray childArray
+            ? childArray.OfType<JObject>().Select(ParseHierarchicalSymbol).ToList()
+            : new List<LspDocumentSymbol>();
+
+        return new LspDocumentSymbol(symbol["name"]?.ToString() ?? string.Empty, ParseSymbolKind(symbol["kind"]), range, selectionRange, children);
+    }
+
+    // design.md #3: a flat SymbolInformation[] response carries no stable id, only each entry's
+    // own "containerName" string - nested here by matching that string against a prior entry's
+    // name. Best-effort, not guaranteed as precise as a server that returns DocumentSymbol[]
+    // natively (e.g. two prior entries sharing a name are indistinguishable as a containerName
+    // target); accepted as a known limitation per design.md's open questions, since no
+    // currently-configured server (csharp-ls/pyright-langserver/typescript-language-server) is
+    // known to return this shape instead of the hierarchical one.
+    private static IReadOnlyList<LspDocumentSymbol> ParseFlatSymbols(IReadOnlyList<JObject> entries)
+    {
+        var roots = new List<MutableSymbolNode>();
+        var lastNodeByName = new Dictionary<string, MutableSymbolNode>(StringComparer.Ordinal);
+
+        foreach (var entry in entries)
+        {
+            var name = entry["name"]?.ToString() ?? string.Empty;
+            var range = ParseRange(entry["location"]?["range"] as JObject) ?? EmptyRange;
+            var node = new MutableSymbolNode(name, ParseSymbolKind(entry["kind"]), range);
+
+            var containerName = entry["containerName"]?.ToString();
+            if (containerName is not null && lastNodeByName.TryGetValue(containerName, out var parent))
+            {
+                parent.Children.Add(node);
+            }
+            else
+            {
+                roots.Add(node);
+            }
+
+            lastNodeByName[name] = node;
+        }
+
+        return roots.Select(node => node.ToImmutable()).ToList();
+    }
+
+    // Mutable intermediate shape ParseFlatSymbols nests into before converting to the immutable
+    // LspDocumentSymbol tree - ParseHierarchicalSymbol doesn't need this since a DocumentSymbol's
+    // children are already known in full before that node is built.
+    private sealed class MutableSymbolNode(string name, LspSymbolKind kind, LspRange range)
+    {
+        public List<MutableSymbolNode> Children { get; } = new();
+
+        public LspDocumentSymbol ToImmutable() => new(name, kind, range, range, Children.Select(child => child.ToImmutable()).ToList());
+    }
+
+    private static readonly LspRange EmptyRange = new(new LspPosition(0, 0), new LspPosition(0, 0));
+
+    private static LspSymbolKind ParseSymbolKind(JToken? token) =>
+        token?.ToObject<int?>() is { } value && Enum.IsDefined(typeof(LspSymbolKind), value) ? (LspSymbolKind)value : LspSymbolKind.Unknown;
+
+    private static LspRange? ParseRange(JObject? range)
+    {
+        if (range?["start"] is not JObject start || range["end"] is not JObject end)
+        {
+            return null;
+        }
+
+        return new LspRange(
+            new LspPosition(start["line"]?.ToObject<int>() ?? 0, start["character"]?.ToObject<int>() ?? 0),
+            new LspPosition(end["line"]?.ToObject<int>() ?? 0, end["character"]?.ToObject<int>() ?? 0));
+    }
+
+    // Result is null (nothing to show) or a Hover { contents, range? } - contents is LSP's own
+    // MarkupContent/MarkedString/MarkedString[] union, flattened to one string here (LspHover's own
+    // remark) since CodeEditor only ever renders plain/wrapped tooltip text.
+    private static LspHover? ParseHover(JToken? result)
+    {
+        if (result is not JObject hover)
+        {
+            return null;
+        }
+
+        var contents = FlattenHoverContents(hover["contents"]);
+        if (string.IsNullOrEmpty(contents))
+        {
+            return null;
+        }
+
+        return new LspHover(contents, ParseRange(hover["range"] as JObject));
+    }
+
+    private static string FlattenHoverContents(JToken? contents) => contents switch
+    {
+        null => string.Empty,
+        JArray array => string.Join("\n\n", array.Select(FlattenMarkedString).Where(text => text.Length > 0)),
+        JObject or JValue => FlattenMarkedString(contents),
+        _ => string.Empty,
+    };
+
+    private static string FlattenMarkedString(JToken token) => token switch
+    {
+        JObject obj when obj["value"] is { } value => value.ToString(),
+        JValue value => value.ToString() ?? string.Empty,
+        _ => string.Empty,
+    };
 
     private async Task<JToken?> SendRequestAsync(string method, JObject? parameters, CancellationToken cancellationToken)
     {

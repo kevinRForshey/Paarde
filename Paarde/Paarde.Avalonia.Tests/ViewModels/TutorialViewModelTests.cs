@@ -32,7 +32,7 @@ public class TutorialViewModelTests
         var llmRunner = new FakeLlmRunner();
         var compose = new PromptViewModel(llmRunner, localSettingsService, new FakeFolderPickerService(), new FakeFilePickerService(), promptResultStore, new PromptTemplateProvider(), new FakeRunSessionStore(), new FakeCodebaseIndexService(), new FakeWorkingDirectoryContext());
         var review = new TutorialViewModel(promptResultStore, new FakeApplyOrchestrationService(), new FakeApplyHistoryLog(), new FakeDialogService(), llmRunner, new PromptTemplateProvider(), new FakeFileSavePickerService(), localSettingsService, new FakeBuildTestRunner());
-        var assistantPanel = new AssistantPanelViewModel(compose, review, promptResultStore);
+        var assistantPanel = new AssistantPanelViewModel(compose, review, promptResultStore, localSettingsService, new FakeNavigationService());
 
         return new ExplorerViewModel(localSettingsService, promptResultStore, llmRunner, new FakeFileChangeApplyService(), new FakeDialogService(), new FakeLanguageServerSessionManager(), new FakeFolderPickerService(), assistantPanel);
     }

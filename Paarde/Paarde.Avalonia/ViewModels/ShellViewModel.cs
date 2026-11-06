@@ -62,6 +62,13 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
+    // specs/editor-intelligence R7: Go to Symbol in File popup - same "singleton handed in, not
+    // created here" shape as the other ShellViewModel-owned singletons above.
+    public SymbolQuickPickViewModel SymbolQuickPickViewModel
+    {
+        get;
+    }
+
     public ShellViewModel(
         INavigationService navigationService,
         INavigationViewService navigationViewService,
@@ -69,7 +76,8 @@ public partial class ShellViewModel : ObservableRecipient
         StatusBarViewModel statusBarViewModel,
         WorkbenchDockViewModel workbenchDockViewModel,
         QuickOpenViewModel quickOpenViewModel,
-        CommandPaletteViewModel commandPaletteViewModel)
+        CommandPaletteViewModel commandPaletteViewModel,
+        SymbolQuickPickViewModel symbolQuickPickViewModel)
     {
         NavigationService = navigationService;
         NavigationService.Navigated += OnNavigated;
@@ -79,6 +87,7 @@ public partial class ShellViewModel : ObservableRecipient
         WorkbenchDockViewModel = workbenchDockViewModel;
         QuickOpenViewModel = quickOpenViewModel;
         CommandPaletteViewModel = commandPaletteViewModel;
+        SymbolQuickPickViewModel = symbolQuickPickViewModel;
 
         // Epic 24, R3.2: wired here, not through DI constructor injection between the two
         // singletons, since that would be a circular dependency the container can't resolve.
