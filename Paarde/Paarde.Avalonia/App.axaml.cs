@@ -133,6 +133,9 @@ public partial class App : Application
 
             services.AddTransient<IGitStatusService, GitStatusService>();
             services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
+            services.AddTransient<IHeadroomService, HeadroomService>();
+            services.AddTransient<IHeadroomCoordinator, HeadroomCoordinator>();
+            services.AddSingleton<IHeadroomStatusStore, HeadroomStatusStore>();
 
             // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
             // prompts in the same session instead of re-tokenizing the whole project on every
@@ -359,6 +362,19 @@ public partial class App : Application
             // MainWindow.ApplyTransparency.
             var transparencyEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
             (MainWindow as Views.MainWindow)?.ApplyTransparency(transparencyEnabled);
+
+            // Off by default, same reasoning as TransparencyEnabled above - see
+            // HeadroomSettingsKeys. Skipped entirely if no project has ever been opened (nothing
+            // to check yet) - the Prompt page hasn't navigated at this point, so
+            // WorkingDirectorySettingsKeys is the only source for "the current project" this early.
+            var headroomIntegrationEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(HeadroomSettingsKeys.IntegrationEnabled) ?? false;
+            var savedWorkingDirectory = await GetService<ILocalSettingsService>().ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory);
+
+            if (headroomIntegrationEnabled && !string.IsNullOrWhiteSpace(savedWorkingDirectory))
+            {
+                var (message, severity) = await GetService<IHeadroomCoordinator>().CheckAndOfferFixesAsync(savedWorkingDirectory);
+                GetService<IHeadroomStatusStore>().SetResult(message, severity);
+            }
         }
         catch (Exception ex)
         {

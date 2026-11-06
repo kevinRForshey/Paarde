@@ -3,6 +3,8 @@
              xmlns:styling="using:Avalonia.Styling"
              xmlns:vm="using:Paarde.Avalonia.ViewModels"
              xmlns:models="using:Paarde.Core.Models"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:conv="using:Avalonia.Data.Converters"
              x:Class="Paarde.Avalonia.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -34,6 +36,19 @@
         <StackPanel Margin="0,8,0,0" Spacing="4">
             <CheckBox Content="Transparent window backdrop (Mica/Acrylic)" IsChecked="{Binding IsTransparencyEnabled, Mode=TwoWay}"
                       ToolTip.Tip="Lets the desktop's window-manager backdrop material show through the window chrome. Off by default - falls back to a solid background on platforms that don't support it." />
+        </StackPanel>
+
+        <TextBlock Margin="0,16,0,0" Text="Headroom" FontSize="20" FontWeight="SemiBold" />
+
+        <StackPanel Margin="0,8,0,0" Spacing="4">
+            <CheckBox Content="Automatically check Headroom on startup" IsChecked="{Binding IsHeadroomIntegrationEnabled, Mode=TwoWay}"
+                      ToolTip.Tip="Off by default. When enabled, checks on startup whether the Headroom CLI is installed, healthy, and this project is wired for it, offering to fix anything missing." />
+            <Button Content="Check Headroom status now" Command="{Binding CheckHeadroomNowCommand}" HorizontalAlignment="Left" />
+            <ui:InfoBar Margin="0,4,0,0"
+                        Message="{Binding HeadroomStatusMessage}"
+                        Severity="{Binding HeadroomStatusSeverity}"
+                        IsClosable="False"
+                        IsOpen="{Binding HeadroomStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
 
         <TextBlock Margin="0,16,0,0" Text="Interface" FontSize="20" FontWeight="SemiBold" />

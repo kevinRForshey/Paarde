@@ -4,6 +4,8 @@ using System.Windows.Input;
 
 using Avalonia.Styling;
 
+using FluentAvalonia.UI.Controls;
+
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Contracts.ViewModels;
 using Paarde.Avalonia.Models;
@@ -28,6 +30,8 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     private readonly ISecureStorageService _secureStorageService;
     private readonly LanguageServerOptionsProvider _languageServerOptionsProvider;
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
+    private readonly IHeadroomCoordinator _headroomCoordinator;
+    private readonly IHeadroomStatusStore _headroomStatusStore;
     private readonly ILogger<SettingsViewModel> _logger;
 
     // Epic 20 (specs/build-and-run R2.6): the working directory Run configurations below belong
@@ -112,6 +116,20 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private bool isTransparencyEnabled;
 
+    // HeadroomSettingsKeys.IntegrationEnabled: off by default, same reasoning as
+    // IsTransparencyEnabled - this spawns external processes and can prompt to install software,
+    // so it must never activate silently on startup.
+    [ObservableProperty]
+    private bool isHeadroomIntegrationEnabled;
+
+    // Reflects the most recent IHeadroomCoordinator result, whether that came from the automatic
+    // startup check (via IHeadroomStatusStore) or from CheckHeadroomNowCommand below.
+    [ObservableProperty]
+    private string headroomStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private InfoBarSeverity headroomStatusSeverity = InfoBarSeverity.Informational;
+
     public IReadOnlyList<InterfaceMode> AvailableInterfaceModes { get; } = Enum.GetValues<InterfaceMode>();
 
     public IReadOnlyList<LlmRunnerKind> AvailableRunnerKinds { get; } = Enum.GetValues<LlmRunnerKind>();
@@ -149,13 +167,15 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
         get;
     }
 
-    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, RunConfigurationsProvider runConfigurationsProvider, ILogger<SettingsViewModel>? logger = null)
+    public SettingsViewModel(IThemeSelectorService themeSelectorService, ILocalSettingsService localSettingsService, ISecureStorageService secureStorageService, IPromptTemplateProvider promptTemplateProvider, LanguageServerOptionsProvider languageServerOptionsProvider, RunConfigurationsProvider runConfigurationsProvider, IHeadroomCoordinator headroomCoordinator, IHeadroomStatusStore headroomStatusStore, ILogger<SettingsViewModel>? logger = null)
     {
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
         _secureStorageService = secureStorageService;
         _languageServerOptionsProvider = languageServerOptionsProvider;
         _runConfigurationsProvider = runConfigurationsProvider;
+        _headroomCoordinator = headroomCoordinator;
+        _headroomStatusStore = headroomStatusStore;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _themeVariant = _themeSelectorService.Theme;
         _versionDescription = GetVersionDescription();
@@ -230,6 +250,10 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             InterfaceModeChangeRequiresRestart = false;
 
             IsTransparencyEnabled = await _localSettingsService.ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
+
+            IsHeadroomIntegrationEnabled = await _localSettingsService.ReadSettingAsync<bool?>(HeadroomSettingsKeys.IntegrationEnabled) ?? false;
+            HeadroomStatusMessage = _headroomStatusStore.Message;
+            HeadroomStatusSeverity = _headroomStatusStore.Severity;
         }
         catch (Exception ex)
         {
@@ -256,6 +280,24 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     {
         _localSettingsService.SaveSettingAsync(AppearanceSettingsKeys.TransparencyEnabled, value);
         (App.MainWindow as MainWindow)?.ApplyTransparency(value);
+    }
+
+    partial void OnIsHeadroomIntegrationEnabledChanged(bool value) => _localSettingsService.SaveSettingAsync(HeadroomSettingsKeys.IntegrationEnabled, value);
+
+    [RelayCommand]
+    private async Task CheckHeadroomNowAsync()
+    {
+        var workingDirectoryPath = await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory);
+        if (string.IsNullOrWhiteSpace(workingDirectoryPath))
+        {
+            HeadroomStatusMessage = "Open a project before checking Headroom status.";
+            HeadroomStatusSeverity = InfoBarSeverity.Warning;
+            return;
+        }
+
+        var (message, severity) = await _headroomCoordinator.CheckAndOfferFixesAsync(workingDirectoryPath);
+        HeadroomStatusMessage = message;
+        HeadroomStatusSeverity = severity;
     }
 
     partial void OnBuildCommandChanged(string value) => _localSettingsService.SaveSettingAsync(BuildTestSettingsKeys.BuildCommand, value);
