@@ -140,6 +140,19 @@ public class HeadroomServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task IsProjectWiredAsync_LocalSettingsHasWrapSelfhealMarker_ReturnsTrue()
+    {
+        // `headroom wrap claude` installs this lighter, SessionStart-only self-heal hook instead
+        // of the full `init claude` wiring - still counts as "wired".
+        var path = Path.Combine(_projectPath, ".claude", "settings.local.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var json = """{"hooks": {"SessionStart": [{"matcher": "startup|resume", "hooks": [{"type": "command", "command": "/home/user/.local/bin/headroom wrap selfheal --marker headroom-wrap-selfheal", "timeout": 10}]}]}}""";
+        await File.WriteAllTextAsync(path, json);
+
+        Assert.True(await _sut.IsProjectWiredAsync(_projectPath));
+    }
+
+    [Fact]
     public async Task IsProjectWiredAsync_SettingsFileWithoutMarker_ReturnsFalse()
     {
         WriteSettings(Path.Combine(_projectPath, ".claude", "settings.local.json"), wired: false);

@@ -254,6 +254,14 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             IsHeadroomIntegrationEnabled = await _localSettingsService.ReadSettingAsync<bool?>(HeadroomSettingsKeys.IntegrationEnabled) ?? false;
             HeadroomStatusMessage = _headroomStatusStore.Message;
             HeadroomStatusSeverity = _headroomStatusStore.Severity;
+
+            // The automatic startup check (App.axaml.cs) can still be running at this point - it
+            // awaits CheckAndOfferFixesAsync (which may itself be waiting on a confirm dialog)
+            // after already navigating to the first page, so a result read just above can be
+            // stale. ResultChanged fires when that check (or a later manual one) finishes;
+            // OnNavigatedFrom unsubscribes since this view model is transient and a new instance
+            // is created on the next visit.
+            _headroomStatusStore.ResultChanged += OnHeadroomStatusChanged;
         }
         catch (Exception ex)
         {
@@ -263,6 +271,13 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
 
     public void OnNavigatedFrom()
     {
+        _headroomStatusStore.ResultChanged -= OnHeadroomStatusChanged;
+    }
+
+    private void OnHeadroomStatusChanged()
+    {
+        HeadroomStatusMessage = _headroomStatusStore.Message;
+        HeadroomStatusSeverity = _headroomStatusStore.Severity;
     }
 
     [RelayCommand(CanExecute = nameof(CanResetPromptTemplate))]
@@ -298,6 +313,10 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
         var (message, severity) = await _headroomCoordinator.CheckAndOfferFixesAsync(workingDirectoryPath, isAutomaticCheck: false);
         HeadroomStatusMessage = message;
         HeadroomStatusSeverity = severity;
+
+        // Also written back to the store so a manual check's result survives navigating away and
+        // back too, not just the automatic startup check's (see IHeadroomStatusStore).
+        _headroomStatusStore.SetResult(message, severity);
     }
 
     partial void OnBuildCommandChanged(string value) => _localSettingsService.SaveSettingAsync(BuildTestSettingsKeys.BuildCommand, value);

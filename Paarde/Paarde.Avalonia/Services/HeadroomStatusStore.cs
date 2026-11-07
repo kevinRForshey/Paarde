@@ -10,9 +10,12 @@ public class HeadroomStatusStore : IHeadroomStatusStore
 
     public InfoBarSeverity Severity { get; private set; } = InfoBarSeverity.Informational;
 
+    public event Action? ResultChanged;
+
     public void SetResult(string message, InfoBarSeverity severity)
     {
         Message = message;
         Severity = severity;
+        ResultChanged?.Invoke();
     }
 }

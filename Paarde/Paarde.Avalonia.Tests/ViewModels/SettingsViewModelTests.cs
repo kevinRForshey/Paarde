@@ -350,6 +350,34 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task HeadroomStatusStore_ResultArrivingAfterNavigation_UpdatesAlreadyDisplayedPage()
+    {
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        // Simulates the automatic startup check (App.axaml.cs) finishing after the user has
+        // already navigated to Settings - the exact staleness scenario this store exists to fix.
+        _headroomStatusStore.SetResult("Headroom is healthy.", InfoBarSeverity.Success);
+
+        Assert.Equal("Headroom is healthy.", sut.HeadroomStatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, sut.HeadroomStatusSeverity);
+    }
+
+    [Fact]
+    public async Task OnNavigatedFrom_UnsubscribesFromHeadroomStatusStore()
+    {
+        var sut = CreateSut();
+        sut.OnNavigatedTo(null!);
+        await Task.Yield();
+        sut.OnNavigatedFrom();
+
+        _headroomStatusStore.SetResult("Headroom is healthy.", InfoBarSeverity.Success);
+
+        Assert.NotEqual("Headroom is healthy.", sut.HeadroomStatusMessage);
+    }
+
+    [Fact]
     public async Task CheckHeadroomNowCommand_CallsCoordinatorWithSavedWorkingDirectoryAndUpdatesStatus()
     {
         await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, "/some/project");
@@ -362,6 +390,24 @@ public class SettingsViewModelTests
         Assert.Equal(["/some/project"], _headroomCoordinator.ProjectPathsChecked);
         Assert.Equal("Headroom is healthy.", sut.HeadroomStatusMessage);
         Assert.Equal(InfoBarSeverity.Success, sut.HeadroomStatusSeverity);
+    }
+
+    [Fact]
+    public async Task CheckHeadroomNowCommand_WritesResultToStore_SoItSurvivesRenavigation()
+    {
+        await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, "/some/project");
+        _headroomCoordinator.MessageToReturn = "Headroom is healthy.";
+        _headroomCoordinator.SeverityToReturn = InfoBarSeverity.Success;
+        var sut = CreateSut();
+        await sut.CheckHeadroomNowCommand.ExecuteAsync(null);
+        sut.OnNavigatedFrom();
+
+        var reopenedSut = CreateSut();
+        reopenedSut.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        Assert.Equal("Headroom is healthy.", reopenedSut.HeadroomStatusMessage);
+        Assert.Equal(InfoBarSeverity.Success, reopenedSut.HeadroomStatusSeverity);
     }
 
     [Fact]

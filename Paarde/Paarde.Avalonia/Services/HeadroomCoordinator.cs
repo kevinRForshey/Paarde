@@ -38,7 +38,7 @@ public class HeadroomCoordinator : IHeadroomCoordinator
 
             if (!installed)
             {
-                return (string.Join(" ", notes), severity);
+                return (string.Join("\n", notes), severity);
             }
         }
 
@@ -55,7 +55,7 @@ public class HeadroomCoordinator : IHeadroomCoordinator
         }
         else
         {
-            notes.Add($"Headroom is working but not optimally configured: {DescribeWarnings(health.Checks)}");
+            notes.Add($"Headroom is working but not optimally configured:\n{DescribeWarnings(health.Checks)}");
             Escalate(ref severity, InfoBarSeverity.Informational);
         }
 
@@ -63,7 +63,7 @@ public class HeadroomCoordinator : IHeadroomCoordinator
         notes.Add(wiringNote);
         Escalate(ref severity, wiringSeverity);
 
-        return (string.Join(" ", notes), severity);
+        return (string.Join("\n", notes), severity);
     }
 
     private async Task<(bool Installed, string Note, InfoBarSeverity Severity)> TryInstallAsync(bool isAutomaticCheck, CancellationToken cancellationToken)
@@ -158,7 +158,9 @@ public class HeadroomCoordinator : IHeadroomCoordinator
     // exit_code 1 ("working but not optimal") covers things like no spend budget configured or
     // Claude Desktop bypassing the proxy - genuinely non-fatal, but not actionable from a bare
     // "run headroom doctor" message in a GUI app, so the actual check summaries are surfaced
-    // instead of making the user open a terminal to find out what's warning.
+    // instead of making the user open a terminal to find out what's warning. One line per check
+    // (rather than joining with " | ") so this stays readable once hints make each entry longer
+    // and there's more than one warning.
     private static string DescribeWarnings(IReadOnlyList<HeadroomCheckItem> checks)
     {
         var warnings = checks
@@ -168,7 +170,9 @@ public class HeadroomCoordinator : IHeadroomCoordinator
                 : $"{check.Name}: {check.Summary} (hint: {check.Hint})", 120))
             .ToList();
 
-        return warnings.Count > 0 ? string.Join(" | ", warnings) : "run 'headroom doctor' for details.";
+        return warnings.Count > 0
+            ? string.Join("\n", warnings.Select(warning => $"  - {warning}"))
+            : "  - run 'headroom doctor' for details.";
     }
 
     private static string Truncate(string text, int maxLength = 200)

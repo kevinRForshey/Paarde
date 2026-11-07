@@ -129,6 +129,21 @@ public class HeadroomCoordinatorTests
     }
 
     [Fact]
+    public async Task CheckAndOfferFixesAsync_WhenHealthHasMultipleWarnings_ListsEachOnItsOwnLine()
+    {
+        _headroomService.HealthResult = new HeadroomHealthResult(1, [
+            new HeadroomCheckItem("codex", "warn", "not routed", "wrap it: headroom wrap codex"),
+            new HeadroomCheckItem("budget", "warn", "no budget configured"),
+        ]);
+        var sut = CreateSut();
+
+        var (message, _) = await sut.CheckAndOfferFixesAsync("/some/project", isAutomaticCheck: true);
+
+        Assert.DoesNotContain(" | ", message);
+        Assert.Contains("  - codex: not routed (hint: wrap it: headroom wrap codex)\n  - budget: no budget configured", message);
+    }
+
+    [Fact]
     public async Task CheckAndOfferFixesAsync_WhenHealthDown_StillChecksProjectWiring()
     {
         _headroomService.HealthResult = new HeadroomHealthResult(2, []);
