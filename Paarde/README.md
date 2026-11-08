@@ -258,3 +258,7 @@ Every run is persisted automatically. Select a past session from the list to see
 
 Paarde is under active development. See [ROADMAP.md](ROADMAP.md) for a detailed, honest breakdown
 of what's implemented, what's partial, and what's planned next.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

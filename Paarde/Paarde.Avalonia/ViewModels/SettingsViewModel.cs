@@ -263,7 +263,11 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             // is created on the next visit.
             _headroomStatusStore.ResultChanged += OnHeadroomStatusChanged;
         }
-        catch (Exception ex)
+        // AnthropicApiKey's ReadAsync (SecureStorageService) additionally throws FormatException on a
+        // corrupted base64 blob or System.Security.Cryptography.CryptographicException on a corrupted/
+        // tampered ciphertext (AES-GCM's tag check) or wrong-user DPAPI data - every other read in this
+        // method is a plain settings read, same surface as everywhere else that narrows this catch.
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException or FormatException or System.Security.Cryptography.CryptographicException)
         {
             _logger.LogError(ex, "Failed to load saved settings while navigating to the Settings page.");
         }

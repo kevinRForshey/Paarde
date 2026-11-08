@@ -272,7 +272,7 @@ public partial class PromptViewModel : ObservableRecipient
 
             UpdateEstimatedTokenCountDisplay();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
             _logger.LogError(ex, "Failed to load saved settings for the Compose panel.");
             StatusMessage = string.Format("Prompt_LoadSettingsFailed".Resolve(), ex.Message);
