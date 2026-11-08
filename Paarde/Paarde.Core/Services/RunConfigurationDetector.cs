@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Paarde.Core.Contracts.Services;
+using Paarde.Core.Helpers;
 using Paarde.Core.Models;
 
 namespace Paarde.Core.Services;
@@ -72,8 +73,8 @@ public class RunConfigurationDetector : IRunConfigurationDetector
                 LanguageId: "csharp",
                 WorkingDirectoryPath: projectDirectory,
                 ProjectRelativePath: Path.GetRelativePath(csharpRoot, projectFilePath),
-                BuildCommand: $"dotnet build \"{projectFilePath}\"",
-                RunCommand: $"dotnet run --project \"{projectFilePath}\"",
+                BuildCommand: $"dotnet build {ShellArgumentQuoting.Quote(projectFilePath)}",
+                RunCommand: $"dotnet run --project {ShellArgumentQuoting.Quote(projectFilePath)}",
                 IsAutoDetected: true);
         }
     }

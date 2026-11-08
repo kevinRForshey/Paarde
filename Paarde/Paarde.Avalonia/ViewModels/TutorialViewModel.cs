@@ -195,7 +195,7 @@ public partial class TutorialViewModel : ObservableRecipient
             var savedStageAppliedFilesInGit = await _localSettingsService.ReadSettingAsync<bool?>(StageAppliedFilesInGitSettingsKey);
             StageAppliedFilesInGit = savedStageAppliedFilesInGit ?? true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
             _logger.LogError(ex, "Failed to load saved settings for the Review panel.");
         }

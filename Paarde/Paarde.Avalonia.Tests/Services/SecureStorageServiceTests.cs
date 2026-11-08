@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using Microsoft.Extensions.Options;
 
 using Paarde.Avalonia.Models;
@@ -70,5 +72,27 @@ public class SecureStorageServiceTests : IDisposable
         var secondInstance = CreateSut(fileService);
 
         Assert.Equal("sk-ant-super-secret", await secondInstance.ReadAsync("AnthropicApiKey"));
+    }
+
+    // AES-GCM's whole point over plain AES-CBC: a single flipped bit in the stored ciphertext must
+    // be detected rather than either silently decrypting to the wrong plaintext or failing with an
+    // unrelated padding error.
+    [Fact]
+    public async Task ReadAsync_TamperedCiphertext_ThrowsRatherThanReturningGarbage()
+    {
+        var fileService = new FakeFileService();
+        var sut = CreateSut(fileService);
+        await sut.SaveAsync("AnthropicApiKey", "sk-ant-super-secret");
+
+        var applicationDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _relativeFolder);
+        var persisted = fileService.Read<IDictionary<string, string>>(applicationDataFolder, "SecureSettings.dat")!;
+        var tampered = Convert.FromBase64String(persisted["AnthropicApiKey"]);
+        tampered[^1] ^= 0xFF;
+        persisted["AnthropicApiKey"] = Convert.ToBase64String(tampered);
+        fileService.Save(applicationDataFolder, "SecureSettings.dat", persisted);
+
+        var secondInstance = CreateSut(fileService);
+
+        await Assert.ThrowsAsync<AuthenticationTagMismatchException>(() => secondInstance.ReadAsync("AnthropicApiKey"));
     }
 }

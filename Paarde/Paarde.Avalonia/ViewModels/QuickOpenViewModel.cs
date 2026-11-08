@@ -76,7 +76,7 @@ public partial class QuickOpenViewModel : ObservableObject
         {
             _workingDirectoryPath = await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory) ?? string.Empty;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
             _logger.LogError(ex, "Failed to load the saved working directory for Quick Open.");
         }

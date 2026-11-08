@@ -400,7 +400,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
                 OpenOrActivateTab(filePath);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
             _logger.LogError(ex, "Failed to load the saved working directory while navigating to the Explorer page.");
         }

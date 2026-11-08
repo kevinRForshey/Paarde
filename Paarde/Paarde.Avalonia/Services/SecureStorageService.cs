@@ -69,6 +69,14 @@ public class SecureStorageService : ISecureStorageService
         }
     }
 
+    // AES-GCM rather than plain AES-CBC: CBC has no integrity check of its own, so a corrupted or
+    // tampered ciphertext either throws a confusing padding error or - if the corruption happens to
+    // land on a byte that still produces valid padding - silently decrypts to garbage instead of
+    // failing. GCM's tag authenticates the ciphertext, so tampering is always detected as a clean
+    // CryptographicException (see DecryptAsync_TamperedCiphertext_ThrowsRatherThanReturningGarbage).
+    private static readonly int NonceSizeBytes = AesGcm.NonceByteSizes.MaxSize;
+    private static readonly int TagSizeBytes = AesGcm.TagByteSizes.MaxSize;
+
     private byte[] Encrypt(string plaintext)
     {
         var plainBytes = Encoding.UTF8.GetBytes(plaintext);
@@ -78,16 +86,17 @@ public class SecureStorageService : ISecureStorageService
             return ProtectedData.Protect(plainBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
         }
 
-        using var aes = Aes.Create();
-        aes.Key = GetOrCreateLocalKey();
-        aes.GenerateIV();
+        using var aes = new AesGcm(GetOrCreateLocalKey(), TagSizeBytes);
 
-        using var encryptor = aes.CreateEncryptor();
-        var ciphertext = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
+        // Nonce doesn't need to be secret, just unique per encryption under this key - prepending it
+        // (together with the tag) to the ciphertext it belongs to avoids storing it anywhere separate.
+        var nonce = RandomNumberGenerator.GetBytes(NonceSizeBytes);
+        var ciphertext = new byte[plainBytes.Length];
+        var tag = new byte[TagSizeBytes];
 
-        // IV doesn't need to be secret, just unique per encryption and available to decrypt with -
-        // prepending it to the ciphertext it belongs to avoids storing it anywhere separate.
-        return [.. aes.IV, .. ciphertext];
+        aes.Encrypt(nonce, plainBytes, ciphertext, tag);
+
+        return [.. nonce, .. tag, .. ciphertext];
     }
 
     private string Decrypt(byte[] data)
@@ -97,12 +106,13 @@ public class SecureStorageService : ISecureStorageService
             return Encoding.UTF8.GetString(ProtectedData.Unprotect(data, optionalEntropy: null, DataProtectionScope.CurrentUser));
         }
 
-        using var aes = Aes.Create();
-        aes.Key = GetOrCreateLocalKey();
-        aes.IV = data[..16];
+        var nonce = data[..NonceSizeBytes];
+        var tag = data[NonceSizeBytes..(NonceSizeBytes + TagSizeBytes)];
+        var ciphertext = data[(NonceSizeBytes + TagSizeBytes)..];
+        var plainBytes = new byte[ciphertext.Length];
 
-        using var decryptor = aes.CreateDecryptor();
-        var plainBytes = decryptor.TransformFinalBlock(data, 16, data.Length - 16);
+        using var aes = new AesGcm(GetOrCreateLocalKey(), TagSizeBytes);
+        aes.Decrypt(nonce, ciphertext, tag, plainBytes);
 
         return Encoding.UTF8.GetString(plainBytes);
     }
