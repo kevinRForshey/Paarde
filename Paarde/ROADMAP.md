@@ -3243,6 +3243,20 @@ spec: `specs/editor-focus-layout/requirements.md`.*
 
 ---
 
+### EPIC 30 — Extract `Paarde.Presentation` (UI-agnostic view models) — ✅ Done 2026-11-09, manually verified
+
+*Why: a WinUI 3 Windows front end is planned (its licensing terms are preferred over Avalonia's),
+and it should reuse the view models and settings/runner services instead of duplicating them.
+Pure refactor, no behavior change: 70 files (21 of 22 view models, contracts, settings/runner
+services, helpers, models, strings) moved from `Paarde.Avalonia` to a new `Paarde.Presentation`
+class library with no UI-framework references, enforced by a guard test. Avalonia leaks were
+replaced by small abstractions that map 1:1 to WinUI 3: `NotificationSeverity`
+(`InfoBarSeverity`), `IUiDispatcher`/`IUiTimer` (`DispatcherQueue`), `AppTheme` (`ElementTheme`),
+a `Frame`-free `INavigationService`, and `IWindowAppearanceService`. Tests split into
+`Paarde.Presentation.Tests` (shared fakes live there). Full spec: `specs/presentation-extraction/`.*
+
+---
+
 ## 4. Suggested execution order
 
 1. **Epic 1** — one codebase, or everything after this costs double.
@@ -3346,3 +3360,6 @@ spec: `specs/editor-focus-layout/requirements.md`.*
     only (Epic 26's Flow/Wizard mode has no tree/Assistant-panel layout to zen/split). Sequenced
     last since it's the most purely cosmetic/ergonomic of the three, with no other epic depending
     on it. Full spec: `specs/editor-focus-layout/`.
+29. **Epic 30** — extract `Paarde.Presentation` so a WinUI 3 front end can reuse the view models.
+    Prerequisite for any second UI; independent of Epics 25-28. Full spec:
+    `specs/presentation-extraction/`. ✅ Done 2026-11-09, manually verified.

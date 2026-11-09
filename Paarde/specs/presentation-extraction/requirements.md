@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft. Not started. Proposed as Epic 30 (`ROADMAP.md` entry still to be added). Pure refactor: no
+Done 2026-11-09, manually verified. Epic 30 in `ROADMAP.md`. Pure refactor: no
 user-visible behavior change. Moves every piece of `Paarde.Avalonia` that does not need Avalonia
 (view models, settings/navigation contracts, non-UI services, plain helpers/models) into a new
 UI-framework-agnostic class library, `Paarde.Presentation`.

@@ -67,8 +67,8 @@ than to `Paarde.Avalonia` first.
 
 ## F30.5 — Verification and docs
 
-- [ ] T18 Manual smoke test per `design.md`'s testing section (launch, theme, transparency,
+- [x] T18 Manual smoke test per `design.md`'s testing section (launch, theme, transparency,
   navigation incl. back, prompt run with elapsed ticker/streaming, Run panel build, terminal,
-  InfoBars). _(R5.2)_
-- [x] T19 `README.md` updated (tech table, project layout, test commands). `ROADMAP.md` entry still
-  to add.
+  InfoBars). _(R5.2)_ Done 2026-11-09 by the user.
+- [x] T19 `README.md` updated (tech table, project layout, test commands); `ROADMAP.md` Epic 30
+  entry added.
