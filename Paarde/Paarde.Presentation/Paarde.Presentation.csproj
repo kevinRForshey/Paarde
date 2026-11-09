@@ -11,7 +11,8 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
-    <!-- [FromKeyedServices] on TerminalViewModel's constructor - attribute only, no container. -->
+    <!-- [FromKeyedServices] on TerminalViewModel's constructor, and AddPaardePresentation()'s
+         IServiceCollection registrations - abstractions only, the container is the host's. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
     <!-- IOptions<LocalSettingsOptions> for LocalSettingsService/SecureStorageService. -->
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />

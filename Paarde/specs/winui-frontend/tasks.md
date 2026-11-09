@@ -5,11 +5,19 @@ and existing tests must keep their counts after every task.
 
 ## F31.0 — Shared composition
 
-- [ ] T0 Record baseline: build warnings/errors, test pass counts, and the Avalonia DI registration
+- [x] T0 Record baseline: build warnings/errors, test pass counts, and the Avalonia DI registration
   list (service, implementation, lifetime, key). _(R5.1)_
-- [ ] T1 Add `AddPaardePresentation()` to `Paarde.Presentation`, move the shared registrations out
+  Done 2026-11-09: 0 warnings/0 errors; `Paarde.Presentation.Tests` 402/403,
+  `Paarde.Avalonia.Tests` 63/63, `Paarde.Core.Tests` 525/565 (same known environmental failures);
+  69 `services.Add*/Configure` lines.
+- [x] T1 Add `AddPaardePresentation()` to `Paarde.Presentation`, move the shared registrations out
   of `App.axaml.cs`, and move data-folder resolution to `ApplicationDataPaths.Resolve`. Diff the
   registration list against T0; build, test, launch Avalonia. _(R1.1–R1.4)_
+  Done 2026-11-09: `Paarde.Presentation/ServiceCollectionExtensions.cs` (verbatim moves, same
+  lifetimes/keys) + `Models/ApplicationDataPaths.cs`, now also used by `LocalSettingsService`
+  (removing its own copy of the default folder). The sorted registration lines across
+  `App.axaml.cs` + the extension are identical to T0. Build 0/0, test counts unchanged, app
+  launches with no errors logged.
 
 ## F31.1 — Scaffold, services, shell, Settings
 

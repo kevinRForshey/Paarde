@@ -10,14 +10,13 @@ using Paarde.Avalonia.Services;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Avalonia.Views;
 using Paarde.Core.Contracts.Services;
-using Paarde.Core.Services;
+using Paarde.Presentation;
 using Paarde.Presentation.Contracts.Services;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using Serilog;
 using Serilog.Events;
@@ -89,120 +88,14 @@ public partial class App : Application
         }).
         ConfigureServices((context, services) =>
         {
-            // Services
-            services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
-            services.AddSingleton<ISecureStorageService, SecureStorageService>();
-            services.AddSingleton<IThemeSelectorService, ThemeSelectorService>();
-            services.AddSingleton<ClaudeCliOptionsProvider>();
-            services.AddSingleton<AnthropicApiOptionsProvider>();
+            // specs/winui-frontend R1: the Core + Presentation graph shared with every front end.
+            services.AddPaardePresentation();
 
-            // T6.3.2/T6.3.3: ILlmRunner itself resolves to LlmRunnerSelector, which picks between
-            // these two concrete runners per-call based on the Settings page's runner choice - see
-            // LlmRunnerSelector's own comment. Each concrete runner is built directly (not also
-            // registered as ILlmRunner) so there's no ambiguity over which one DI would hand to a
-            // constructor that asked for "the" ILlmRunner.
-            services.AddSingleton(sp => new ClaudeCliRunner(sp.GetRequiredService<ClaudeCliOptionsProvider>().GetOptionsAsync));
-            services.AddSingleton(sp => new AnthropicApiRunner(sp.GetRequiredService<AnthropicApiOptionsProvider>().GetOptionsAsync));
-            services.AddSingleton<ILlmRunner>(sp => new LlmRunnerSelector(
-                sp.GetRequiredService<ILocalSettingsService>(),
-                sp.GetRequiredService<ClaudeCliRunner>(),
-                sp.GetRequiredService<AnthropicApiRunner>()));
+            // Avalonia-specific implementations of Presentation contracts.
+            services.AddSingleton<IThemeSelectorService, ThemeSelectorService>();
             services.AddTransient<IFolderPickerService, FolderPickerService>();
             services.AddTransient<IFilePickerService, FilePickerService>();
             services.AddTransient<IFileSavePickerService, FileSavePickerService>();
-            services.AddSingleton<IPromptResultStore, PromptResultStore>();
-            services.AddSingleton<IPromptTemplateProvider, PromptTemplateProvider>();
-            services.AddTransient<IFileChangeApplyService, FileChangeApplyService>();
-            services.AddSingleton<IApplyBackupStore, ApplyBackupStore>();
-            services.AddSingleton<IApplyHistoryStore, ApplyHistoryStore>();
-            services.AddSingleton<IApplyHistoryLog, ApplyHistoryLog>();
-
-            // T7.1.1: persists each run to %AppData%/<ApplicationDataFolder>/Sessions/*.json - reads
-            // the same LocalSettingsOptions.ApplicationDataFolder LocalSettingsService uses (rather
-            // than hardcoding a second copy of that folder name) so a user-configured data folder
-            // covers sessions too.
-            services.AddSingleton<IRunSessionStore>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<LocalSettingsOptions>>().Value;
-                var applicationDataFolder = ResolveApplicationDataFolder(options);
-                var sessionsFolder = Path.Combine(applicationDataFolder, "Sessions");
-
-                return new RunSessionStore(
-                    sp.GetRequiredService<IFileService>(),
-                    sp.GetRequiredService<IPromptResultStore>(),
-                    sp.GetRequiredService<IApplyHistoryLog>(),
-                    sessionsFolder);
-            });
-
-            services.AddTransient<IGitStatusService, GitStatusService>();
-            services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
-            services.AddTransient<IHeadroomService, HeadroomService>();
-            services.AddTransient<IHeadroomCoordinator, HeadroomCoordinator>();
-            services.AddSingleton<IHeadroomStatusStore, HeadroomStatusStore>();
-            services.AddTransient<IHeadroomPromptSnoozeStore, HeadroomPromptSnoozeStore>();
-
-            // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
-            // prompts in the same session instead of re-tokenizing the whole project on every
-            // "Suggest relevant files" click.
-            services.AddSingleton<ICodebaseIndexService, TfIdfCodebaseIndexService>();
-
-            // Epic 17 (T17.2.1)/Epic 18 (specs/multi-language-support): singleton, not transient
-            // like the per-call runners above - ILanguageServerSessionManager owns zero-or-more
-            // long-lived per-language server processes tied to Explorer's current working
-            // directory, started/stopped by ExplorerViewModel rather than spun up fresh per call.
-            services.AddSingleton<LanguageServerOptionsProvider>();
-            services.AddSingleton<IProjectTypeDetector, ProjectTypeDetector>();
-            services.AddSingleton<ILanguageServerSessionManager>(sp => new LanguageServerSessionManager(
-                sp.GetRequiredService<IProjectTypeDetector>(),
-                sp.GetRequiredService<LanguageServerOptionsProvider>().GetOptionsAsync,
-                logger: sp.GetRequiredService<ILogger<LanguageServerSessionManager>>()));
-
-            // specs/ide-workbench-shell, R4: subscribes to ILanguageServerSessionManager directly
-            // (not relayed through ExplorerViewModel), so it has to be a singleton constructed
-            // before any page navigates anywhere - WorkbenchDockViewModel's own eager construction
-            // (via ShellViewModel) is what actually guarantees that, the same way RunPanelViewModel
-            // already guarantees it for Build/Run.
-            services.AddSingleton<IDiagnosticsAggregator, DiagnosticsAggregator>();
-
-            // Epic 20 (specs/build-and-run): RunConfigurationsProvider/RunPanelViewModel are
-            // singletons for the same reason ILanguageServerSessionManager above is - they back
-            // ShellView's persistent toolbar (R5.1), not any one page.
-            services.AddSingleton<IRunConfigurationDetector, RunConfigurationDetector>();
-            services.AddSingleton<RunConfigurationsProvider>();
-
-            // Epic 21 (specs/terminal-emulation T6): RunPanelViewModel starts processes through
-            // this instead of the retired IRunProcessManager - singleton because it owns at most
-            // one long-lived PTY-backed process at a time, the same ownership shape
-            // ILanguageServerSessionManager has for its per-language server processes.
-            services.AddSingleton<IPtyProcessManager, PtyProcessManager>();
-
-            // specs/terminal-emulation T7: TerminalViewModel gets its own, separately keyed
-            // PtyProcessManager instance rather than sharing RunPanelViewModel's - Run's
-            // persistent toolbar and the Terminal page are independent features (same as the
-            // pre-epic IRunProcessManager/ITerminalCommandRunner split), so a command typed into
-            // one must not stop or report status for whatever's running in the other.
-            services.AddKeyedSingleton<IPtyProcessManager, PtyProcessManager>(TerminalViewModel.PtyProcessManagerKey);
-            services.AddSingleton<IWorkingDirectoryContext, WorkingDirectoryContext>();
-            services.AddSingleton<IActiveEditorContext, ActiveEditorContext>();
-            services.AddSingleton<RunPanelViewModel>();
-            services.AddSingleton<StatusBarViewModel>();
-
-            // specs/ide-workbench-shell R1.3: promoted from AddTransient so the Terminal page and
-            // the workbench dock's Terminal tab share the exact same instance/session - see this
-            // class's own remark.
-            services.AddSingleton<TerminalViewModel>();
-            services.AddSingleton<WorkbenchDockViewModel>();
-
-            // Epic 24, R1/R2/R3: Quick Open and the command palette - reachable from anywhere via
-            // ShellViewModel-owned global KeyBindings, so each must be one instance, not one per
-            // page navigation.
-            services.AddSingleton<QuickOpenViewModel>();
-            services.AddSingleton<CommandPaletteViewModel>();
-
-            // specs/editor-intelligence R7: Go to Symbol in File - same "reachable from anywhere
-            // via a global KeyBinding" reason as the two singletons above.
-            services.AddSingleton<SymbolQuickPickViewModel>();
-            services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
 
@@ -216,30 +109,12 @@ public partial class App : Application
             services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
             services.AddSingleton<IWindowAppearanceService, WindowAppearanceService>();
 
-            // Core Services
-            services.AddSingleton<IFileService, FileService>();
-
-            // Views and ViewModels
-            services.AddTransient<SettingsViewModel>();
+            // Views
             services.AddTransient<SettingsView>();
-            // Epic 25, T6: AddSingleton rather than AddTransient - the Assistant panel must be
-            // reachable from HistoryViewModel's Fork/Rerun without depending on ExplorerView ever
-            // having been constructed, and a second accidental instance would mean "Fork" from
-            // History silently updates a PromptViewModel/TutorialViewModel nobody is looking at.
-            services.AddSingleton<AssistantPanelViewModel>();
-            services.AddSingleton<TutorialViewModel>();
-            services.AddTransient<HistoryViewModel>();
             services.AddTransient<HistoryView>();
-            services.AddTransient<ExplorerViewModel>();
             services.AddTransient<ExplorerView>();
             services.AddTransient<TerminalView>();
-            services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
-
-            // Epic 26 (specs/interface-mode R5/R6): FlowWizard mode's Home/Review pages - AddTransient
-            // like every other page-scoped view model/view pair above, since neither is reachable
-            // from outside navigation the way AssistantPanelViewModel/TutorialViewModel are.
-            services.AddTransient<MainViewModel>();
             services.AddTransient<MainView>();
             services.AddTransient<ReviewView>();
 
@@ -252,18 +127,10 @@ public partial class App : Application
         Build();
     }
 
-    // T9.2.1: shared by the logging setup above (which runs ahead of DI and so only has
-    // IConfiguration to read LocalSettingsOptions from) and the IRunSessionStore registration
-    // (which already has it bound via IOptions<LocalSettingsOptions>) - previously each resolved
-    // this path with its own duplicated default-folder literal; now there's exactly one.
+    // T9.2.1: the logging setup above runs ahead of DI and so only has IConfiguration to read
+    // LocalSettingsOptions from; ApplicationDataPaths is the one shared resolution (specs/winui-frontend R1.4).
     private static string ResolveApplicationDataFolder(IConfiguration configuration) =>
-        ResolveApplicationDataFolder(configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>() ?? new LocalSettingsOptions());
-
-    private static string ResolveApplicationDataFolder(LocalSettingsOptions options)
-    {
-        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(localApplicationData, options.ApplicationDataFolder ?? "Paarde.Avalonia/ApplicationData");
-    }
+        ApplicationDataPaths.Resolve(configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>()?.ApplicationDataFolder);
 
     public override void Initialize()
     {
