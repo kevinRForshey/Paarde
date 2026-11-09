@@ -72,7 +72,7 @@ public static IServiceCollection AddPaardePresentation(this IServiceCollection s
 | `Microsoft.WindowsAppSDK` | 2.6.5 | WinUI 3 | **Microsoft Software License Terms – Windows App SDK** (free, redistributable, "solely for use on Windows"; checked in the package's `license.txt` at T2). Not MIT: only the WinUI *source* repo is MIT. Accepted as the platform itself - see R2.4. |
 | `Microsoft.Windows.SDK.BuildTools` | 10.0.28000.2957 | build tooling WinAppSDK needs | Microsoft license (build-time only, not redistributed) |
 | `Microsoft.Extensions.Hosting`, `Serilog.*` | same as Avalonia | host + logging | MIT / Apache-2.0 |
-| `Microsoft.Graphics.Win2D` | 1.4.0 (F31.4) | `TerminalControl` drawing | check at F31.4 |
+| ~~`Microsoft.Graphics.Win2D`~~ | not used | was planned for `TerminalControl` drawing | Checked at F31.4: the NuGet package is under Microsoft's Win2D EULA, not MIT (only the source repo is MIT). Dropped: `TerminalControl` draws with plain XAML elements instead (below). |
 | `CommunityToolkit.WinUI.Controls.Sizers` | 8.2.251219 (added F31.2) | `GridSplitter`; `ResizablePaneHelper.AttachSplitter` persists the width on `ManipulationCompleted` | MIT |
 | `TextMateSharp.Grammars` (in `Paarde.Presentation`) | 2.0.5 (F31.2) | `SyntaxTokenizer`, moved out of Avalonia so both front ends share it | MIT |
 | editor (O1) | — | see below | must be permissive |
@@ -116,10 +116,22 @@ Avalonia's commit-per-keystroke); `[ObservableProperty]` in `Paarde.WinUI` uses 
 
 ### `TerminalControl`
 
-Win2D `CanvasControl`; `Draw` walks `TerminalBuffer`'s cells exactly like the Avalonia
-`Render(DrawingContext)` (fixed-cell grid measured from "M", Cascadia Mono → Consolas fallback).
-Input: `CharacterReceived` + `KeyDown` translated to VT sequences → `InputReceived`; size changes →
-`Resized(cols, rows)`. Port the Avalonia key-translation table rather than rewriting it.
+Plain XAML on a `Canvas`, not Win2D (see Packages). Per row: one `Rectangle` per run of the same
+background colour, and one `TextBlock` per run of same-style text, placed at its exact column, so
+a monospace font can't drift out of the grid by more than one run. Wide characters always get a
+run of their own. Rows whose cells are unchanged since the last refresh are left alone, and
+`TerminalBuffer.Changed` (raised on the PTY thread) is coalesced to one refresh per UI-thread turn.
+The cell is measured from a run of "M"s in `MonospaceFontFamily`, with row height snapped to whole
+device pixels so row backgrounds don't anti-alias into seams.
+Input: `PreviewKeyDown` (so Tab and the arrow keys reach the PTY rather than moving focus) uses
+Avalonia's key-translation table, ported as-is, and `CharacterReceived` sends printable
+characters, including surrogate pairs. AltGr (Ctrl+Alt) is left to `CharacterReceived` so it
+still types characters. Size changes → `Resized(cols, rows)`.
+The `Changed` subscription only lives while the control is loaded, because the buffers are
+singletons that outlive the pages hosting them.
+
+The workbench dock: WinUI has no `TabControl`, so a `SelectorBar` (Build/Run/Problems/Terminal,
+`Tag` = `ActiveTabKey`) toggles which of four panes is visible inside the `Expander`.
 
 ### `MarkdownTextBlock`, `DiffWordSpanTextBlock`
 
@@ -178,7 +190,10 @@ navigation) on the simplest page.
   not in `OnNavigatingFrom`.
 - **Keyboard shortcuts**: Avalonia `KeyBinding`s in `ShellView` become `KeyboardAccelerator`s;
   some (F12 in the editor, Ctrl+Tab) may be swallowed by focused controls and need
-  `ProcessKeyboardAccelerators` handling.
+  `ProcessKeyboardAccelerators` handling. _(F31.5: the shell's three accelerators work from
+  every page and from inside the popups. `TerminalControl` handles keys in `PreviewKeyDown`, so a
+  focused terminal keeps Ctrl+P, as in Avalonia. The editor's F12 and Ctrl+Tab are still open
+  for F31.7.)_
 - **Shared settings**: a WinUI-only setting added later must not break the Avalonia app — keep all
   keys in Presentation's `*SettingsKeys`, read with defaults.
 - **Unpackaged APIs**: some Windows APIs (notifications, `ApplicationData`) need package identity;

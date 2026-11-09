@@ -32,6 +32,10 @@ public static class BindingFunctions
 
     public static bool IsEnumValue(Enum value, string name) => Enum.Parse(value.GetType(), name).Equals(value);
 
+    // WinUI's TextBlock isn't a Control, so it has no IsEnabled to grey itself out with (Avalonia's
+    // command palette binds TextBlock.IsEnabled); dimming is the closest equivalent.
+    public static double OpacityIfEnabled(bool enabled) => enabled ? 1.0 : 0.4;
+
     // Same member names and order as InfoBarSeverity (asserted for FluentAvalonia's copy in
     // Paarde.Avalonia.Tests), so a plain cast.
     public static InfoBarSeverity ToInfoBarSeverity(NotificationSeverity severity) => (InfoBarSeverity)(int)severity;

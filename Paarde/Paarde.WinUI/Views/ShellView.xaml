@@ -3,40 +3,316 @@
     x:Class="Paarde.WinUI.Views.ShellView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:helpers="using:Paarde.WinUI.Helpers">
+    xmlns:controls="using:Paarde.WinUI.Controls"
+    xmlns:helpers="using:Paarde.WinUI.Helpers"
+    xmlns:models="using:Paarde.Core.Models"
+    xmlns:pvm="using:Paarde.Presentation.ViewModels"
+    KeyboardAcceleratorPlacementMode="Hidden">
 
-    <!-- specs/winui-frontend T5: navigation only for now. Paarde.Avalonia's ShellView also has the
-         Build/Run toolbar, the output dock and the status bar (F31.4) and the Quick Open/command
-         palette/symbol popups (F31.5). -->
-    <!-- UX pass: compact icon-rail pane instead of a labeled sidebar, same as Paarde.Avalonia - the
-         current page's name is still shown via the Header binding, and the hamburger toggle still
-         expands the pane temporarily to show labels. -->
-    <NavigationView x:Name="NavigationViewControl"
-                    IsBackButtonVisible="Visible"
-                    IsBackEnabled="{x:Bind ViewModel.IsBackEnabled, Mode=OneWay}"
-                    SelectedItem="{x:Bind ViewModel.Selected, Mode=OneWay}"
-                    IsSettingsVisible="True"
-                    PaneDisplayMode="LeftCompact"
-                    Header="{x:Bind GetHeader(ViewModel.Selected), Mode=OneWay}">
-        <NavigationView.MenuItems>
-            <NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.ExplorerViewModel">
-                <NavigationViewItem.Icon>
-                    <SymbolIcon Symbol="Folder" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <!-- specs/fluent-design-pass R3: Keyboard, not Play, so this nav icon doesn't collide
-                 with the Run buttons' Play icon. -->
-            <NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.TerminalViewModel">
-                <NavigationViewItem.Icon>
-                    <SymbolIcon Symbol="Keyboard" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.HistoryViewModel">
-                <NavigationViewItem.Icon>
-                    <SymbolIcon Symbol="Clock" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-        </NavigationView.MenuItems>
-        <Frame x:Name="NavigationFrame" />
-    </NavigationView>
+    <!-- Epic 24, R3.1: Ctrl+P/Ctrl+Shift+P/Ctrl+Shift+O work wherever focus is - Avalonia attaches
+         them to the Window's KeyBindings; here, accelerators on the shell's root have global scope.
+         Hidden placement stops the shell from showing them as a tooltip. -->
+    <UserControl.KeyboardAccelerators>
+        <KeyboardAccelerator Key="P" Modifiers="Control" Invoked="OnQuickOpenAcceleratorInvoked" />
+        <KeyboardAccelerator Key="P" Modifiers="Control,Shift" Invoked="OnCommandPaletteAcceleratorInvoked" />
+        <KeyboardAccelerator Key="O" Modifiers="Control,Shift" Invoked="OnSymbolQuickPickAcceleratorInvoked" />
+    </UserControl.KeyboardAccelerators>
+
+    <UserControl.Resources>
+        <!-- The palette popups' chrome, same brushes as ComposePanelControl's mention popup. A fixed
+             width (Avalonia's MinWidth is 420) so code-behind can centre the popup without
+             measuring it. -->
+        <Style x:Key="PalettePopupBorderStyle" TargetType="Border">
+            <Setter Property="Width" Value="480" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Background" Value="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeColorFlyoutBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+        </Style>
+    </UserControl.Resources>
+
+    <!-- Epic 20 (specs/build-and-run F20.3): the NavigationView is row 1 of a 4-row grid so the
+         Build/Run/Stop toolbar (row 0), the output dock (row 2) and the status bar (row 3) are
+         visible on every page. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="8" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox Grid.Column="0"
+                      ItemsSource="{x:Bind ViewModel.RunPanelViewModel.Configurations}"
+                      SelectedItem="{x:Bind ViewModel.RunPanelViewModel.SelectedConfiguration, Mode=TwoWay}"
+                      PlaceholderText="No run configuration found - add one on the Settings page"
+                      HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:RunConfiguration">
+                        <TextBlock Text="{x:Bind Name}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button Grid.Column="1" Command="{x:Bind ViewModel.RunPanelViewModel.BuildCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE943;" FontSize="16" />
+                    <TextBlock Text="Build" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Command="{x:Bind ViewModel.RunPanelViewModel.RunCommand}" Style="{StaticResource AccentButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Play" />
+                    <TextBlock Text="Run" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="3" Command="{x:Bind ViewModel.RunPanelViewModel.StopCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Stop" />
+                    <TextBlock Text="Stop" />
+                </StackPanel>
+            </Button>
+            <InfoBar Grid.Column="4"
+                     Margin="4,0,0,0"
+                     VerticalAlignment="Center"
+                     Message="{x:Bind ViewModel.RunPanelViewModel.StatusMessage, Mode=OneWay}"
+                     Severity="{x:Bind helpers:BindingFunctions.ToInfoBarSeverity(ViewModel.RunPanelViewModel.StatusSeverity), Mode=OneWay}"
+                     IsClosable="False"
+                     IsOpen="{x:Bind helpers:BindingFunctions.IsNotEmpty(ViewModel.RunPanelViewModel.StatusMessage), Mode=OneWay}" />
+        </Grid>
+
+        <!-- UX pass: compact icon-rail pane instead of a labeled sidebar, same as Paarde.Avalonia - the
+             current page's name is still shown via the Header binding, and the hamburger toggle still
+             expands the pane temporarily to show labels. -->
+        <NavigationView x:Name="NavigationViewControl"
+                        Grid.Row="1"
+                        IsBackButtonVisible="Visible"
+                        IsBackEnabled="{x:Bind ViewModel.IsBackEnabled, Mode=OneWay}"
+                        SelectedItem="{x:Bind ViewModel.Selected, Mode=OneWay}"
+                        IsSettingsVisible="True"
+                        PaneDisplayMode="LeftCompact"
+                        Header="{x:Bind GetHeader(ViewModel.Selected), Mode=OneWay}">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.ExplorerViewModel">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Folder" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <!-- specs/fluent-design-pass R3: Keyboard, not Play, so this nav icon doesn't collide
+                     with the Run buttons' Play icon. -->
+                <NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.TerminalViewModel">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Keyboard" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.HistoryViewModel">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Clock" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <Frame x:Name="NavigationFrame" />
+        </NavigationView>
+
+        <!-- Epic 24, R1/R3: Quick Open. WinUI's Popup has no Center placement, so each popup sits
+             at row 1's top-left and code-behind centres it horizontally on open (near the top, like
+             VS Code's, rather than Avalonia's vertical centre, so it doesn't jump as results
+             filter). Light-dismiss, with IsOpen two-way so a click outside closes the view model too. -->
+        <Popup x:Name="QuickOpenPopup"
+               Grid.Row="1"
+               IsLightDismissEnabled="True"
+               IsOpen="{x:Bind ViewModel.QuickOpenViewModel.IsOpen, Mode=TwoWay}">
+            <Border Style="{StaticResource PalettePopupBorderStyle}">
+                <StackPanel Spacing="4">
+                    <TextBox x:Name="QuickOpenQueryBox"
+                             Text="{x:Bind ViewModel.QuickOpenViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="Go to file..."
+                             PreviewKeyDown="OnQuickOpenQueryBoxPreviewKeyDown" />
+                    <TextBlock Text="{x:Bind ViewModel.QuickOpenViewModel.EmptyStateMessage, Mode=OneWay}"
+                               Visibility="{x:Bind helpers:BindingFunctions.VisibleIfNotNull(ViewModel.QuickOpenViewModel.EmptyStateMessage), Mode=OneWay}" />
+                    <ListView x:Name="QuickOpenResultsList"
+                              MaxHeight="240"
+                              ItemsSource="{x:Bind ViewModel.QuickOpenViewModel.Results}"
+                              SelectedItem="{x:Bind ViewModel.QuickOpenViewModel.SelectedResult, Mode=TwoWay}"
+                              DoubleTapped="OnQuickOpenResultDoubleTapped" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Epic 24, R2/R3: the command palette - same shape as QuickOpenPopup. Disabled entries
+             (PaletteCommand.IsEnabled) stay in the list, dimmed, per R2.4. -->
+        <Popup x:Name="CommandPalettePopup"
+               Grid.Row="1"
+               IsLightDismissEnabled="True"
+               IsOpen="{x:Bind ViewModel.CommandPaletteViewModel.IsOpen, Mode=TwoWay}">
+            <Border Style="{StaticResource PalettePopupBorderStyle}">
+                <StackPanel Spacing="4">
+                    <TextBox x:Name="CommandPaletteQueryBox"
+                             Text="{x:Bind ViewModel.CommandPaletteViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="Type a command..."
+                             PreviewKeyDown="OnCommandPaletteQueryBoxPreviewKeyDown" />
+                    <ListView x:Name="CommandPaletteResultsList"
+                              MaxHeight="240"
+                              ItemsSource="{x:Bind ViewModel.CommandPaletteViewModel.Results}"
+                              SelectedItem="{x:Bind ViewModel.CommandPaletteViewModel.SelectedResult, Mode=TwoWay}"
+                              DoubleTapped="OnCommandPaletteResultDoubleTapped">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="pvm:PaletteCommand">
+                                <TextBlock Text="{x:Bind Name}" Opacity="{x:Bind helpers:BindingFunctions.OpacityIfEnabled(IsEnabled)}" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- specs/editor-intelligence R7: Go to Symbol in File - same shape as the two above. -->
+        <Popup x:Name="SymbolQuickPickPopup"
+               Grid.Row="1"
+               IsLightDismissEnabled="True"
+               IsOpen="{x:Bind ViewModel.SymbolQuickPickViewModel.IsOpen, Mode=TwoWay}">
+            <Border Style="{StaticResource PalettePopupBorderStyle}">
+                <StackPanel Spacing="4">
+                    <TextBox x:Name="SymbolQuickPickQueryBox"
+                             Text="{x:Bind ViewModel.SymbolQuickPickViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="Go to symbol..."
+                             PreviewKeyDown="OnSymbolQuickPickQueryBoxPreviewKeyDown" />
+                    <TextBlock Text="{x:Bind ViewModel.SymbolQuickPickViewModel.EmptyStateMessage, Mode=OneWay}"
+                               Visibility="{x:Bind helpers:BindingFunctions.VisibleIfNotNull(ViewModel.SymbolQuickPickViewModel.EmptyStateMessage), Mode=OneWay}" />
+                    <ListView x:Name="SymbolQuickPickResultsList"
+                              MaxHeight="240"
+                              ItemsSource="{x:Bind ViewModel.SymbolQuickPickViewModel.Results}"
+                              SelectedItem="{x:Bind ViewModel.SymbolQuickPickViewModel.SelectedResult, Mode=TwoWay}"
+                              DoubleTapped="OnSymbolQuickPickResultDoubleTapped">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:LspDocumentSymbol">
+                                <TextBlock Text="{x:Bind Name}" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- specs/ide-workbench-shell R1: the four-tab dock (Build, Run, Problems, Terminal) inside
+             one Expander, whose IsExpanded covers the whole dock. WinUI has no TabControl, so a
+             SelectorBar picks which of the four panes is visible; the selection <-> ActiveTabKey
+             sync, InputReceived/Resized and focus are wired in code-behind, same as Avalonia's.
+             MaxHeight caps how much of the window the expanded dock can claim. -->
+        <Expander Grid.Row="2"
+                  Margin="8,0,8,8"
+                  Header="Output"
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Stretch"
+                  IsExpanded="{x:Bind ViewModel.WorkbenchDockViewModel.IsExpanded, Mode=TwoWay}">
+            <Grid MaxHeight="320" RowSpacing="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <SelectorBar x:Name="DockSelectorBar" Grid.Row="0" SelectionChanged="OnDockSelectorBarSelectionChanged">
+                    <SelectorBarItem Text="Build" Tag="Build" />
+                    <SelectorBarItem Text="Run" Tag="Run" />
+                    <SelectorBarItem Text="Problems" Tag="Problems" />
+                    <SelectorBarItem Text="Terminal" Tag="Terminal" />
+                </SelectorBar>
+
+                <controls:TerminalControl x:Name="BuildTerminal"
+                                          Grid.Row="1"
+                                          Visibility="Collapsed"
+                                          Buffer="{x:Bind ViewModel.RunPanelViewModel.BuildOutputBuffer}" />
+                <controls:TerminalControl x:Name="OutputTerminal"
+                                          Grid.Row="1"
+                                          Visibility="Collapsed"
+                                          Buffer="{x:Bind ViewModel.RunPanelViewModel.RunOutputBuffer}" />
+                <ListView x:Name="ProblemsList"
+                          Grid.Row="1"
+                          Visibility="Collapsed"
+                          SelectionMode="None"
+                          ItemContainerStyle="{StaticResource PlainListViewItemStyle}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="pvm:ProblemRow">
+                            <TextBlock Text="{x:Bind Summary}" FontFamily="{StaticResource MonospaceFontFamily}" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <!-- Same content as TerminalView, bound to the shared
+                     WorkbenchDockViewModel.TerminalViewModel instance. -->
+                <Grid x:Name="DockTerminalPane" Grid.Row="1" Visibility="Collapsed" RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.CommandText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Type a command to run in the current working directory..."
+                                 FontFamily="{StaticResource MonospaceFontFamily}" />
+                        <Button Grid.Column="1" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <SymbolIcon Symbol="Play" />
+                                <TextBlock Text="Run" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.CancelCommandCommand}"
+                                Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.WorkbenchDockViewModel.TerminalViewModel.IsRunning), Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <SymbolIcon Symbol="Stop" />
+                                <TextBlock Text="Cancel" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="3" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.ClearOutputCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE894;" FontSize="16" />
+                                <TextBlock Text="Clear" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <controls:TerminalControl x:Name="DockTerminal"
+                                              Grid.Row="1"
+                                              Buffer="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.OutputBuffer}" />
+                    <InfoBar Grid.Row="2"
+                             Message="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.StatusMessage, Mode=OneWay}"
+                             Severity="{x:Bind helpers:BindingFunctions.ToInfoBarSeverity(ViewModel.WorkbenchDockViewModel.TerminalViewModel.StatusSeverity), Mode=OneWay}"
+                             IsClosable="False"
+                             IsOpen="{x:Bind helpers:BindingFunctions.IsNotEmpty(ViewModel.WorkbenchDockViewModel.TerminalViewModel.StatusMessage), Mode=OneWay}" />
+                </Grid>
+            </Grid>
+        </Expander>
+
+        <!-- specs/ide-workbench-shell, R3: a thin status bar below everything else - git branch/dirty
+             count, the active run configuration, per-language LSP state, and (only when a code editor
+             has focus) the caret's line:column. -->
+        <Border Grid.Row="3"
+                Padding="8,4"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <TextBlock Text="{x:Bind ViewModel.StatusBarViewModel.GitBranchName, Mode=OneWay}"
+                           Visibility="{x:Bind helpers:BindingFunctions.VisibleIfNotNull(ViewModel.StatusBarViewModel.GitBranchName), Mode=OneWay}" />
+                <TextBlock Text="{x:Bind FormatDirtyCount(ViewModel.StatusBarViewModel.DirtyFileCount), Mode=OneWay}"
+                           Visibility="{x:Bind helpers:BindingFunctions.VisibleIfNotNull(ViewModel.StatusBarViewModel.GitBranchName), Mode=OneWay}" />
+                <TextBlock Text="{x:Bind ViewModel.StatusBarViewModel.RunConfigurationName, Mode=OneWay}" />
+                <TextBlock Text="{x:Bind ViewModel.StatusBarViewModel.LanguageServerStatus, Mode=OneWay}" />
+                <TextBlock Text="{x:Bind ViewModel.StatusBarViewModel.CaretPositionText, Mode=OneWay}"
+                           Visibility="{x:Bind helpers:BindingFunctions.VisibleIfNotNull(ViewModel.StatusBarViewModel.CaretPositionText), Mode=OneWay}" />
+            </StackPanel>
+        </Border>
+    </Grid>
 </UserControl>

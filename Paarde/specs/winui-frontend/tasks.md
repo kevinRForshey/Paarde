@@ -106,14 +106,67 @@ and existing tests must keep their counts after every task.
 
 ## F31.4 — Terminal and workbench dock
 
-- [ ] T10 `TerminalControl` on Win2D (port rendering + key translation). _(R4.2)_
-- [ ] T11 `TerminalView`; `ShellView` workbench dock (Run panel, terminal tab), status bar.
+- [x] T10 `TerminalControl` ~~on Win2D~~ (port rendering + key translation). _(R4.2)_
+  Done 2026-11-09, **without Win2D**: its NuGet package is under Microsoft's Win2D EULA rather
+  than MIT, so the control draws with plain XAML elements and needs no new package (design.md
+  "TerminalControl").
+- [x] T11 `TerminalView`; `ShellView` workbench dock (Run panel, terminal tab), status bar.
   Manual check: interactive shell, a TUI app, Run-panel build. _(R4.1, R4.2, R5.2)_
+  Done 2026-11-09. `ShellView` is now Avalonia's 4-row layout: the Build/Run/Stop toolbar and
+  InfoBar, the NavigationView, the Output dock (`Expander` + `SelectorBar`), and the status bar.
+
+  Checked with real keystrokes and screenshots:
+  - **Terminal page with `cmd`:** prompt, `dir`, a coloured foreground/background line, `cls`,
+    Up-arrow history, Backspace.
+  - **Size:** `mode con` reports 134×22, matching the control, so `Resized` reaches the PTY.
+  - **Dock:** expands; its Terminal tab shares the same session and takes focus.
+  - **Build/Run** (the scratch project turned into a console app): the configuration was
+    auto-detected, Build switched the dock to Build with the output and a success InfoBar, and the
+    status bar showed it. Run switched to Run and focused the terminal; typed input reached the
+    program, its green output rendered, and the exit code was reported. Stop reported "Stopped."
+  - Rows snap to device pixels; before that fix, faint seams showed between rows.
+
+  **Found (shared Core, both apps, not fixed here):**
+  - `TerminalBuffer` never answers terminal queries (DA/DSR/OSC colour), so a TUI that waits for
+    a reply (Microsoft `edit`) hangs on "…".
+  - Ctrl+C reaches cmd (a new prompt appears), but a running `ping` isn't interrupted.
+  - Cancel/Stop end only the top-level process: `edit.exe` (under `cmd`) and `Greeter.exe`
+    (under `dotnet run`) were left running.
+
+  **Not exercised:** the Problems tab with real diagnostics (needs a language server, F31.7).
+  Both solutions build with 0 warnings/0 errors; test counts unchanged.
 
 ## F31.5 — Palette and shortcuts
 
-- [ ] T12 Command palette, Quick Open, symbol quick pick, and `ShellView` keyboard shortcuts as
+- [x] T12 Command palette, Quick Open, symbol quick pick, and `ShellView` keyboard shortcuts as
   `KeyboardAccelerator`s. Manual check. _(R4.1, R5.2)_
+  Done 2026-11-09. Ctrl+P / Ctrl+Shift+P / Ctrl+Shift+O are `KeyboardAccelerator`s on `ShellView`'s
+  root (global scope, `KeyboardAcceleratorPlacementMode="Hidden"` so they don't show as a
+  tooltip). WinUI-specific changes:
+  - WinUI's `Popup` has no Center placement. The popups have a fixed width (480) and are centred
+    horizontally from code-behind when they open, near the top of the page (like VS Code's) rather
+    than Avalonia's vertical centre.
+  - They're light-dismiss with `IsOpen` bound two-way, so a click outside also closes the view
+    model.
+  - Disabled palette entries are dimmed (`BindingFunctions.OpacityIfEnabled`), because WinUI's
+    `TextBlock` has no `IsEnabled`.
+  - The query boxes use `PreviewKeyDown` for Escape/Enter/Up/Down.
+
+  Checked with real keystrokes, a mouse click and screenshots:
+  - **Quick Open:** opens centred with the query focused and the first result selected; typing
+    filters; Down moves the selection; Enter on `Greeter.cs` navigates to Explorer (still the
+    placeholder).
+  - **Command palette:** Ctrl+Shift+P from inside Quick Open swaps one popup for the other. The
+    disabled Stop entry is dimmed, and "term" + Enter runs "Go to Terminal".
+  - **Go to Symbol:** shows "No file is focused in the editor." with no editor open. Escape closes
+    it.
+  - **Light-dismiss:** a click outside closes the popup, and Ctrl+P reopens it.
+  - **Focused terminal:** keeps Ctrl+P for the shell (no popup), same as Avalonia.
+  - Clean exit; this run logged nothing at WRN or above.
+
+  **Not exercised:** symbol results and jumping to one; both need Explorer's editor (F31.7).
+  `Paarde.Windows.slnx` builds with 0 warnings/0 errors. Only `Paarde.WinUI` changed, so test counts
+  are unchanged.
 
 ## F31.6 — Editor spike (O1)
 

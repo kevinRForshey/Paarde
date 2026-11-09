@@ -1,10 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- specs/winui-frontend: placeholder until this page is ported (F31.4). No ViewModel on purpose:
-     resolving the real view model would start its work (file watching, PTYs, language servers)
-     for a page that can't show it yet. -->
 <Page
     x:Class="Paarde.WinUI.Views.TerminalView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <TextBlock Margin="24" Style="{StaticResource BodyTextBlockStyle}" Text="The Terminal page hasn't been ported to WinUI yet." />
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Paarde.WinUI.Controls"
+    xmlns:helpers="using:Paarde.WinUI.Helpers">
+
+    <!-- Port of Paarde.Avalonia's TerminalView. InputReceived/Resized are wired in code-behind,
+         same as Avalonia's. -->
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Terminal" Style="{StaticResource SubtitleTextBlockStyle}" />
+
+        <Grid Grid.Row="1" Margin="0,8,0,0" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0"
+                     Text="{x:Bind ViewModel.CommandText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PlaceholderText="Type a command to run in the current working directory..."
+                     FontFamily="{StaticResource MonospaceFontFamily}" />
+            <Button Grid.Column="1" Command="{x:Bind ViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Play" />
+                    <TextBlock Text="Run" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Command="{x:Bind ViewModel.CancelCommandCommand}"
+                    Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Stop" />
+                    <TextBlock Text="Cancel" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="3" Command="{x:Bind ViewModel.ClearOutputCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE894;" FontSize="16" />
+                    <TextBlock Text="Clear" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <controls:TerminalControl x:Name="OutputTerminal"
+                                  Grid.Row="2"
+                                  Margin="0,8,0,0"
+                                  Buffer="{x:Bind ViewModel.OutputBuffer}" />
+
+        <InfoBar Grid.Row="3"
+                 Margin="0,4,0,0"
+                 Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                 Severity="{x:Bind helpers:BindingFunctions.ToInfoBarSeverity(ViewModel.StatusSeverity), Mode=OneWay}"
+                 IsClosable="False"
+                 IsOpen="{x:Bind helpers:BindingFunctions.IsNotEmpty(ViewModel.StatusMessage), Mode=OneWay}" />
+    </Grid>
 </Page>
