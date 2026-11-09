@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 
-using Paarde.Avalonia.Strings;
+using Paarde.Presentation.Strings;
 
 namespace Paarde.Avalonia.Views;
 

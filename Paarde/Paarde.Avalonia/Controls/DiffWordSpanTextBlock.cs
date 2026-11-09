@@ -5,6 +5,7 @@ using Avalonia.Media;
 
 using Paarde.Avalonia.Helpers;
 using Paarde.Core.Models;
+using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Controls;
 

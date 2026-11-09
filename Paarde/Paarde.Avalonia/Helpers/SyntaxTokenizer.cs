@@ -2,6 +2,7 @@ using System.IO;
 
 using TextMateSharp.Grammars;
 using TextMateSharp.Registry;
+using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Helpers;
 

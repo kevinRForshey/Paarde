@@ -32,7 +32,7 @@
             </ResourceDictionary.ThemeDictionaries>
             <Thickness x:Key="ToolTipBorderThickness">1</Thickness>
             <helpers:DiffLineKindToBackgroundConverter x:Key="DiffLineKindToBackgroundConverter" />
-            <helpers:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />
+            <helpers:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />            <helpers:NotificationSeverityToInfoBarSeverityConverter x:Key="NotificationSeverityToInfoBarSeverityConverter" />
             <helpers:SelectedNavigationItemToHeaderConverter x:Key="SelectedNavigationItemToHeaderConverter" />
         </ResourceDictionary>
     </Application.Resources>

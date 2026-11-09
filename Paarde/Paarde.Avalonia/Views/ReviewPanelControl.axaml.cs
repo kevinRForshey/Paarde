@@ -1,8 +1,8 @@
 using Avalonia.Controls;
 
-using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Helpers;
-using Paarde.Avalonia.Services;
+using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Services;
 
 namespace Paarde.Avalonia.Views;
 

@@ -1,8 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 
-using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Helpers;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Views;
 

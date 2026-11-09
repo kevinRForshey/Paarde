@@ -3,7 +3,7 @@
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:coreVm="using:Paarde.Core.ViewModels"
-             xmlns:viewmodels="using:Paarde.Avalonia.ViewModels"
+             xmlns:viewmodels="using:Paarde.Presentation.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              x:Class="Paarde.Avalonia.Views.ReviewFileDetailControl"
              x:DataType="coreVm:ProposedFileChangeViewModel">

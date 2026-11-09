@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Contracts.ViewModels;
+using Paarde.Presentation.Contracts.ViewModels;
 using Paarde.Avalonia.Helpers;
 
 using FluentAvalonia.UI.Controls;
@@ -9,10 +9,11 @@ using FluentAvalonia.UI.Navigation;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Services;
 
-public class NavigationService : INavigationService
+public class NavigationService : IFrameNavigationService
 {
     private readonly IPageService _pageService;
     private readonly IDialogService _dialogService;

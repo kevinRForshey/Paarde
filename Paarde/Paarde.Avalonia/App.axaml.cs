@@ -5,12 +5,13 @@ using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Models;
+using Paarde.Presentation.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Avalonia.Views;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.Services;
+using Paarde.Presentation.Contracts.Services;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,8 @@ using Microsoft.Extensions.Options;
 
 using Serilog;
 using Serilog.Events;
+using Paarde.Presentation.Services;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia;
 
@@ -204,7 +207,14 @@ public partial class App : Application
             services.AddTransient<IDialogService, DialogService>();
 
             services.AddSingleton<IPageService, PageService>();
-            services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<NavigationService>();
+            services.AddSingleton<IFrameNavigationService>(sp => sp.GetRequiredService<NavigationService>());
+            services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<NavigationService>());
+
+            // specs/presentation-extraction R2.2: view models marshal onto the UI thread through
+            // this rather than Avalonia's Dispatcher directly.
+            services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
+            services.AddSingleton<IWindowAppearanceService, WindowAppearanceService>();
 
             // Core Services
             services.AddSingleton<IFileService, FileService>();

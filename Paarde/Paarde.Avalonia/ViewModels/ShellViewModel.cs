@@ -4,6 +4,7 @@ using Paarde.Avalonia.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using FluentAvalonia.UI.Navigation;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.ViewModels;
 
@@ -15,7 +16,7 @@ public partial class ShellViewModel : ObservableRecipient
     [ObservableProperty]
     private object? selected;
 
-    public INavigationService NavigationService
+    public IFrameNavigationService NavigationService
     {
         get;
     }
@@ -70,7 +71,7 @@ public partial class ShellViewModel : ObservableRecipient
     }
 
     public ShellViewModel(
-        INavigationService navigationService,
+        IFrameNavigationService navigationService,
         INavigationViewService navigationViewService,
         RunPanelViewModel runPanelViewModel,
         StatusBarViewModel statusBarViewModel,

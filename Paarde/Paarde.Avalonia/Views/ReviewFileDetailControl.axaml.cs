@@ -4,9 +4,9 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 
-using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Contracts.Services;
 using Paarde.Core.ViewModels;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Views;
 

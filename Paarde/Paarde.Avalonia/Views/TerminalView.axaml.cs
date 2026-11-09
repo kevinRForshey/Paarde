@@ -2,7 +2,7 @@ using System.ComponentModel;
 
 using Avalonia.Controls;
 
-using Paarde.Avalonia.ViewModels;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Views;
 

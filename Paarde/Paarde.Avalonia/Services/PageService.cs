@@ -1,10 +1,10 @@
 using Avalonia.Controls;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.ViewModels;
 using Paarde.Avalonia.Views;
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Services;
 

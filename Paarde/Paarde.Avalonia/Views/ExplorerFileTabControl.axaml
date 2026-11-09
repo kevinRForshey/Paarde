@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:vm="using:Paarde.Presentation.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
              xmlns:models="using:Paarde.Core.Models"
@@ -66,7 +66,7 @@
         <ui:InfoBar Grid.Row="2"
                     Margin="0,0,0,4"
                     Message="{Binding StatusMessage}"
-                    Severity="{Binding StatusSeverity}"
+                    Severity="{Binding StatusSeverity, Converter={StaticResource NotificationSeverityToInfoBarSeverityConverter}}"
                     IsClosable="False"
                     IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 

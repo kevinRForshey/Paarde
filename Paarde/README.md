@@ -51,17 +51,26 @@ a modern desktop app on any of the three.
 | Domain/shared logic | `Paarde.Core` — parsing, diffing, apply orchestration, session persistence; UI-framework-agnostic so it's unit-testable without Avalonia |
 | LLM integration | Shells out to the `claude` CLI (`Paarde.Core/Services/ClaudeCliRunner.cs`), streaming NDJSON (`stream-json`) for live progress |
 | Code intelligence | Shells out to a Language Server Protocol server over stdio (`Paarde.Core/Services/StdioLanguageServerClient.cs`, `csharp-ls` by default) for Explorer's diagnostics/go-to-definition/find-references |
-| Tests | xUnit (`Paarde.Core.Tests`, `Paarde.Avalonia.Tests`) |
+| Presentation logic | `Paarde.Presentation` — view models, settings/navigation contracts and non-UI app services; references no UI framework, so any front end (Avalonia today, WinUI 3 planned) can host it |
+| Tests | xUnit (`Paarde.Core.Tests`, `Paarde.Presentation.Tests`, `Paarde.Avalonia.Tests`) |
 
 ### Project layout
 
 ```
 Paarde.slnx
-├─ Paarde.Core/            Domain models, services, view models shared by the UI (no Avalonia dependency)
-├─ Paarde.Core.Tests/      Unit tests for Paarde.Core
-├─ Paarde.Avalonia/        The desktop app: views, view models, DI setup, Program.cs entry point
-└─ Paarde.Avalonia.Tests/  Unit tests for Paarde.Avalonia view models
+├─ Paarde.Core/                Domain models, services, shared diff/apply view models (no UI dependency)
+├─ Paarde.Core.Tests/          Unit tests for Paarde.Core
+├─ Paarde.Presentation/        View models, contracts, settings/app services (no UI dependency)
+├─ Paarde.Presentation.Tests/  Unit tests for Paarde.Presentation, plus shared test fakes
+├─ Paarde.Avalonia/            The Avalonia desktop app: views, controls, converters, Avalonia-backed
+│                              service implementations, ShellViewModel, DI setup, Program.cs
+└─ Paarde.Avalonia.Tests/      Unit tests for Avalonia controls/converters
 ```
+
+Dependencies run one way: `Paarde.Avalonia → Paarde.Presentation → Paarde.Core`. A front end
+supplies views plus implementations of the UI-bound contracts in
+`Paarde.Presentation/Contracts/Services` (`IUiDispatcher`, `INavigationService`,
+`IThemeSelectorService`, `IWindowAppearanceService`, `IDialogService`, the file/folder pickers).
 
 ## Prerequisites
 
@@ -96,6 +105,7 @@ dotnet run --project Paarde.Avalonia
 
 # Run the test suites
 dotnet test Paarde.Core.Tests
+dotnet test Paarde.Presentation.Tests
 dotnet test Paarde.Avalonia.Tests
 ```
 

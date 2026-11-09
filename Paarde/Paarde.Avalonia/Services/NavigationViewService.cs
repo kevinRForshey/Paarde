@@ -2,9 +2,10 @@ using System.Diagnostics.CodeAnalysis;
 
 using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Helpers;
-using Paarde.Avalonia.ViewModels;
 
 using FluentAvalonia.UI.Controls;
+using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Services;
 

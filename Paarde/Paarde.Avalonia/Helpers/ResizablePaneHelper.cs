@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-using Paarde.Avalonia.Contracts.Services;
+using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Helpers;
 

@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 
 using Paarde.Avalonia.Helpers;
-using Paarde.Avalonia.Tests.Fakes;
+using Paarde.Presentation.Tests.Fakes;
 
 namespace Paarde.Avalonia.Tests.Helpers;
 

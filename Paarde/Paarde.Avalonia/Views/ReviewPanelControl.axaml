@@ -3,7 +3,7 @@
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:views="using:Paarde.Avalonia.Views"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:vm="using:Paarde.Presentation.ViewModels"
              xmlns:coreVm="using:Paarde.Core.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              x:Class="Paarde.Avalonia.Views.ReviewPanelControl"

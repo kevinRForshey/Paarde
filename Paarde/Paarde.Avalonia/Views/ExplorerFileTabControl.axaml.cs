@@ -6,12 +6,12 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 
-using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Controls;
 using Paarde.Avalonia.Helpers;
-using Paarde.Avalonia.Services;
-using Paarde.Avalonia.ViewModels;
 using Paarde.Core.Models;
+using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Services;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Views;
 

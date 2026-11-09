@@ -7,13 +7,15 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 
-using Paarde.Avalonia.Contracts.Services;
 using Paarde.Avalonia.Helpers;
-using Paarde.Avalonia.Models;
+using Paarde.Presentation.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.ViewModels;
 
 using FluentAvalonia.UI.Controls;
+using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Services;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Views;
 

@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:vm="using:Paarde.Presentation.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              x:Class="Paarde.Avalonia.Views.TerminalView"
              x:DataType="vm:TerminalViewModel">
@@ -51,7 +51,7 @@
         <ui:InfoBar Grid.Row="3"
                     Margin="0,4,0,0"
                     Message="{Binding StatusMessage}"
-                    Severity="{Binding StatusSeverity}"
+                    Severity="{Binding StatusSeverity, Converter={StaticResource NotificationSeverityToInfoBarSeverityConverter}}"
                     IsClosable="False"
                     IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
     </Grid>

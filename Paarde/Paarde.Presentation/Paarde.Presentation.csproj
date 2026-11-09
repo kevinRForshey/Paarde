@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- specs/presentation-extraction: UI-framework-agnostic view models, contracts and non-UI
+       services shared by the Avalonia front end and a future WinUI 3 one. Must never reference an
+       Avalonia/FluentAvalonia/AvaloniaEdit/TextMateSharp package - guarded by
+       Paarde.Presentation.Tests' PresentationAssemblyReferenceTests. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Paarde.Presentation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+    <!-- [FromKeyedServices] on TerminalViewModel's constructor - attribute only, no container. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <!-- IOptions<LocalSettingsOptions> for LocalSettingsService/SecureStorageService. -->
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />
+    <!-- T6.3.2: DPAPI (Windows-only secret protection, used by SecureStorageService) - official,
+         minimal Microsoft package; non-Windows platforms use built-in System.Security.Cryptography
+         instead, so this is never loaded there. Moved here from Paarde.Avalonia with
+         SecureStorageService. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Paarde.Core\Paarde.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Paarde.Presentation.Tests" />
+  </ItemGroup>
+</Project>

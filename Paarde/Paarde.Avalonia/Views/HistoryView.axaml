@@ -4,7 +4,7 @@
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:coreVm="using:Paarde.Core.ViewModels"
              xmlns:views="using:Paarde.Avalonia.Views"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:vm="using:Paarde.Presentation.ViewModels"
              x:Class="Paarde.Avalonia.Views.HistoryView"
              x:DataType="vm:HistoryViewModel">
 

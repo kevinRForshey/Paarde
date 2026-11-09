@@ -16,6 +16,7 @@ using Paarde.Avalonia.Helpers;
 using Paarde.Core.Models;
 
 using TextMateSharp.Grammars;
+using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Controls;
 

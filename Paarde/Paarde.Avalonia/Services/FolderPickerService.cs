@@ -1,6 +1,6 @@
 using Avalonia.Platform.Storage;
 
-using Paarde.Avalonia.Contracts.Services;
+using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Services;
 
