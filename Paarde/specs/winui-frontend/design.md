@@ -75,7 +75,9 @@ public static IServiceCollection AddPaardePresentation(this IServiceCollection s
 | ~~`Microsoft.Graphics.Win2D`~~ | not used | was planned for `TerminalControl` drawing | Checked at F31.4: the NuGet package is under Microsoft's Win2D EULA, not MIT (only the source repo is MIT). Dropped: `TerminalControl` draws with plain XAML elements instead (below). |
 | `CommunityToolkit.WinUI.Controls.Sizers` | 8.2.251219 (added F31.2) | `GridSplitter`; `ResizablePaneHelper.AttachSplitter` persists the width on `ManipulationCompleted` | MIT |
 | `TextMateSharp.Grammars` (in `Paarde.Presentation`) | 2.0.5 (F31.2) | `SyntaxTokenizer`, moved out of Avalonia so both front ends share it | MIT |
-| editor (O1) | — | see below | must be permissive |
+| `monaco-editor` (npm, `min/vs` AMD build, not a NuGet package) | 0.57.0 (chosen F31.6) | the code editor, hosted in `WebView2` (below) | MIT (checked in the package's `LICENSE`) |
+| `Microsoft.Web.WebView2` | 1.0.3719.77, transitive via Windows App SDK (no new reference) | the `WebView2` control's SDK | BSD-3-Clause (checked in the package's `LICENSE.txt`) |
+| WebView2 Runtime (Evergreen) | system component (157.0 on the dev machine) | the browser engine `WebView2` runs on | Microsoft license; ships with Windows 11 and is installed on almost all Windows 10 machines. Not redistributed by Paarde. Accepted as a platform component, like Windows App SDK (R2.4). |
 
 Licenses are checked against each package's own license file when it's added, not assumed from
 the source repo.
@@ -138,12 +140,69 @@ The workbench dock: WinUI has no `TabControl`, so a `SelectorBar` (Build/Run/Pro
 Straight ports onto `RichTextBlock`/`TextBlock.Inlines` (`Run`, `Bold`, `Italic`, `Span`), keeping
 the same dependency properties so view XAML ports 1:1.
 
-### Code editor — open question O1
+### Code editor — O1, decided in F31.6: Monaco in `WebView2`
 
-`CodeEditor` is confined to `ExplorerFileTabControl`, so the decision is deferred to a timeboxed
-spike (T-F6) just before the Explorer port. Candidates, scored against R4.4's checklist (highlight,
-two-way text, brackets, diagnostics, diff backgrounds, hunk gutter accept/reject, ghost text,
-completion list, F12):
+**Decision: Monaco 0.57.0 hosted in `WebView2`.** The spike (a throwaway WinUI app outside the
+repo, same Windows App SDK setup as `Paarde.WinUI`) passed every R4.4 item, so WinUIEdit was not
+evaluated. The spike drove Monaco from C# through a small message bridge, with fake C# responders
+standing in for the LSP and ghost-text services, and was checked with real keystrokes, mouse clicks
+and screenshots.
+
+| R4.4 item | Result | How |
+| --- | --- | --- |
+| Syntax highlighting | ✅ | Monaco's built-in C# grammar (and ~80 others). It's Monarch, not TextMate, so colours differ slightly from Avalonia's Dark+ TextMate theme. |
+| Two-way text | ✅ | Host → editor: `setText`, suppressing the echo. Editor → host: `textChanged` on every edit. Caret → host for the status bar. |
+| Bracket highlighting | ✅ | `matchBrackets: 'always'`, plus bracket-pair colours by default. |
+| Diagnostics squiggles | ✅ | `monaco.editor.setModelMarkers`. Error and warning squiggles show, and the markers follow edits. |
+| Diff line backgrounds | ✅ | A whole-line decoration collection with the same red/green tints as `BindingFunctions.DiffLineBackground`. |
+| Hunk gutter accept/reject | ✅ | Two glyph-margin lanes (✓ left, ✗ right) on the hunk's first line. Clicks report the hunk index and action. The lane is read from the clicked glyph's CSS class: Monaco's `detail.glyphMarginLane` reported "accept" for both lanes. |
+| Ghost text | ✅ | `registerInlineCompletionsProvider` asks C# and awaits the reply. Shown inline and accepted with Tab, as in VS Code. |
+| LSP completion list | ✅ | `registerCompletionItemProvider` asks C# and awaits the items. Monaco filters and inserts them. |
+| Go to definition (F12) | ✅ | `addCommand(F12)` reports the position, and C# reveals the target. Paarde resolves cross-file jumps itself, so no definition provider is registered. |
+| Also checked | ✅ | Hover (Markdown, with a highlighted code block); live dark/light theme switch; Monaco's own Ctrl+F find. |
+
+**Bridge:** `chrome.webview.postMessage` for JS → C#. C# → JS goes through `ExecuteScriptAsync`
+calls on a small `window.paarde` API. Request/response features (completion, hover, ghost text)
+carry an id that C# answers with `paarde.resolve(id, value)`. This matches the existing
+`CompletionRequested`/`HoverRequested` events plus bound result properties on Avalonia's
+`CodeEditor`, so `ExplorerFileTabControl`'s wiring ports unchanged.
+
+**Measured (Debug, dev machine):**
+- Cold start is 555–690 ms from creating the `WebView2` to a ready editor; a second instance is
+  ready in 243 ms.
+- Memory: the app process uses 95 MB private, and the six WebView2 processes for one editor
+  200 MB. A second `WebView2` added one process and **+93 MB**.
+
+**Findings that shape F31.7:**
+- **One `WebView2` per Explorer page, not per tab.** Each open tab gets its own Monaco model, and
+  `setModel` plus `saveViewState`/`restoreViewState` switch tabs. This avoids ~90 MB per open tab.
+  Avalonia gives each `ExplorerFileTabControl` its own `CodeEditor`, so the WinUI editor will sit
+  outside the `TabView` items and follow the selected tab.
+- **Keyboard:** WebView2 has its own input queue, so WinUI `KeyboardAccelerator`s never see keys
+  pressed inside the editor. The page forwards Ctrl+P, Ctrl+Shift+P and Ctrl+Shift+O to C#;
+  forwarding was verified. `AreBrowserAcceleratorKeysEnabled = false` turns off browser keys such
+  as Ctrl+P (print) and F5 (reload).
+- **Focus:** once in seven window deactivate/reactivate cycles, keystrokes after reactivation went
+  nowhere. Fix for F31.7: on `Window.Activated`, if the editor had focus, call
+  `WebView2.Focus` and the editor's `focus()`.
+- **Offline assets:** `SetVirtualHostNameToFolderMapping("paarde.editor", …)` serves `min/vs` from
+  the output folder, with no network access and no file:// URLs.
+- **Monaco's file names:** copy `min/vs` as `None` items, not `Content`. The resource indexer reads
+  hashed names like `monaco.contribution-BuX2NvO2.js` as resource qualifiers and raises a warning
+  per file (14 in the spike), which would break the 0-warning rule.
+- **AMD build:** Monaco marks its AMD build (`loader.js`) deprecated in favour of ESM, which needs a
+  bundler. AMD is still in 0.57.0, needs no JavaScript build step, and is pinned. Moving to ESM is
+  only needed if a future upgrade drops AMD.
+- **Text sync:** the spike sends the full text on every edit. F31.7 should debounce this, as
+  `ExplorerViewModel`'s dirty tracking only needs the final text.
+- **Getting `min/vs` into the build is still open** (about 25 MB). The options are:
+  - commit it to the repo;
+  - an MSBuild target that downloads the pinned npm tarball, checks its SHA-512 and extracts it
+    with Windows' built-in `tar`, so Node isn't needed at build time.
+
+  To decide at the start of F31.7.
+
+Original candidate list, kept for reference:
 
 | Option | Fit | Cost / risk |
 | --- | --- | --- |
@@ -151,9 +210,8 @@ completion list, F12):
 | **WinUIEdit** (Scintilla for WinUI; verify license) | Native; Scintilla indicators, markers, margins, autocomplete list cover most items. | Ghost text only as end-of-line annotations; syntax highlighting depends on which Lexilla lexers it exposes; smaller community. |
 | Custom on Win2D | Full control | Re-implementing an editor; rejected. |
 
-**Recommendation:** spike Monaco first (it's the only option that covers ghost text and
-highlighting without compromise); fall back to WinUIEdit if WebView2 startup/memory is
-unacceptable. The spike's output is a filled-in checklist + decision recorded here.
+The plan was to spike Monaco first and fall back to WinUIEdit if WebView2's startup or memory was
+unacceptable. Neither was, so the fallback wasn't needed.
 
 ## Sequencing
 
@@ -201,6 +259,8 @@ navigation) on the simplest page.
 
 ## Open questions
 
-- O1 — Code editor control (spike in F31.6).
+- ~~O1 — Code editor control (spike in F31.6).~~ Decided: Monaco in `WebView2` (see "Code editor").
+- O3 — How `monaco-editor`'s `min/vs` gets into the build: committed, or downloaded at build time
+  with a pinned hash. To decide at the start of F31.7.
 - O2 — Should the settings folder eventually be renamed from `Paarde.Avalonia/ApplicationData` to
   something host-neutral? Not in this epic (would need a migration); sharing the current one is fine.

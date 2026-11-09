@@ -170,8 +170,23 @@ and existing tests must keep their counts after every task.
 
 ## F31.6 — Editor spike (O1)
 
-- [ ] T13 Timeboxed spike: Monaco/WebView2 first, WinUIEdit if needed, scored against R4.4's
+- [x] T13 Timeboxed spike: Monaco/WebView2 first, WinUIEdit if needed, scored against R4.4's
   checklist; record the decision, package and license in `design.md`. _(R4.4, R2.4)_
+  Done 2026-11-09. **Decision: Monaco 0.57.0 (MIT) in `WebView2`.** Every R4.4 item passed in a
+  throwaway WinUI app outside the repo, so WinUIEdit wasn't needed. The checklist, measurements and
+  F31.7 consequences are in design.md "Code editor". In short:
+  - Use one `WebView2` per Explorer page with a Monaco model per tab; each extra `WebView2` costs
+    ~90 MB.
+  - Forward the shell's shortcuts from JS, because WinUI accelerators don't see keys typed in the
+    editor.
+  - Refocus the editor when the window is activated.
+  - Copy Monaco's files as `None` items so the build stays at 0 warnings.
+
+  Licences checked: `monaco-editor` MIT; the `Microsoft.Web.WebView2` SDK BSD-3-Clause (already
+  pulled in by Windows App SDK); the WebView2 Runtime is a Windows component.
+  **Open (O3):** whether Monaco's `min/vs` (~25 MB) is committed or downloaded at build time with a
+  pinned hash.
+  Nothing in the repo changed apart from the spec, so builds and test counts are unaffected.
 
 ## F31.7 — Explorer
 
