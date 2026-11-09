@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Paarde.WinUI.Views.ShellView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:Paarde.WinUI.Helpers">
+
+    <!-- specs/winui-frontend T5: navigation only for now. Paarde.Avalonia's ShellView also has the
+         Build/Run toolbar, the output dock and the status bar (F31.4) and the Quick Open/command
+         palette/symbol popups (F31.5). -->
+    <!-- UX pass: compact icon-rail pane instead of a labeled sidebar, same as Paarde.Avalonia - the
+         current page's name is still shown via the Header binding, and the hamburger toggle still
+         expands the pane temporarily to show labels. -->
+    <NavigationView x:Name="NavigationViewControl"
+                    IsBackButtonVisible="Visible"
+                    IsBackEnabled="{x:Bind ViewModel.IsBackEnabled, Mode=OneWay}"
+                    SelectedItem="{x:Bind ViewModel.Selected, Mode=OneWay}"
+                    IsSettingsVisible="True"
+                    PaneDisplayMode="LeftCompact"
+                    Header="{x:Bind GetHeader(ViewModel.Selected), Mode=OneWay}">
+        <NavigationView.MenuItems>
+            <NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.ExplorerViewModel">
+                <NavigationViewItem.Icon>
+                    <SymbolIcon Symbol="Folder" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <!-- specs/fluent-design-pass R3: Keyboard, not Play, so this nav icon doesn't collide
+                 with the Run buttons' Play icon. -->
+            <NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.TerminalViewModel">
+                <NavigationViewItem.Icon>
+                    <SymbolIcon Symbol="Keyboard" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.HistoryViewModel">
+                <NavigationViewItem.Icon>
+                    <SymbolIcon Symbol="Clock" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+        <Frame x:Name="NavigationFrame" />
+    </NavigationView>
+</UserControl>

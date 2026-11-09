@@ -21,23 +21,56 @@ and existing tests must keep their counts after every task.
 
 ## F31.1 — Scaffold, services, shell, Settings
 
-- [ ] T2 Create `Paarde.WinUI` (unpackaged, self-contained, x64/ARM64) and `Paarde.Windows.slnx`;
+- [x] T2 Create `Paarde.WinUI` (unpackaged, self-contained, x64/ARM64) and `Paarde.Windows.slnx`;
   record package versions and licenses in `design.md`. App launches to an empty window. _(R2.1–R2.4)_
-- [ ] T3 Host + DI in `App`: Serilog (`winui-log-` prefix), `AddPaardePresentation()`,
+  Done 2026-11-09: Windows App SDK 2.6.5. Its license is the Microsoft Software License Terms, not
+  MIT (R2.4 updated to say so).
+- [x] T3 Host + DI in `App`: Serilog (`winui-log-` prefix), `AddPaardePresentation()`,
   `LocalSettingsOptions` from `appsettings.json`. _(R1, R3.3)_
-- [ ] T4 `WinUiDispatcher`, `ThemeSelectorService`, `WindowAppearanceService`, `DialogService`,
+- [x] T4 `WinUiDispatcher`, `ThemeSelectorService`, `WindowAppearanceService`, `DialogService`,
   three pickers. _(R3.1)_
-- [ ] T5 `PageService`, `NavigationService` (+ `IFrameNavigationService`), `NavigationViewService`,
+- [x] T5 `PageService`, `NavigationService` (+ `IFrameNavigationService`), `NavigationViewService`,
   `NavigationHelper`, `ShellViewModel`, `ShellView` with `NavigationView` (nav only; dock/status
-  bar/palette come later). _(R3.1, R3.2)_
-- [ ] T6 Converters + `SettingsView`. Manual check: theme, transparency, runner settings,
+  bar/palette come later). Unported pages are XAML placeholders. _(R3.1, R3.2)_
+- [x] T6 Converters + `SettingsView`. Manual check: theme, transparency, runner settings,
   pickers, InfoBars, settings shared with Avalonia. _(R4.1, R5.2)_
+  Done 2026-11-09, checked by driving the running app through UI Automation and screenshots:
+  launch → Explorer placeholder with header; Settings shows the Avalonia app's saved values,
+  including the Headroom error InfoBar; Light theme applies live (title bar too) and persists;
+  Mica toggles live and persists; Back returns to Explorer; both settings reverted; closing
+  the window exits cleanly; no WRN/ERR in `winui-log-*.txt`. **Not yet exercised:** the pickers and
+  `DialogService` (Settings uses neither; first real use is in F31.2/F31.3), and the
+  unsaved-changes navigation prompt.
+  Both solutions build with 0 warnings/0 errors; test counts unchanged.
 
 ## F31.2 — Read-mostly pages
 
-- [ ] T7 `MarkdownTextBlock`, `DiffWordSpanTextBlock`. _(R4.3)_
-- [ ] T8 `MainView`, `HistoryView`, `ReviewView` + `ReviewPanelControl` +
+- [x] T7 `MarkdownTextBlock`, `DiffWordSpanTextBlock`. _(R4.3)_
+  Done 2026-11-09. `SyntaxTokenizer` moved from `Paarde.Avalonia/Helpers` to
+  `Paarde.Presentation/Helpers` (with its tests) so both front ends share it. This brings
+  `TextMateSharp.Grammars` (MIT) into Presentation, so it was removed from the guard test's
+  forbidden-prefix list. `DiffWordSpanTextBlock` uses `TextHighlighter` ranges for word
+  highlights because WinUI's `Run` has no `Background`.
+- [x] T8 `MainView`, `HistoryView`, `ReviewView` + `ReviewPanelControl` +
   `ReviewFileDetailControl`, `DiffsDetailControl`. Manual check. _(R4.1, R5.2)_
+  Done 2026-11-09, checked through UI Automation and screenshots against a scratch data folder
+  (`LocalSettingsOptions__ApplicationDataFolder`). Checked:
+  - Home: recent runs and projects.
+  - History: selecting a session and a file.
+  - Diffs: syntax colours, word highlights, row tints, expanding collapsed regions, next/previous
+    change, side-by-side with horizontal scroll, copy file contents.
+  - Review: overview Markdown, tri-state file checkbox, Apply Selected (confirm dialog → file
+    written → results dialog, status and Apply History), Undo Last Apply (confirm → file restored).
+
+  This is the first real use of `DialogService`: dialogs pick up the app theme, and Cancel is the
+  default button. Clean exit with no WRN/ERR in the log.
+  The `GridSplitter` package (CommunityToolkit.WinUI.Controls.Sizers) came in here rather than in
+  F31.7, for the Review file-list splitter.
+  **Known gap:** Review's per-file detail follows `TutorialViewModel.Selected`, which is driven by
+  Explorer's file tabs, so it can't be shown until F31.7.
+  **Not yet exercised:** the pickers (Export) and the unsaved-changes prompt.
+  Both solutions build with 0 warnings/0 errors. Test counts are unchanged: Presentation 407/408,
+  Avalonia 58/58, Core 525/565 (pre-existing failures).
 
 ## F31.3 — Prompt
 

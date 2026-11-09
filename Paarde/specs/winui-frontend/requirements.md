@@ -78,7 +78,9 @@ uses the real `%AppData%` path (MSIX virtualizes it). MSIX packaging is out of s
 R2.3 `Paarde.slnx` stays buildable on Linux/macOS: `Paarde.WinUI` goes in a separate Windows
 solution (`Paarde.Windows.slnx`) that includes every project.
 R2.4 Third-party packages MUST be MIT/Apache-2.0/similarly permissive (the reason for this epic).
-Each one added is recorded with its license in `design.md`.
+The one exception is the platform itself: the Windows App SDK package ships under the Microsoft
+Software License Terms (free, redistributable, Windows-only), not MIT. Each package added is
+recorded with its license, as stated in the package's own license file, in `design.md`.
 
 ### R3 — UI-specific services
 

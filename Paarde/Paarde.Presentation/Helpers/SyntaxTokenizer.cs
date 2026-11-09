@@ -2,15 +2,16 @@ using System.IO;
 
 using TextMateSharp.Grammars;
 using TextMateSharp.Registry;
-using Paarde.Presentation.Helpers;
 
-namespace Paarde.Avalonia.Helpers;
+namespace Paarde.Presentation.Helpers;
 
 // T8.3.4: tokenizes a single line of source into syntax-highlighted runs using the same
 // TextMateSharp grammars/theme CodeEditor uses for the full-file editor view, so a line shown in
 // the Diffs page gets the same colors it would in the editor - just driven one line at a time
 // (there's no single AvaloniaEdit document backing a diff row) rather than through
-// AvaloniaEdit.TextMate's document-wide installation.
+// AvaloniaEdit.TextMate's document-wide installation. specs/winui-frontend: moved here from
+// Paarde.Avalonia so every front end's diff rows share one tokenizer - TextMateSharp is a plain .NET
+// grammar engine, not a UI framework.
 public static class SyntaxTokenizer
 {
     private static readonly RegistryOptions RegistryOptions = new(ThemeName.DarkPlus);

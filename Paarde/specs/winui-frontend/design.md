@@ -47,9 +47,15 @@ public static IServiceCollection AddPaardePresentation(this IServiceCollection s
 ## Project setup (R2)
 
 - `Paarde.WinUI.csproj`: `OutputType=WinExe`, `UseWinUI=true`,
-  `TargetFramework=net10.0-windows10.0.22621.0`, `TargetPlatformMinVersion=10.0.19041.0`,
-  `Platforms=x64;ARM64`, `WindowsPackageType=None`, `WindowsAppSDKSelfContained=true` (no separate
-  runtime install for an unpackaged app). Package versions pinned to the latest stable at T2 time.
+  `TargetFramework=net10.0-windows10.0.26100.0` (matches the current `dotnet new winui` template),
+  `TargetPlatformMinVersion=10.0.19041.0`, `Platforms=x64;ARM64`, `RuntimeIdentifier` defaulting to
+  the build machine's architecture (template pattern, so `dotnet build` of the solution works),
+  `WindowsPackageType=None`, `WindowsAppSDKSelfContained=true` (no separate runtime install for an
+  unpackaged app), `EnableMsixTooling=true` (still needed unpackaged: it generates `resources.pri`).
+  Package versions pinned to the latest stable at T2 time.
+- Pages navigated by `Frame` must be XAML pages: `Frame.Navigate` to a code-only `Page` subclass
+  crashes natively (0xC0000005) because the XAML compiler emits no type metadata for it. Not-yet-
+  ported pages are therefore one-line XAML placeholders, not C# stubs.
 - Host: `App` constructor builds the same Generic Host as Avalonia (`UseSerilog` →
   `ConfigureServices` → `AddPaardePresentation()` + WinUI registrations). `OnLaunched` creates
   `MainWindow`, resolves `ShellView`, applies saved theme and transparency, then activates.
@@ -61,16 +67,18 @@ public static IServiceCollection AddPaardePresentation(this IServiceCollection s
 
 ### Packages
 
-| Package | Why | License |
-| --- | --- | --- |
-| `Microsoft.WindowsAppSDK` | WinUI 3 | MIT |
-| `Microsoft.Windows.SDK.BuildTools` | required by WinAppSDK | MIT |
-| `Microsoft.Graphics.Win2D` | `TerminalControl` drawing | MIT |
-| `CommunityToolkit.WinUI.Controls.Sizers` | `GridSplitter` (replaces `ResizablePaneHelper`'s splitter) | MIT |
-| `Microsoft.Extensions.Hosting`, `Serilog.*` | same as Avalonia | MIT / Apache-2.0 |
-| editor (O1) | see below | must be permissive |
+| Package | Version | Why | License |
+| --- | --- | --- | --- |
+| `Microsoft.WindowsAppSDK` | 2.6.5 | WinUI 3 | **Microsoft Software License Terms – Windows App SDK** (free, redistributable, "solely for use on Windows"; checked in the package's `license.txt` at T2). Not MIT: only the WinUI *source* repo is MIT. Accepted as the platform itself - see R2.4. |
+| `Microsoft.Windows.SDK.BuildTools` | 10.0.28000.2957 | build tooling WinAppSDK needs | Microsoft license (build-time only, not redistributed) |
+| `Microsoft.Extensions.Hosting`, `Serilog.*` | same as Avalonia | host + logging | MIT / Apache-2.0 |
+| `Microsoft.Graphics.Win2D` | 1.4.0 (F31.4) | `TerminalControl` drawing | check at F31.4 |
+| `CommunityToolkit.WinUI.Controls.Sizers` | 8.2.251219 (added F31.2) | `GridSplitter`; `ResizablePaneHelper.AttachSplitter` persists the width on `ManipulationCompleted` | MIT |
+| `TextMateSharp.Grammars` (in `Paarde.Presentation`) | 2.0.5 (F31.2) | `SyntaxTokenizer`, moved out of Avalonia so both front ends share it | MIT |
+| editor (O1) | — | see below | must be permissive |
 
-Licenses re-checked at T2 and recorded here.
+Licenses are checked against each package's own license file when it's added, not assumed from
+the source repo.
 
 ## UI-specific services (R3)
 
@@ -81,13 +89,28 @@ Licenses re-checked at T2 and recorded here.
 | `IThemeSelectorService` | `ElementTheme` on the window's root `FrameworkElement` | `AppTheme.Default/Light/Dark` ↔ `ElementTheme.Default/Light/Dark`; persists `theme.ToString()` under the existing key. Also updates title-bar button colors. |
 | `IWindowAppearanceService` | `MainWindow.SystemBackdrop` = `MicaBackdrop` if `MicaController.IsSupported()`, else `DesktopAcrylicBackdrop`, else `null` | Same fallback order as Avalonia. |
 | `IDialogService` | `ContentDialog` with `XamlRoot = MainWindow.Content.XamlRoot`, `DefaultButton = Close` for confirms | |
-| Pickers | `FileOpenPicker` / `FileSavePicker` / `FolderPicker` + `InitializeWithWindow.Initialize(picker, hwnd)` | Required for unpackaged apps. |
+| Pickers | Windows App SDK's `Microsoft.Windows.Storage.Pickers` (`FileOpenPicker` / `FileSavePicker` / `FolderPicker`) constructed with `AppWindow.Id` | Not the UWP-era `Windows.Storage.Pickers`: no `InitializeWithWindow` interop, plain paths back, and they work elevated. No settable title, so `IFileSavePickerService`'s `title` is unused. |
 | `IPageService` | same 7 `Configure<VM, View>()` registrations | |
 | `INavigationViewService` + `ShellViewModel` | WinUI `NavigationView` / `NavigationViewItem` (`NavigationHelper.NavigateTo` attached property ported) | |
 
-Converters needed (WinUI `IValueConverter` has a `string language` parameter, so Avalonia's can't
-be shared): `NotificationSeverity` → `InfoBarSeverity` (int cast), `EnumToBoolean`,
-`DiffLineKindToBackground`, bool → `Visibility` where `x:Bind` function binding doesn't cover it.
+Converters: replaced by `x:Bind` function bindings in `Helpers/BindingFunctions.cs`
+(`ToInfoBarSeverity`, `IsEnumValue`, `IsNotEmpty`, `VisibleIf`/`CollapsedIf`/`VisibleIfNotNull`) -
+compile-checked and no resources to declare. Enum radio groups bind `IsChecked` one-way and set
+the view model from `Checked` handlers (Tag = member name), because `x:Bind`'s generated two-way
+code casts whatever `ConvertBack` returns and so can't ignore an unchecked button.
+F31.2 added `DiffLineBackground`/`DiffCellBackground` for diff row tints.
+
+Diff and step lists (F31.2) are `ListView`s with `SelectionMode="None"` (virtualized, and
+`ScrollIntoView` for change/step navigation). The diff lists sit in a horizontal-only outer
+`ScrollViewer` so long lines scroll instead of clipping. `DataTemplate`s can't reach the parent's
+DataContext, so rows are wrapped in records that carry the file path (`DiffRowItem`,
+`SideBySideRowItem`).
+
+Other WinUI-specific notes from F31.1: `x:Bind` defaults to `OneTime`, so every live binding
+states `Mode=OneWay`/`TwoWay` (text boxes add `UpdateSourceTrigger=PropertyChanged` to match
+Avalonia's commit-per-keystroke); `[ObservableProperty]` in `Paarde.WinUI` uses partial properties
+(MVVMTK0045), while Presentation's field-based ones are left alone; the theme setting key moved to
+`AppearanceSettingsKeys.RequestedTheme` so both `ThemeSelectorService`s share it.
 
 ## Controls (R4)
 

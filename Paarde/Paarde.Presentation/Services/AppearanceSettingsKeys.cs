@@ -6,4 +6,8 @@ namespace Paarde.Presentation.Services;
 public static class AppearanceSettingsKeys
 {
     public const string TransparencyEnabled = "Appearance.TransparencyEnabled";
+
+    // specs/winui-frontend R3.3: shared by every front end's ThemeSelectorService. The value predates
+    // the "Appearance." prefix convention and is kept as-is so existing settings files keep loading.
+    public const string RequestedTheme = "AppBackgroundRequestedTheme";
 }

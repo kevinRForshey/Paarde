@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- specs/presentation-extraction: UI-framework-agnostic view models, contracts and non-UI
-       services shared by the Avalonia front end and a future WinUI 3 one. Must never reference an
-       Avalonia/FluentAvalonia/AvaloniaEdit/TextMateSharp package - guarded by
+       services shared by the Avalonia and WinUI 3 front ends. Must never reference an
+       Avalonia/FluentAvalonia/AvaloniaEdit package - guarded by
        Paarde.Presentation.Tests' PresentationAssemblyReferenceTests. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -21,6 +21,9 @@
          instead, so this is never loaded there. Moved here from Paarde.Avalonia with
          SecureStorageService. -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
+    <!-- specs/winui-frontend: SyntaxTokenizer's TextMate grammars (diff-row syntax coloring, shared by
+         every front end). MIT; plain .NET plus the Onigwrap native regex library, no UI framework. -->
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.5" />
   </ItemGroup>
 
   <ItemGroup>

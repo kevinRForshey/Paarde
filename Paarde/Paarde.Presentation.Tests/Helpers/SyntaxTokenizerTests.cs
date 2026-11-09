@@ -1,6 +1,6 @@
-using Paarde.Avalonia.Helpers;
+using Paarde.Presentation.Helpers;
 
-namespace Paarde.Avalonia.Tests.Helpers;
+namespace Paarde.Presentation.Tests.Helpers;
 
 public class SyntaxTokenizerTests
 {

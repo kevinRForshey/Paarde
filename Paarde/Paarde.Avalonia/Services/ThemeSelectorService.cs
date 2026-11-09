@@ -3,13 +3,12 @@ using Avalonia.Styling;
 
 using Paarde.Presentation.Models;
 using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Services;
 
 namespace Paarde.Avalonia.Services;
 
 public class ThemeSelectorService : IThemeSelectorService
 {
-    private const string SettingsKey = "AppBackgroundRequestedTheme";
-
     public AppTheme Theme { get; set; } = AppTheme.Default;
 
     private readonly ILocalSettingsService _localSettingsService;
@@ -52,7 +51,7 @@ public class ThemeSelectorService : IThemeSelectorService
 
     private async Task<AppTheme> LoadThemeFromSettingsAsync()
     {
-        var themeName = await _localSettingsService.ReadSettingAsync<string>(SettingsKey);
+        var themeName = await _localSettingsService.ReadSettingAsync<string>(AppearanceSettingsKeys.RequestedTheme);
 
         return themeName switch
         {
@@ -65,5 +64,5 @@ public class ThemeSelectorService : IThemeSelectorService
     // Persisted as the member name ("Default"/"Light"/"Dark") - the same strings this saved back
     // when it worked in ThemeVariant terms, so existing settings files keep loading unchanged.
     private async Task SaveThemeInSettingsAsync(AppTheme theme) =>
-        await _localSettingsService.SaveSettingAsync(SettingsKey, theme.ToString());
+        await _localSettingsService.SaveSettingAsync(AppearanceSettingsKeys.RequestedTheme, theme.ToString());
 }
