@@ -74,8 +74,35 @@ and existing tests must keep their counts after every task.
 
 ## F31.3 — Prompt
 
-- [ ] T9 `PromptView` + `ComposePanelControl` (incl. @-mention popup, elapsed timer, streaming
+- [x] T9 `PromptView` + `ComposePanelControl` (incl. @-mention popup, elapsed timer, streaming
   output). Manual check: a full prompt run. _(R4.1, R5.2)_
+  Done 2026-11-09. Avalonia's `PromptView` repeats `ComposePanelControl`'s whole body. In WinUI,
+  `PromptView` just hosts `ComposePanelControl` with its own `PromptViewModel`, and the control
+  will be reused by the Assistant panel in F31.7. WinUI-specific changes:
+  - The mention keys use `PreviewKeyDown`, because an `AcceptsReturn` TextBox handles Enter/Up/Down
+    before `KeyDown`.
+  - `CaretIndex` → `SelectionStart`.
+  - The mention `Popup` isn't light-dismiss, so the TextBox keeps keyboard input.
+  - The Recent dropdown is reset from code-behind (WinUI's ComboBox ignores the view model clearing
+    `SelectedItem` inside its own `SelectionChanged`).
+  - Timeout is a `NumberBox` bound one-way and written back from `ValueChanged`, since its value is
+    a double.
+
+  Checked in the running app through UI Automation and real keystrokes:
+  - Picking a recent project switches the working directory and resets the dropdown.
+  - `@Gre` shows `Greeter.cs`; Enter inserts `@Greeter.cs ` with no newline, leaves the caret after
+    it, and attaches the file; Escape closes the popup without changing the text.
+  - A real Claude Code run against the scratch project: Cancel, spinner, ticking timer and
+    streamed-character count while running; then a success InfoBar, the usage summary, "Continue
+    previous conversation" enabled, and the new result on Review.
+
+  Avalonia doesn't navigate to Review after a run either, so the Home page's "you'll be taken to
+  the Review tab" wording is out of date in both apps.
+  **Found (shared code, both apps, not fixed here):** `LocalSettingsService.SaveSettingAsync` writes
+  `LocalSettings.json` from `Task.Run` with no lock. Switching the working directory triggered two
+  saves at once, and one failed with an `IOException`, logged as a WRN by `RunPanelViewModel`.
+  **Not yet exercised:** the pickers (Browse, Add files/folder) and Suggest relevant files.
+  Both solutions build with 0 warnings/0 errors; test counts unchanged.
 
 ## F31.4 — Terminal and workbench dock
 
