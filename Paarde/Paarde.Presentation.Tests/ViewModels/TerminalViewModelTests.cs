@@ -96,7 +96,7 @@ public class TerminalViewModelTests
         Assert.False(sut.CancelCommandCommand.CanExecute(null));
     }
 
-    // specs/ide-workbench-shell R1.3: OnNavigatedFrom used to unsubscribe from the PTY process
+    // OnNavigatedFrom used to unsubscribe from the PTY process
     // manager here (this ViewModel was AddTransient, one instance per page visit); now that it's
     // a DI singleton shared with the workbench dock's Terminal tab, it's a deliberate no-op, since
     // leaving the page must not stop the process's output from updating state that tab (or a

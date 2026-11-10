@@ -1,6 +1,6 @@
 namespace Paarde.Presentation.Helpers;
 
-// Pure accept/dismiss state machine behind Epic 15's ghost-text suggestion (T15.1.1/T15.3.1) - same
+// Pure accept/dismiss state machine behind Epic 15's ghost-text suggestion - same
 // split as BracketHighlightRenderer's internal state vs. its pure FindMatchingPair, so the
 // transitions here are unit-testable without a real AvaloniaEdit TextArea. A suggestion is only ever
 // valid at the exact document offset it was shown at; any edit that moves the caret away from that

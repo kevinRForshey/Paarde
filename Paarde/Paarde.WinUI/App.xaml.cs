@@ -23,7 +23,7 @@ using Serilog.Events;
 
 namespace Paarde.WinUI;
 
-// specs/winui-frontend: the WinUI composition root - same Generic Host, Serilog and startup sequence
+// The WinUI composition root - same Generic Host, Serilog and startup sequence
 // as Paarde.Avalonia's App.axaml.cs, with the shared graph coming from AddPaardePresentation() and only
 // the WinUI implementations registered here.
 public partial class App : Application
@@ -72,7 +72,7 @@ public partial class App : Application
         Host = Microsoft.Extensions.Hosting.Host.
         CreateDefaultBuilder().
         UseContentRoot(AppContext.BaseDirectory).
-        // T9.2.1: same Serilog setup as Paarde.Avalonia, into the same shared Logs folder, but with
+        // Same Serilog setup as Paarde.Avalonia, into the same shared Logs folder, but with
         // its own file prefix so both apps can run at once without contending for one rolling file.
         UseSerilog((context, loggerConfiguration) =>
         {
@@ -88,7 +88,7 @@ public partial class App : Application
         }).
         ConfigureServices((context, services) =>
         {
-            // specs/winui-frontend R1: the Core + Presentation graph shared with every front end.
+            // The Core + Presentation graph shared with every front end.
             services.AddPaardePresentation();
 
             // WinUI implementations of Presentation contracts.
@@ -118,12 +118,19 @@ public partial class App : Application
             GetService<ILogger<App>>().LogCritical(e.Exception, "Unhandled exception on the UI thread.");
     }
 
-    // T9.2.1: the logging setup above runs ahead of DI and so only has IConfiguration to read
+    // The logging setup above runs ahead of DI and so only has IConfiguration to read
     // LocalSettingsOptions from; ApplicationDataPaths is the one shared resolution.
-    private static string ResolveApplicationDataFolder(IConfiguration configuration) =>
-        ApplicationDataPaths.Resolve(configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>()?.ApplicationDataFolder);
+    private static string ResolveApplicationDataFolder(IConfiguration configuration)
+    {
+        var configuredFolder = configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>()?.ApplicationDataFolder;
 
-    // T9.2.2: a last-resort record for exceptions that unwound past every frame on their own
+        // Logging is the first thing to open a file in the folder, so the one-time move happens here.
+        ApplicationDataPaths.MoveLegacyFolder(configuredFolder);
+
+        return ApplicationDataPaths.Resolve(configuredFolder);
+    }
+
+    // A last-resort record for exceptions that unwound past every frame on their own
     // thread/task - same handlers as Paarde.Avalonia.
     private static void RegisterGlobalCrashHandlers()
     {
@@ -169,7 +176,7 @@ public partial class App : Application
         InitializeThemeAndNavigate();
     }
 
-    // T9.2.3: async void because OnLaunched can't await it - wrapped so a failure here is logged
+    // Async void because OnLaunched can't await it - wrapped so a failure here is logged
     // and the app still comes up, rather than crashing before showing anything.
     private async void InitializeThemeAndNavigate()
     {
@@ -179,16 +186,16 @@ public partial class App : Application
             await themeSelectorService.InitializeAsync();
             await themeSelectorService.SetRequestedThemeAsync();
 
-            // T7.1.2: restore the last recorded run before anything navigates.
+            // Restore the last recorded run before anything navigates.
             GetService<IRunSessionStore>().RestoreLastSession();
 
-            // Epic 26 (specs/interface-mode R2): which shell the app starts into.
+            // Which shell the app starts into.
             var localSettingsService = GetService<ILocalSettingsService>();
             var interfaceMode = await localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
             var startupViewModelType = interfaceMode == InterfaceMode.FlowWizard ? typeof(MainViewModel) : typeof(ExplorerViewModel);
             GetService<INavigationService>().NavigateTo(startupViewModelType.FullName!);
 
-            // specs/fluent-design-pass R1: off by default.
+            // Off by default.
             var transparencyEnabled = await localSettingsService.ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
             GetService<IWindowAppearanceService>().ApplyTransparency(transparencyEnabled);
 

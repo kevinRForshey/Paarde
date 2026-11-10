@@ -3,7 +3,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Display wrapper around a persisted RunSession for the History page's master list (T7.2.1).
+// Display wrapper around a persisted RunSession for the History page's master list.
 // Pre-formats DisplayText in C# (From), following TutorialViewModel.FormatHistoryEntry's precedent,
 // rather than using XAML StringFormat (unused elsewhere in this codebase) or putting UI-specific
 // formatting (truncation, locale-dependent date formatting) on the Core RunSession model itself.

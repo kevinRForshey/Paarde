@@ -5,8 +5,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Paarde.Presentation.ViewModels;
 
-// specs/multi-language-support/design.md "Settings UI": one row per configured language, bound to
-// LanguageServerOptionsProvider's collection (R6.1) rather than a fixed count, so a language added
+// One row per configured language, bound to
+// LanguageServerOptionsProvider's collection rather than a fixed count, so a language added
 // later to LanguageServerOptions.Defaults needs no XAML change. Edits here save the whole
 // collection back through SettingsViewModel - see OnExecutablePathChanged/OnArgumentsChanged.
 public partial class LanguageServerOptionsRowViewModel : ObservableObject
@@ -30,7 +30,7 @@ public partial class LanguageServerOptionsRowViewModel : ObservableObject
     [ObservableProperty]
     private string arguments;
 
-    // R6.2: a simple PATH-existence preflight, same check StdioLanguageServerClient.IsAvailableAsync
+    // A simple PATH-existence preflight, same check StdioLanguageServerClient.IsAvailableAsync
     // performs - no process is spawned just to populate this indicator.
     [ObservableProperty]
     private bool isAvailable;

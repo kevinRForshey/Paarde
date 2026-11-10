@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Presentation.Contracts.Services;
 
-// specs/ide-workbench-shell, R3.5: StatusBarViewModel is a DI singleton, not a page ViewModel, so
+// StatusBarViewModel is a DI singleton, not a page ViewModel, so
 // it has no INavigationAware.OnNavigatedTo to read a focused CodeEditor's caret position from -
 // this is the one place every CodeEditor host (ExplorerView, TutorialDetailControl) reports its own
 // caret position to whenever its editor has focus, without StatusBarViewModel needing to know any
@@ -13,7 +13,7 @@ public interface IActiveEditorContext
 
     void SetCaretPosition(LspPosition? position);
 
-    // specs/editor-intelligence R7: the same "whichever CodeEditor host currently has focus
+    // The same "whichever CodeEditor host currently has focus
     // reports here" shape as Changed/SetCaretPosition above, so SymbolQuickPickViewModel (a DI
     // singleton, like StatusBarViewModel) can read the focused tab's own file/outline and jump
     // its caret without depending on the page-scoped ExplorerViewModel.

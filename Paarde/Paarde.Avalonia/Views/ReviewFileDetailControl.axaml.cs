@@ -16,13 +16,13 @@ public partial class ReviewFileDetailControl : UserControl
     private readonly IFileChangeApplyService _fileChangeApplyService;
     private readonly ILlmRunner _llmRunner;
 
-    // Epic 25: cached once this control is attached to its host's visual tree (DataContext is
+    // Cached once this control is attached to its host's visual tree (DataContext is
     // typically assigned before that, so FindAncestorOfType in RebuildSteps itself would miss it on
     // this control's very first materialization) and reused by every later RebuildSteps - e.g. when
     // Selected switches to a different file and the DataTemplate recycles this same instance.
     private TutorialViewModel? _owner;
 
-    // T8.4.3: which step the Previous/Next buttons and progress indicator currently point at - reset
+    // Which step the Previous/Next buttons and progress indicator currently point at - reset
     // to the first step whenever Steps is rebuilt (new file selected), since there's no notion of a
     // "current step" that should survive switching files.
     private int _currentStepIndex;
@@ -39,20 +39,20 @@ public partial class ReviewFileDetailControl : UserControl
         StepsItemsControl.ItemsSource = Steps;
         DataContextChanged += (_, _) => RebuildSteps();
 
-        // Epic 25: AttachedToVisualTree (rather than Loaded) is the earliest point FindAncestorOfType
+        // AttachedToVisualTree (rather than Loaded) is the earliest point FindAncestorOfType
         // can succeed - re-running RebuildSteps here covers this control's first materialization,
         // where DataContextChanged above already fired while it was still unattached and _owner was
         // still null.
         AttachedToVisualTree += (_, _) =>
         {
-            // T18: ReviewPanelControl's DataContext is bound directly to AssistantPanel.Review
+            // ReviewPanelControl's DataContext is bound directly to AssistantPanel.Review
             // (a TutorialViewModel) - unlike TutorialView, there's no .ViewModel property to go
             // through, so the owner is just that DataContext.
             _owner ??= this.FindAncestorOfType<ReviewPanelControl>()?.DataContext as TutorialViewModel;
             RebuildSteps();
         };
 
-        // T8.4.5: applied once this control is attached to its host's visual tree, by which point
+        // Applied once this control is attached to its host's visual tree, by which point
         // RebuildSteps (above) has already populated Steps for the jump's target file.
         Loaded += (_, _) => ApplyPendingStepTarget();
     }
@@ -75,7 +75,7 @@ public partial class ReviewFileDetailControl : UserControl
         RefreshStepNavigation();
     }
 
-    // T8.4.5: scrolls to the step a TutorialJumpRequest targeted, if any. Finding the step by
+    // Scrolls to the step a TutorialJumpRequest targeted, if any. Finding the step by
     // reference within the just-rebuilt Steps (rather than trusting an index) is robust to Steps'
     // order matching Hunk's order, which RebuildSteps above already guarantees.
     private void ApplyPendingStepTarget()
@@ -111,7 +111,7 @@ public partial class ReviewFileDetailControl : UserControl
         StepsItemsControl.ScrollIntoView(index);
     }
 
-    // T8.4.3: no step-navigation UI at all for a file with no resolved steps (nothing to move
+    // No step-navigation UI at all for a file with no resolved steps (nothing to move
     // between); otherwise keeps the Previous/Next buttons' enabled state, the "Step X of Y" label,
     // and the progress bar in sync with _currentStepIndex.
     private void RefreshStepNavigation()

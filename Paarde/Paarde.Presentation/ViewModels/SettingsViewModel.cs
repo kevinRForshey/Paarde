@@ -31,13 +31,13 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     private readonly IWindowAppearanceService _windowAppearanceService;
     private readonly ILogger<SettingsViewModel> _logger;
 
-    // Epic 20 (specs/build-and-run R2.6): the working directory Run configurations below belong
+    // The working directory Run configurations below belong
     // to - read once in OnNavigatedTo the same way TerminalViewModel reads it, not re-exposed as
     // its own editable field here since this page doesn't change the working directory, only
     // edits what's configured for whichever one is currently selected on the Prompt page.
     private string _runConfigurationsWorkingDirectoryPath = string.Empty;
 
-    // Epic 26 (specs/interface-mode R1): the value loaded in OnNavigatedTo, compared against the
+    // The value loaded in OnNavigatedTo, compared against the
     // live InterfaceMode property to decide InterfaceModeChangeRequiresRestart - switching modes
     // changes which pages/startup view model the shell navigates to, which isn't something that
     // can be re-applied live the way Theme can.
@@ -55,13 +55,13 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private string claudeCliArguments = ClaudeCliOptions.Default.Arguments;
 
-    // Epic 11 (F11.1.1): off by default - this changes what the model can *do* mid-run (read/grep/
+    // Off by default - this changes what the model can *do* mid-run (read/grep/
     // glob the project), not just how it's invoked, so it shouldn't turn on silently. Shared by
-    // whichever ILlmRunner is selected (T11.1.2/T11.1.3).
+    // whichever ILlmRunner is selected.
     [ObservableProperty]
     private bool agentToolsEnabled;
 
-    // Epic 12 (F12.1.2): the commands run after an apply, if non-blank, to check the result still
+    // The commands run after an apply, if non-blank, to check the result still
     // builds/passes its tests. Blank means "skip" rather than falling back to some default command
     // name - not every working directory is a .NET project, and a wrong guess shelling out to a
     // nonexistent command would be a worse default than doing nothing.
@@ -71,12 +71,12 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private string testCommand = "dotnet test";
 
-    // Epic 18 (R6.1): one row per configured language, replacing Epic 17's single flat
+    // One row per configured language, replacing Epic 17's single flat
     // LspExecutablePath/LspArguments pair - populated from LanguageServerOptionsProvider in
     // OnNavigatedTo, saved back as a whole collection on any row's edit.
     public ObservableCollection<LanguageServerOptionsRowViewModel> LanguageServerRows { get; } = [];
 
-    // Epic 20 (specs/build-and-run R2.6): one row per Run configuration for the current working
+    // One row per Run configuration for the current working
     // directory - populated from RunConfigurationsProvider in OnNavigatedTo, saved back as a
     // whole collection on any row's edit/delete, same shape as LanguageServerRows above.
     public ObservableCollection<RunConfigurationRowViewModel> RunConfigurationRows { get; } = [];
@@ -84,7 +84,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private bool hasRunConfigurationsWorkingDirectory;
 
-    // T6.3.2/T6.3.3: which ILlmRunner implementation LlmRunnerSelector should delegate to.
+    // Which ILlmRunner implementation LlmRunnerSelector should delegate to.
     [ObservableProperty]
     private LlmRunnerKind selectedRunnerKind = LlmRunnerKind.ClaudeCli;
 
@@ -96,7 +96,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private string anthropicApiModel = AnthropicModelCatalog.DefaultModelId;
 
-    // Epic 26 (specs/interface-mode R1/R9): which of the two top-level shells the app starts into.
+    // Which of the two top-level shells the app starts into.
     // Loaded in OnNavigatedTo/persisted via OnInterfaceModeChanged like SelectedRunnerKind below -
     // not a live-apply Command like SwitchThemeCommand, since this governs startup navigation and
     // ShellView's menu items, not something applicable to the already-running shell.
@@ -106,7 +106,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     private bool interfaceModeChangeRequiresRestart;
 
-    // specs/fluent-design-pass R1: off by default - the Mica/Acrylic window backdrop is a visual
+    // Off by default - the Mica/Acrylic window backdrop is a visual
     // preference, not something that should turn on silently (same reasoning as AgentToolsEnabled
     // above). Unlike InterfaceMode, this applies live to the already-running MainWindow instead of
     // requiring a restart - see OnIsTransparencyEnabledChanged.
@@ -146,7 +146,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
         set => AnthropicApiModel = value?.Id ?? AnthropicModelCatalog.DefaultModelId;
     }
 
-    // T5.3.2: blank means "use DefaultPromptTemplate" - PromptViewModel applies that same fallback
+    // Blank means "use DefaultPromptTemplate" - PromptViewModel applies that same fallback
     // when it reads this setting fresh on every run.
     [ObservableProperty]
     private string promptTemplateOverride = string.Empty;
@@ -190,7 +190,7 @@ public partial class SettingsViewModel : ObservableRecipient, INavigationAware
             });
     }
 
-    // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
+    // Async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
     // corrupt LocalSettings.json (ReadSettingAsync's JSON deserialization is the one thing here
     // that can actually throw) is logged and leaves the already-initialized defaults in place,
     // rather than unwinding unobserved out of NavigationService.OnNavigated.

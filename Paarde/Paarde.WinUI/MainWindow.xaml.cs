@@ -27,7 +27,7 @@ public sealed partial class MainWindow : Window
 
     public void SetShell(ShellView shell) => ShellHost.Content = shell;
 
-    // specs/fluent-design-pass R1 / specs/winui-frontend R3.1: off by default - called once at startup
+    // Off by default - called once at startup
     // with whatever was saved, and again live from SettingsViewModel when toggled. Same fallback order
     // as Paarde.Avalonia: Mica, then Acrylic, then a solid background.
     public void ApplyTransparency(bool enabled)

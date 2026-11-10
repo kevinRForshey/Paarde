@@ -4,7 +4,7 @@ namespace Paarde.Core.Helpers;
 // as "empty" rather than throwing - a missing file just means the proposed change is a brand-new
 // file (the whole proposed content shows up as added lines), and a transient read failure shouldn't
 // block showing a diff at all. Shared by ProposedFileChangeViewModel.RefreshOriginalContent and
-// ApplyOrchestrationService's pre-write conflict check (T3.3.3) so both read "what's on disk right
+// ApplyOrchestrationService's pre-write conflict check so both read "what's on disk right
 // now" the same way.
 public static class FileContentReader
 {

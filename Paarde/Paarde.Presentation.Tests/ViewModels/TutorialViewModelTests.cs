@@ -21,7 +21,7 @@ public class TutorialViewModelTests
 
     private TutorialViewModel CreateSut() => new(_promptResultStore, _applyOrchestrationService, _applyHistoryLog, _dialogService, _llmRunner, _promptTemplateProvider, _fileSavePickerService, _localSettingsService, _buildTestRunner);
 
-    // Epic 25, T5: ExplorerViewModel now takes a real AssistantPanelViewModel (wrapping its own,
+    // ExplorerViewModel now takes a real AssistantPanelViewModel (wrapping its own,
     // unrelated PromptViewModel/TutorialViewModel pair, each needing only fakes for their own
     // dependencies) rather than a fake - these helpers don't exercise that wiring at all, so a
     // throwaway panel/store built fresh each time is simplest.
@@ -37,7 +37,7 @@ public class TutorialViewModelTests
         return new ExplorerViewModel(localSettingsService, promptResultStore, llmRunner, new FakeFileChangeApplyService(), new FakeDialogService(), new FakeLanguageServerSessionManager(), new FakeFolderPickerService(), assistantPanel, new FakeUiDispatcher());
     }
 
-    // Epic 25, T4: Selected now reads ExplorerViewModel.SelectedTab?.PendingChange rather than its
+    // Selected now reads ExplorerViewModel.SelectedTab?.PendingChange rather than its
     // own settable property - a real ExplorerViewModel (rather than a fake) stands in for it, with
     // SelectedTab assigned directly instead of going through OpenOrActivateTab/a real file tree, so
     // these tests don't need to touch disk.
@@ -94,7 +94,7 @@ public class TutorialViewModelTests
 
         var sut = CreateSut();
 
-        // Epic 25: unlike the old auto-select-the-first-file behavior, there's no selection at all
+        // Unlike the old auto-select-the-first-file behavior, there's no selection at all
         // until Explorer (via AttachExplorer) says otherwise - HasFilesButNoneSelected is true for
         // every file-selecting view model that hasn't attached/selected yet, not just a brief moment.
         Assert.False(sut.HasNoFiles);

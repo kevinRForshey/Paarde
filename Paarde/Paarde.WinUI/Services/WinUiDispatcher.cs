@@ -4,7 +4,7 @@ using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.WinUI.Services;
 
-// specs/winui-frontend R3.1: IUiDispatcher over the UI thread's DispatcherQueue. Constructed by App
+// IUiDispatcher over the UI thread's DispatcherQueue. Constructed by App
 // on the UI thread and registered as an instance, since DI may first resolve it from a background
 // thread, where DispatcherQueue.GetForCurrentThread() would return null.
 public sealed class WinUiDispatcher : IUiDispatcher

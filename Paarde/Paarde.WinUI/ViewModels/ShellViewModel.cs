@@ -31,7 +31,7 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
-    // Epic 20 (specs/build-and-run F20.3): the persistent Build/Run/Stop toolbar - a singleton
+    // The persistent Build/Run/Stop toolbar - a singleton
     // handed in here rather than created by this ViewModel, so it's the same instance regardless of
     // how many times ShellView/ShellViewModel themselves get recreated.
     public RunPanelViewModel RunPanelViewModel
@@ -39,13 +39,13 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
-    // specs/ide-workbench-shell, R3: the status bar - same "singleton handed in" shape.
+    // The status bar - same "singleton handed in" shape.
     public StatusBarViewModel StatusBarViewModel
     {
         get;
     }
 
-    // specs/ide-workbench-shell, R1: the output dock - same "singleton handed in" shape. Taking it
+    // The output dock - same "singleton handed in" shape. Taking it
     // here is also what constructs it (and so DiagnosticsAggregator's subscription) before any page
     // navigates.
     public WorkbenchDockViewModel WorkbenchDockViewModel
@@ -53,19 +53,19 @@ public partial class ShellViewModel : ObservableRecipient
         get;
     }
 
-    // Epic 24, R1/R3: the Quick Open popup.
+    // The Quick Open popup.
     public QuickOpenViewModel QuickOpenViewModel
     {
         get;
     }
 
-    // Epic 24, R2/R3: the command palette popup.
+    // The command palette popup.
     public CommandPaletteViewModel CommandPaletteViewModel
     {
         get;
     }
 
-    // specs/editor-intelligence R7: Go to Symbol in File popup.
+    // Go to Symbol in File popup.
     public SymbolQuickPickViewModel SymbolQuickPickViewModel
     {
         get;
@@ -91,7 +91,7 @@ public partial class ShellViewModel : ObservableRecipient
         CommandPaletteViewModel = commandPaletteViewModel;
         SymbolQuickPickViewModel = symbolQuickPickViewModel;
 
-        // Epic 24, R3.2: wired here, not through DI constructor injection between the two
+        // Wired here, not through DI constructor injection between the two
         // singletons, since that would be a circular dependency the container can't resolve.
         quickOpenViewModel.AttachCommandPalette(commandPaletteViewModel);
         commandPaletteViewModel.AttachQuickOpen(quickOpenViewModel);

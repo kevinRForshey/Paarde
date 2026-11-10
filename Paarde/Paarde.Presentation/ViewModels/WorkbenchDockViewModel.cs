@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Paarde.Presentation.ViewModels;
 
-// specs/ide-workbench-shell, R1: a DI singleton (constructed as a ShellViewModel property, same
+// A DI singleton (constructed as a ShellViewModel property, same
 // pattern as RunPanelViewModel/StatusBarViewModel) so it backs ShellView's output dock across
 // every page navigation instead of being created and torn down with one page.
 public partial class WorkbenchDockViewModel : ObservableObject
@@ -15,7 +15,7 @@ public partial class WorkbenchDockViewModel : ObservableObject
 
     public RunPanelViewModel RunPanelViewModel { get; }
 
-    // specs/ide-workbench-shell R1.3: promoted to a DI singleton (App.axaml.cs) so this is the
+    // Promoted to a DI singleton (App.axaml.cs) so this is the
     // exact same instance TerminalView (the page) binds to - one live PTY session, not two.
     public TerminalViewModel TerminalViewModel { get; }
 
@@ -58,7 +58,7 @@ public partial class WorkbenchDockViewModel : ObservableObject
     partial void OnIsExpandedChanged(bool value) =>
         _ = _localSettingsService.SaveSettingAsync(WorkbenchDockSettingsKeys.IsExpanded, value);
 
-    // R5.2-equivalent (specs/build-and-run): starting an action should bring you to it - the old
+    // R5.2-equivalent: starting an action should bring you to it - the old
     // RunPanelViewModel.IsOutputExpanded auto-expand-on-build-or-run behavior, now expressed as
     // "expand the dock and switch to the tab for whatever just started" instead of "expand the
     // one strip" since there's no longer just one strip.

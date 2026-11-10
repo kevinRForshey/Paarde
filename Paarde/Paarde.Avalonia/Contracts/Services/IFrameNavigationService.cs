@@ -4,7 +4,7 @@ using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Contracts.Services;
 
-// specs/presentation-extraction R2.4: the FluentAvalonia-specific side of INavigationService -
+// The FluentAvalonia-specific side of INavigationService -
 // only the shell (ShellView/ShellViewModel) needs to hand over the Frame and react to Navigated.
 // DI maps this and INavigationService to the same NavigationService singleton.
 public interface IFrameNavigationService : INavigationService

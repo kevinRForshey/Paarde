@@ -37,7 +37,7 @@ public class AnthropicApiRunnerTests
 
         public string? LastRequestBody { get; private set; }
 
-        // Epic 11 (F11.1.3/F11.3.2): a tool-use round trip makes more than one call per
+        // A tool-use round trip makes more than one call per
         // RunPromptAsync - this records each request body in order, so a test can assert on, say,
         // the second request's tool_result content without the first call's body overwriting it.
         public List<string> RequestBodies { get; } = new();

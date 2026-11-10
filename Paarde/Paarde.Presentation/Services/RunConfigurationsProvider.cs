@@ -5,7 +5,7 @@ using Paarde.Core.Models;
 namespace Paarde.Presentation.Services;
 
 // Same seam as LanguageServerOptionsProvider: reads Settings fresh on every call rather than
-// caching, so a hand-edit made in Settings (R2.6) or a change in the project files on disk takes
+// caching, so a hand-edit made in Settings or a change in the project files on disk takes
 // effect the next time this is called.
 public class RunConfigurationsProvider
 {
@@ -23,7 +23,7 @@ public class RunConfigurationsProvider
         _runConfigurationDetector = runConfigurationDetector;
     }
 
-    // R2.3: merges a fresh detection pass into whatever's already persisted for this working
+    // Merges a fresh detection pass into whatever's already persisted for this working
     // directory - a candidate never seen before is appended, one the user has since hand-edited
     // (IsAutoDetected: false) is left alone rather than silently overwritten.
     public async Task<RunConfigurationsSnapshot> GetConfigurationsAsync(string workingDirectoryPath)

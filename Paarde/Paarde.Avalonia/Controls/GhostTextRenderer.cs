@@ -5,7 +5,7 @@ using AvaloniaEdit.Rendering;
 
 namespace Paarde.Avalonia.Controls;
 
-// Draws Epic 15's inline ghost-text suggestion (T15.1.1) right at the caret, dimmed, using an
+// Draws Epic 15's inline ghost-text suggestion right at the caret, dimmed, using an
 // InlineObjectElement with DocumentLength 0 - it occupies one visual column but consumes no real
 // document text, unlike every other VisualLineElementGenerator in AvaloniaEdit (link/tab/space
 // detection) which all replace an existing character. CodeEditor owns the actual suggestion

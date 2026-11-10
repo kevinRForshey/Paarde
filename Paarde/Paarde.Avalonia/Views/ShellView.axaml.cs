@@ -21,7 +21,7 @@ namespace Paarde.Avalonia.Views;
 
 public partial class ShellView : UserControl
 {
-    // specs/ide-workbench-shell R1: keys WorkbenchDockViewModel.ActiveTabKey persists/compares
+    // Keys WorkbenchDockViewModel.ActiveTabKey persists/compares
     // against, in the same order the TabItems appear in ShellView.axaml - the fallback design.md
     // flagged in case TabControl.SelectedItem can't bind directly against a string Header.
     private static readonly string[] TabKeysByIndex = ["Build", "Run", "Problems", "Terminal"];
@@ -42,7 +42,7 @@ public partial class ShellView : UserControl
         ViewModel.NavigationService.Frame = NavigationFrame;
         ViewModel.NavigationViewService.Initialize(NavigationViewControl);
 
-        // specs/terminal-emulation T6: OutputTerminal stays ignorant of IPtyProcessManager (same
+        // OutputTerminal stays ignorant of IPtyProcessManager (same
         // shape as Editor.GhostTextRequested above in ExplorerView.axaml.cs) - RunPanelViewModel
         // exposes thin passthroughs rather than this code-behind reaching past it to the service.
         OutputTerminal.InputReceived += ViewModel.RunPanelViewModel.WriteInput;
@@ -56,13 +56,13 @@ public partial class ShellView : UserControl
         // TerminalView.axaml.cs already uses for its own View-only concern (caret-follows-output).
         ViewModel.RunPanelViewModel.PropertyChanged += OnRunPanelViewModelPropertyChanged;
 
-        // specs/ide-workbench-shell R1.3: same InputReceived/Resized passthrough shape as
+        // Same InputReceived/Resized passthrough shape as
         // OutputTerminal above, reaching the shared WorkbenchDockViewModel.TerminalViewModel
         // instance instead of RunPanelViewModel's.
         DockTerminal.InputReceived += ViewModel.WorkbenchDockViewModel.TerminalViewModel.WriteInput;
         DockTerminal.Resized += ViewModel.WorkbenchDockViewModel.TerminalViewModel.Resize;
 
-        // specs/ide-workbench-shell R1.1/R2.1: DockTabControl.SelectedIndex <-> ActiveTabKey, kept
+        // DockTabControl.SelectedIndex <-> ActiveTabKey, kept
         // in sync both ways in code-behind rather than a direct XAML binding - TabControl's
         // SelectedItem binds against the selected TabItem instance, not its Header, so a plain
         // string<->SelectedItem binding wouldn't resolve to anything.
@@ -70,7 +70,7 @@ public partial class ShellView : UserControl
         ViewModel.WorkbenchDockViewModel.PropertyChanged += OnWorkbenchDockViewModelPropertyChanged;
         DockTabControl.SelectionChanged += OnDockTabControlSelectionChanged;
 
-        // specs/ide-workbench-shell R1.4: ProblemsList is populated/kept in sync here rather than
+        // ProblemsList is populated/kept in sync here rather than
         // bound directly in XAML, since DiagnosticsAggregator.Diagnostics is a per-file dictionary
         // and the list needs a flat, display-ready row per diagnostic (design.md: "a pure
         // presentation flattening... not a new ViewModel-level collection type").
@@ -78,7 +78,7 @@ public partial class ShellView : UserControl
         RefreshProblemRows();
         ViewModel.WorkbenchDockViewModel.DiagnosticsAggregator.Changed += OnDiagnosticsAggregatorChanged;
 
-        // Epic 24, R1.3/R2.5/R3.3: move keyboard focus into the popup's own query box the moment
+        // Move keyboard focus into the popup's own query box the moment
         // it opens - neither popup has anything else to give it, and without this the global
         // Ctrl+P/Ctrl+Shift+P KeyBinding would leave focus wherever it already was.
         ViewModel.QuickOpenViewModel.PropertyChanged += OnQuickOpenViewModelPropertyChanged;
@@ -90,7 +90,7 @@ public partial class ShellView : UserControl
         InsertFlowWizardMenuItemsIfNeededAsync();
     }
 
-    // Epic 26 (specs/interface-mode R3): FlowWizard mode gets Home/Compose/Review menu items ahead
+    // FlowWizard mode gets Home/Compose/Review menu items ahead
     // of EditorFocused mode's Explorer/Terminal/History - inserted here (rather than in XAML) since
     // which set applies is a runtime setting, not something the Avalonia XAML compiler can branch
     // on. Fire-and-forget async, same shape every other constructor-kickoff read in this codebase
@@ -121,7 +121,7 @@ public partial class ShellView : UserControl
         NavigationViewControl.MenuItems.Insert(0, homeItem);
     }
 
-    // Epic 24, R3.1: Ctrl+P/Ctrl+Shift+P must work regardless of which control has focus - the
+    // Ctrl+P/Ctrl+Shift+P must work regardless of which control has focus - the
     // only place that's true app-wide is the Window's own KeyBindings (TopLevel.KeyBindings);
     // ShellView itself is a UserControl, which has no such collection. App.axaml.cs's F12
     // DevTools gesture is the one existing precedent for attaching a KeyGesture this way.
@@ -144,7 +144,7 @@ public partial class ShellView : UserControl
             Command = ViewModel.CommandPaletteViewModel.OpenCommand,
         });
 
-        // specs/editor-intelligence R7: Ctrl+Shift+O, the same keybind VS Code itself uses for Go
+        // Ctrl+Shift+O, the same keybind VS Code itself uses for Go
         // to Symbol in File.
         window.KeyBindings.Add(new KeyBinding
         {
@@ -177,7 +177,7 @@ public partial class ShellView : UserControl
         }
     }
 
-    // R1.3: Up/Down move QuickOpenResultsList's own selection (which SelectedResult is two-way
+    // Up/Down move QuickOpenResultsList's own selection (which SelectedResult is two-way
     // bound to) rather than touching the view model directly - same "code-behind moves the
     // ListBox, not the VM property" shape PromptView.axaml.cs's MoveMentionSelection already uses.
     private void OnQuickOpenQueryBoxKeyDown(object? sender, KeyEventArgs e)

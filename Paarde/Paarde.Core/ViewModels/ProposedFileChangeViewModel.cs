@@ -229,7 +229,7 @@ public partial class ProposedFileChangeViewModel : ObservableObject
         return matchingSteps.Count == 0 || matchingSteps.Any(h => h.IsSelected);
     }
 
-    // T13.1.3: the inline editor's gutter Accept/Reject buttons are an alternate entry point into
+    // The inline editor's gutter Accept/Reject buttons are an alternate entry point into
     // the same per-step selection the Tutorial page's checkboxes drive, not a second selection
     // model - so this just finds every ProposedHunk whose matched diff hunks include diffHunk and
     // flips its IsSelected, exactly what checking/unchecking that step's checkbox already does. A
@@ -244,7 +244,7 @@ public partial class ProposedFileChangeViewModel : ObservableObject
     }
 
     // Records that a write using the current selection just happened, so each step's IsApplied
-    // (T3.3.2) reflects exactly what ended up on disk - a selected step is now applied, a deselected
+    // reflects exactly what ended up on disk - a selected step is now applied, a deselected
     // one isn't, regardless of what either was before. Called by FileChangeApplyService.Apply right
     // after a successful write; a no-op for files with no resolved hunks (the fallback case has
     // nothing per-step to mark).

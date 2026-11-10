@@ -7,9 +7,9 @@ namespace Paarde.Presentation.Helpers;
 // the insertion point the deleted lines used to sit before).
 public readonly record struct DiffBand(int StartLine, int LineCount, bool IsAddition);
 
-// Moved out of Paarde.Avalonia's DiffBackgroundRenderer (specs/winui-frontend F31.7) so both code
+// Moved out of Paarde.Avalonia's DiffBackgroundRenderer so both code
 // editors paint the same bands from ProposedFileChangeViewModel.DiffLines - a pure line-range
-// mapping, kept free of any UI framework so it's unit-testable on its own (T13.3.1).
+// mapping, kept free of any UI framework so it's unit-testable on its own.
 public static class DiffBandBuilder
 {
     // Walks the flat line diff once, tracking the running 1-based line number on the proposed side

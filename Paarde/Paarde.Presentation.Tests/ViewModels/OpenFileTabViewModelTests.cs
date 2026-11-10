@@ -6,7 +6,7 @@ using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Presentation.Tests.ViewModels;
 
-// Epic 23, T23.1.1: Save/Revert/Explain used to live on ExplorerViewModel against a single
+// Save/Revert/Explain used to live on ExplorerViewModel against a single
 // SelectedFilePath/SelectedFileContent slot - these tests moved here along with that logic onto
 // OpenFileTabViewModel, one instance per open Explorer tab.
 public class OpenFileTabViewModelTests : IDisposable

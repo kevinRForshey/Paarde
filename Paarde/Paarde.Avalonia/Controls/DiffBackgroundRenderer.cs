@@ -36,7 +36,7 @@ internal sealed class DiffBackgroundRenderer : IBackgroundRenderer
         _textView.BackgroundRenderers.Add(this);
     }
 
-    // T13.2.1: replaces _diffLines wholesale every time the bound DiffLines change (an edit, or
+    // Replaces _diffLines wholesale every time the bound DiffLines change (an edit, or
     // OriginalContent being refreshed from disk) rather than caching offsets once at load, so the
     // bands painted next never describe a stale diff.
     public void UpdateDiffLines(IReadOnlyList<DiffLine>? diffLines)

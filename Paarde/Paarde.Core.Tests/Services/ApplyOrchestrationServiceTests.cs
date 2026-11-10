@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using Paarde.Core.Models;
 using Paarde.Core.Services;
+using Paarde.Core.Tests.TestSupport;
 using Paarde.Core.ViewModels;
 
 namespace Paarde.Core.Tests.Services;
@@ -31,15 +32,8 @@ public class ApplyOrchestrationServiceTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_workingDirectory))
-        {
-            Directory.Delete(_workingDirectory, recursive: true);
-        }
-
-        if (Directory.Exists(_sessionsFolder))
-        {
-            Directory.Delete(_sessionsFolder, recursive: true);
-        }
+        TempDirectory.Delete(_workingDirectory);
+        TempDirectory.Delete(_sessionsFolder);
     }
 
     [Fact]
@@ -422,7 +416,7 @@ public class ApplyOrchestrationServiceTests : IDisposable
         Assert.Equal("clean.txt", Assert.Single(entry.FilePaths));
     }
 
-    // T7.1.1: ApplySelected/TryUndoLastApply/RevertAllApplied each resave the active run session so
+    // ApplySelected/TryUndoLastApply/RevertAllApplied each resave the active run session so
     // its persisted apply log stays current - verified end-to-end through the real RunSessionStore
     // rather than a mock, consistent with this test class's existing no-mocking convention.
     [Fact]

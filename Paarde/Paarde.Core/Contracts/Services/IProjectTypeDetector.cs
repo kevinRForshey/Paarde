@@ -1,6 +1,6 @@
 namespace Paarde.Core.Contracts.Services;
 
-// Epic 18 (specs/multi-language-support R4): decides which language servers are even worth
+// Decides which language servers are even worth
 // attempting for a working directory, so opening a pure C# repo never tries (and fails, noisily)
 // to launch a Python or TypeScript server, and vice versa.
 public interface IProjectTypeDetector

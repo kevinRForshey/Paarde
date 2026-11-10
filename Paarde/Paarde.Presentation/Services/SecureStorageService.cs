@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace Paarde.Presentation.Services;
 
 // Encrypts values at rest rather than storing them as plaintext JSON the way ILocalSettingsService
-// does - meant for secrets like the Anthropic API key (T6.3.2), not general settings. On Windows
+// does - meant for secrets like the Anthropic API key, not general settings. On Windows
 // this is real OS-level protection via DPAPI (tied to the logged-in user's credentials, the same
 // mechanism Windows Credential Manager itself builds on). Elsewhere there's no equivalent BCL API -
 // true Keychain/Secret Service integration would mean shelling out to `security`/`secret-tool` per
@@ -28,36 +28,52 @@ public class SecureStorageService : ISecureStorageService
     private readonly IFileService _fileService;
     private readonly string _applicationDataFolder;
 
+    // Serializes loading, changing and writing the file; two saves at once would otherwise write
+    // the same file concurrently and one fails with an IOException.
+    private readonly SemaphoreSlim _lock = new(1, 1);
+
     private IDictionary<string, string> _values = new Dictionary<string, string>();
     private bool _isInitialized;
 
     public SecureStorageService(IFileService fileService, IOptions<LocalSettingsOptions> options)
     {
         _fileService = fileService;
-
-        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        _applicationDataFolder = Path.Combine(localApplicationData, options.Value.ApplicationDataFolder ?? "Paarde.Avalonia/ApplicationData");
+        _applicationDataFolder = ApplicationDataPaths.Resolve(options.Value.ApplicationDataFolder);
     }
 
     public async Task<string?> ReadAsync(string key)
     {
-        await InitializeAsync();
+        string? ciphertext;
 
-        if (!_values.TryGetValue(key, out var ciphertext))
+        await _lock.WaitAsync();
+        try
         {
-            return null;
+            await InitializeAsync();
+            _values.TryGetValue(key, out ciphertext);
+        }
+        finally
+        {
+            _lock.Release();
         }
 
-        return Decrypt(Convert.FromBase64String(ciphertext));
+        return ciphertext == null ? null : Decrypt(Convert.FromBase64String(ciphertext));
     }
 
     public async Task SaveAsync(string key, string value)
     {
-        await InitializeAsync();
+        await _lock.WaitAsync();
+        try
+        {
+            await InitializeAsync();
 
-        _values[key] = Convert.ToBase64String(Encrypt(value));
+            _values[key] = Convert.ToBase64String(Encrypt(value));
 
-        await Task.Run(() => _fileService.Save(_applicationDataFolder, SecureSettingsFileName, _values));
+            await Task.Run(() => _fileService.Save(_applicationDataFolder, SecureSettingsFileName, _values));
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     private async Task InitializeAsync()

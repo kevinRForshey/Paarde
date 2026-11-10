@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Paarde.Presentation.ViewModels;
 
-// specs/build-and-run/requirements.md R2.6: the escape hatch for every case detection gets wrong
+// The escape hatch for every case detection gets wrong
 // or doesn't cover - the user can add, edit, or delete a RunConfiguration by hand regardless of
 // whether RunConfigurationDetector found anything. Same per-row-ViewModel-with-onChanged-callback
 // shape as LanguageServerOptionsRowViewModel, plus a delete callback since that list's rows are
@@ -53,7 +53,7 @@ public partial class RunConfigurationRowViewModel : ObservableObject
     [ObservableProperty]
     private string runCommand;
 
-    // R2.3: once the user edits anything here, a future detection pass must leave this row
+    // Once the user edits anything here, a future detection pass must leave this row
     // alone rather than silently overwriting it - surfaced in the row itself so the "auto" badge
     // in SettingsView disappears the moment that happens.
     public bool IsAutoDetected => _isAutoDetected;

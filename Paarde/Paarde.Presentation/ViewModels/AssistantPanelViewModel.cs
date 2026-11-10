@@ -7,7 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Epic 25, T2: composes the two existing page view models (Compose/Review) behind one docked
+// Composes the two existing page view models (Compose/Review) behind one docked
 // "Assistant" panel living inside ExplorerView, instead of Main/Prompt/Tutorial/Diffs being
 // separate navigation destinations. Registered AddSingleton (same as Compose/Review themselves,
 // per design.md) so it's reachable from HistoryViewModel's Fork/Rerun without depending on
@@ -34,7 +34,7 @@ public partial class AssistantPanelViewModel : ObservableObject
         // A finished run (successful or not - IPromptResultStore.Tutorial is set either way)
         // should put the narrative in front of the user without them having to click anything.
         // In EditorFocused mode ShowReview() alone is enough (the docked panel already lives on
-        // whichever page is open); in FlowWizard mode (Epic 26, specs/interface-mode R8) there is
+        // whichever page is open); in FlowWizard mode there is
         // no docked panel, so this also has to navigate to the separate Review page.
         promptResultStore.PropertyChanged += async (_, e) =>
         {

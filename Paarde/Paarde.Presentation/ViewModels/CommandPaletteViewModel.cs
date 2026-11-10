@@ -7,19 +7,19 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Epic 24, R2.2: a named, filterable command. CanExecute/Execute are plain delegates rather than
+// A named, filterable command. CanExecute/Execute are plain delegates rather than
 // ICommand so Build/Run/Stop (delegating to RunPanelViewModel's existing IAsyncRelayCommand/
 // IRelayCommand) and "Go to <Page>" (a plain NavigateTo call) can share one shape without either
 // kind needing a CommandParameter.
 public sealed record PaletteCommand(string Name, Func<bool> CanExecute, Action Execute)
 {
-    // R2.4: a snapshot taken when this entry is added to Results, not a live binding - the same
+    // A snapshot taken when this entry is added to Results, not a live binding - the same
     // "re-evaluated on refresh, not pushed" shape every other list in this app already uses, so
     // the command palette's disabled state doesn't need its own change-notification plumbing.
     public bool IsEnabled => CanExecute();
 }
 
-// Epic 24, R2: a DI singleton (ShellViewModel property, same shape as QuickOpenViewModel) so
+// A DI singleton (ShellViewModel property, same shape as QuickOpenViewModel) so
 // Ctrl+Shift+P reaches the same instance regardless of which page is currently navigated to. The
 // registry is a hand-written list, not a reflection-based scan of every [RelayCommand] in the app
 // - see requirements.md's non-goals.
@@ -27,7 +27,7 @@ public partial class CommandPaletteViewModel : ObservableObject
 {
     private readonly IReadOnlyList<PaletteCommand> _registry;
 
-    // Epic 24, R3.2: set once by ShellViewModel after both singletons exist - see
+    // Set once by ShellViewModel after both singletons exist - see
     // QuickOpenViewModel's matching field for why this isn't constructor injection.
     private QuickOpenViewModel? _quickOpenViewModel;
 

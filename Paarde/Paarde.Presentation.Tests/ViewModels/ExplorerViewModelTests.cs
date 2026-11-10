@@ -33,7 +33,7 @@ public class ExplorerViewModelTests : IDisposable
         }
     }
 
-    // Epic 25, T5: ExplorerViewModel now takes a real AssistantPanelViewModel (which itself wraps
+    // ExplorerViewModel now takes a real AssistantPanelViewModel (which itself wraps
     // a real PromptViewModel/TutorialViewModel, each only needing fakes for their own
     // dependencies) rather than a fake, since AttachExplorer/FileFocusRequested below need the
     // genuine wiring, not just a constructor to satisfy.
@@ -90,7 +90,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Equal(NotificationSeverity.Informational, sut.StatusSeverity);
     }
 
-    // Epic 24, R1.4: Quick Open navigates here with the absolute path of the file to open.
+    // Quick Open navigates here with the absolute path of the file to open.
     [Fact]
     public async Task OnNavigatedTo_StringParameterPointingAtAnExistingFile_OpensItAsATab()
     {
@@ -276,7 +276,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Single(sut.OpenTabs);
     }
 
-    // Epic 23, T23.1.1: every open tab keeps its own content now, so switching the tree selection
+    // Every open tab keeps its own content now, so switching the tree selection
     // can no longer discard anything - the T10.2.5 discard-confirmation this page used to show on
     // SelectedNode changing while dirty (SelectedNode_ChangedWhileDirty_PromptsAndDiscardsWhenConfirmed/
     // RevertsSelectionWhenDeclined) no longer applies. This replaces those two tests: selecting a
@@ -402,7 +402,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Same(tabC, sut.SelectedTab);
     }
 
-    // Epic 25, T5 (R4): a prompt run adding to IPromptResultStore.Files opens/activates a tab for
+    // A prompt run adding to IPromptResultStore.Files opens/activates a tab for
     // each new file, carrying its proposed change along as PendingChange.
     [Fact]
     public async Task PromptResultStoreFilesChanged_NewFileAdded_OpensTabWithPendingChange()
@@ -419,7 +419,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Same(change, tab.PendingChange);
     }
 
-    // Epic 25, T5: an already-open tab keeps whichever PendingChange it already had rather than
+    // An already-open tab keeps whichever PendingChange it already had rather than
     // letting a later, unrelated prompt run's change for the same file clobber it.
     [Fact]
     public async Task PromptResultStoreFilesChanged_TabAlreadyHasAPendingChange_DoesNotClobberIt()
@@ -438,7 +438,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Same(firstChange, tab.PendingChange);
     }
 
-    // Epic 25, T5 (R10): lets the user pick a working directory from the Explorer page itself.
+    // Lets the user pick a working directory from the Explorer page itself.
     [Fact]
     public async Task OpenFolderCommand_FolderPicked_SavesSettingUpdatesPathAndRefreshesTree()
     {
@@ -466,7 +466,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Equal(_workingDirectory, sut.WorkingDirectoryPath);
     }
 
-    // Epic 25, T5 (R7): Review's file list / a step card's "View in Diff" asks to focus a proposed
+    // Review's file list / a step card's "View in Diff" asks to focus a proposed
     // change - the tab is asked to scroll to the targeted hunk once it's open.
     [Fact]
     public async Task ReviewFileFocusRequested_WithHunk_OpensTabAndForwardsScrollRequest()
@@ -488,7 +488,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Same(hunk, received);
     }
 
-    // specs/editor-focus-layout R2: every newly opened tab starts out in the primary group, same
+    // Every newly opened tab starts out in the primary group, same
     // as it always has (PrimaryGroupTabs mirrors OpenTabs until something is split right).
     [Fact]
     public async Task OpenOrActivateTab_NewTab_AddsToPrimaryGroup()
@@ -541,7 +541,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.False(sut.HasSecondaryGroupTabs);
     }
 
-    // specs/editor-focus-layout R3: pinning moves a tab to right after the last already-pinned
+    // Pinning moves a tab to right after the last already-pinned
     // tab in its own group - unpinning leaves its position untouched.
     [Fact]
     public async Task TogglePin_PinningATab_MovesItBeforeAllUnpinnedTabsInItsGroup()
@@ -582,7 +582,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.False(tabB.IsPinned);
     }
 
-    // specs/editor-focus-layout R1: raises the view's event rather than touching layout itself -
+    // Raises the view's event rather than touching layout itself -
     // ExplorerView.axaml.cs owns the live ColumnDefinitions.
     [Fact]
     public void ToggleZenModeCommand_RaisesZenModeToggled()
@@ -596,7 +596,7 @@ public class ExplorerViewModelTests : IDisposable
         Assert.Equal(1, raisedCount);
     }
 
-    // specs/editor-focus-layout R5: OpenMruSwitcher snapshots the most-recently-activated order
+    // OpenMruSwitcher snapshots the most-recently-activated order
     // and highlights the second entry (the previously-active tab, not the still-current one) -
     // matching the "first Ctrl+Tap press jumps to the previous tab" convention.
     [Fact]

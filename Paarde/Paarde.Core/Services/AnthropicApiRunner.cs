@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Paarde.Core.Services;
 
-// The direct-API implementation of ILlmRunner (T6.3.2) - a second implementation alongside
+// The direct-API implementation of ILlmRunner - a second implementation alongside
 // ClaudeCliRunner, behind the same interface per T6.3.1's design. Unlike the CLI, the raw Messages
 // API is stateless (no --resume equivalent): this runner owns conversation history itself, keyed by
 // the SessionId it hands back, so resumeSessionId can still work the same way callers already rely
@@ -25,7 +25,7 @@ public class AnthropicApiRunner : ILlmRunner
     private const string AnthropicVersion = "2023-06-01";
     private const int MaxTokens = 8192;
 
-    // Epic 11 (F11.1.3): a bound on how many tool-use round trips a single RunPromptAsync call will
+    // A bound on how many tool-use round trips a single RunPromptAsync call will
     // make before giving up - without one, a model stuck repeatedly requesting tools (its own bug,
     // or a tool result it keeps misreading) would hang this call and keep billing API calls
     // indefinitely instead of surfacing as a normal failure.
@@ -126,7 +126,7 @@ public class AnthropicApiRunner : ILlmRunner
         var finalText = string.Empty;
         var reachedIterationLimit = false;
 
-        // Epic 11 (F11.1.3): a single call used to mean a single request/response. With tools
+        // A single call used to mean a single request/response. With tools
         // enabled, the model can come back asking to run one or more of them before it's ready to
         // answer - each iteration is one request/response turn; the loop ends as soon as a turn's
         // stop_reason isn't "tool_use" (or the MaxAgentToolIterations safety cap trips). With no
@@ -335,7 +335,7 @@ public class AnthropicApiRunner : ILlmRunner
                         var toolInput = string.IsNullOrWhiteSpace(json) ? new JObject() : JObject.Parse(json);
                         blocks[stopIndex]["input"] = toolInput;
 
-                        // Epic 11 (F11.2.3): fires once the tool's full input has actually finished
+                        // Fires once the tool's full input has actually finished
                         // streaming in, not at content_block_start, since e.g. a read_file's path
                         // isn't known yet at that point.
                         onToolActivity?.Invoke(ToolActivityDescriber.Describe(blocks[stopIndex]["name"]!.ToString(), toolInput));
@@ -356,9 +356,9 @@ public class AnthropicApiRunner : ILlmRunner
         return new StreamParseResult(orderedBlocks, combinedText, inputTokens, outputTokens, stopReason);
     }
 
-    // T11.1.3/T11.3.2: dispatches one tool_use block to the matching read-only implementation,
+    // Dispatches one tool_use block to the matching read-only implementation,
     // scoped to workingDirectory through the same FilePathContainment guard writes already go
-    // through (T4.1.1) - a model-requested path that escapes the project comes back as a rejected
+    // through - a model-requested path that escapes the project comes back as a rejected
     // tool call (is_error, with the guard's own message) rather than an unhandled exception that
     // would kill the whole run over one bad tool call.
     private static (string Output, bool IsError) ExecuteReadOnlyTool(string toolName, JObject input, string? workingDirectory)

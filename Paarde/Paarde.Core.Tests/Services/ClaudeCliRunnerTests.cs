@@ -1,81 +1,73 @@
-using System.Runtime.Versioning;
-
 using Paarde.Core.Models;
 using Paarde.Core.Services;
+using Paarde.Core.Tests.TestSupport;
 
 namespace Paarde.Core.Tests.Services;
 
-[SupportedOSPlatform("linux")]
-[SupportedOSPlatform("macos")]
-
-// Stands a POSIX shell script in for the `claude` CLI (same approach GitStatusServiceTests takes with a
-// real `git` binary) so RunPromptAsync's stream-json NDJSON parsing (T6.2.1/T6.2.3) can be exercised
-// without invoking the real, paid Claude Code CLI.
+// Stands a fake script in for the `claude` CLI (same approach GitStatusServiceTests takes with a
+// real `git` binary) so RunPromptAsync's stream-json NDJSON parsing can be exercised
+// without invoking the real, paid Claude Code CLI. Python rather than sh so it runs on Windows too
+// (FakeExecutable); tests that need it return early where Python isn't installed.
 [Collection("RealProcess")]
 public class ClaudeCliRunnerTests : IDisposable
 {
     private const string FakeClaudeScript = """
-        #!/bin/sh
-        cat > /dev/null
-        cat <<'EOF'
-        {"type":"system","subtype":"init"}
-        {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}}
-        {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":", world"}}}
-        {"type":"stream_event","event":{"type":"content_block_stop"}}
-        {"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"total_cost_usd":0.0056,"usage":{"input_tokens":10,"output_tokens":5},"session_id":"session-abc"}
-        EOF
+        import sys
+        sys.stdin.read()
+        print('{"type":"system","subtype":"init"}')
+        print('{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}}')
+        print('{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":", world"}}}')
+        print('{"type":"stream_event","event":{"type":"content_block_stop"}}')
+        print('{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"total_cost_usd":0.0056,"usage":{"input_tokens":10,"output_tokens":5},"session_id":"session-abc"}')
         """;
 
     // Also echoes its argv (one per line) to stderr, so tests can assert on exactly which
     // arguments ClaudeCliRunner invoked it with (T7.3.1's --resume in particular).
     private const string ArgvEchoingFakeClaudeScript = """
-        #!/bin/sh
-        cat > /dev/null
-        for arg in "$@"; do echo "$arg" >&2; done
-        echo '{"type":"result","subtype":"success","is_error":false}'
+        import sys
+        sys.stdin.read()
+        for arg in sys.argv[1:]:
+            print(arg, file=sys.stderr)
+        print('{"type":"result","subtype":"success","is_error":false}')
         """;
 
-    private readonly string _scriptPath = Path.Combine(Path.GetTempPath(), $"fake-claude-{Guid.NewGuid()}.sh");
-    private readonly ClaudeCliRunner _runner;
+    private const string UnsupportedCliScript = """
+        import sys
+        sys.stdin.read()
+        print("error: unknown option '--allowedTools'", file=sys.stderr)
+        sys.exit(1)
+        """;
 
-    public ClaudeCliRunnerTests()
-    {
-        File.WriteAllText(_scriptPath, FakeClaudeScript);
-        File.SetUnixFileMode(_scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-
-        var options = new ClaudeCliOptions(_scriptPath, string.Empty);
-        _runner = new ClaudeCliRunner(() => Task.FromResult(options));
-    }
+    private readonly List<FakeExecutable> _fakes = [];
 
     public void Dispose()
     {
-        if (File.Exists(_scriptPath))
+        foreach (var fake in _fakes)
         {
-            File.Delete(_scriptPath);
-        }
-
-        foreach (var path in _extraScriptPaths)
-        {
-            File.Delete(path);
+            fake.Dispose();
         }
     }
-
-    private readonly List<string> _extraScriptPaths = [];
 
     private ClaudeCliRunner CreateRunner(string script, bool agentToolsEnabled = false)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"fake-claude-{Guid.NewGuid()}.sh");
-        File.WriteAllText(path, script);
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        _extraScriptPaths.Add(path);
+        var fake = new FakeExecutable(script);
+        _fakes.Add(fake);
 
-        return new ClaudeCliRunner(() => Task.FromResult(new ClaudeCliOptions(path, string.Empty, agentToolsEnabled)));
+        return new ClaudeCliRunner(() => Task.FromResult(new ClaudeCliOptions(fake.ExecutablePath, string.Empty, agentToolsEnabled)));
     }
+
+    // Each argument stderr line; the Windows .cmd wrapper's stderr lines end in \r\n.
+    private static string[] ReadArgv(LlmRunResult result) => result.ErrorMessage.ReplaceLineEndings("\n").Split('\n');
 
     [Fact]
     public async Task RunPromptAsync_StreamJsonTextDeltas_AccumulatesThemAsOutput()
     {
-        var result = await _runner.RunPromptAsync("prompt");
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
+        var result = await CreateRunner(FakeClaudeScript).RunPromptAsync("prompt");
 
         Assert.Equal("Hello, world", result.Output);
         Assert.True(result.Success);
@@ -85,9 +77,14 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_StreamJsonTextDeltas_InvokesOnTextDeltaForEachChunkInOrder()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var received = new List<string>();
 
-        await _runner.RunPromptAsync("prompt", onTextDelta: received.Add);
+        await CreateRunner(FakeClaudeScript).RunPromptAsync("prompt", onTextDelta: received.Add);
 
         Assert.Equal(new[] { "Hello", ", world" }, received);
     }
@@ -95,7 +92,12 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_ResultLine_PopulatesCostAndUsageFields()
     {
-        var result = await _runner.RunPromptAsync("prompt");
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
+        var result = await CreateRunner(FakeClaudeScript).RunPromptAsync("prompt");
 
         Assert.Equal(0.0056, result.TotalCostUsd);
         Assert.Equal(1234, result.DurationMs);
@@ -107,11 +109,16 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_ResumeSessionIdGiven_PassesResumeFlagToTheCli()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var runner = CreateRunner(ArgvEchoingFakeClaudeScript);
 
         var result = await runner.RunPromptAsync("prompt", resumeSessionId: "session-xyz");
 
-        var argv = result.ErrorMessage.Split('\n');
+        var argv = ReadArgv(result);
         Assert.Contains("--resume", argv);
         Assert.Contains("session-xyz", argv);
     }
@@ -119,21 +126,31 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_NoResumeSessionIdGiven_DoesNotPassResumeFlagToTheCli()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var runner = CreateRunner(ArgvEchoingFakeClaudeScript);
 
         var result = await runner.RunPromptAsync("prompt");
 
-        Assert.DoesNotContain("--resume", result.ErrorMessage.Split('\n'));
+        Assert.DoesNotContain("--resume", ReadArgv(result));
     }
 
     [Fact]
     public async Task RunPromptAsync_AgentToolsDisabled_DoesNotPassAllowedToolsOrPermissionModeFlags()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var runner = CreateRunner(ArgvEchoingFakeClaudeScript, agentToolsEnabled: false);
 
         var result = await runner.RunPromptAsync("prompt");
 
-        var argv = result.ErrorMessage.Split('\n');
+        var argv = ReadArgv(result);
         Assert.DoesNotContain("--allowedTools", argv);
         Assert.DoesNotContain("--permission-mode", argv);
     }
@@ -141,11 +158,16 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_AgentToolsEnabled_PassesAllowedToolsAndPermissionModeFlags()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var runner = CreateRunner(ArgvEchoingFakeClaudeScript, agentToolsEnabled: true);
 
         var result = await runner.RunPromptAsync("prompt");
 
-        var argv = result.ErrorMessage.Split('\n');
+        var argv = ReadArgv(result);
         Assert.Contains("--allowedTools", argv);
         Assert.Contains("Read", argv);
         Assert.Contains("Grep", argv);
@@ -157,12 +179,11 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_AgentToolsEnabledAndCliRejectsTheFlag_ReturnsAnActionableErrorMessage()
     {
-        const string UnsupportedCliScript = """
-            #!/bin/sh
-            cat > /dev/null
-            echo "error: unknown option '--allowedTools'" >&2
-            exit 1
-            """;
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var runner = CreateRunner(UnsupportedCliScript, agentToolsEnabled: true);
 
         var result = await runner.RunPromptAsync("prompt");
@@ -174,12 +195,11 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_AgentToolsDisabledAndCliFailsForAnUnrelatedReason_LeavesTheRawErrorMessageAlone()
     {
-        const string UnsupportedCliScript = """
-            #!/bin/sh
-            cat > /dev/null
-            echo "error: unknown option '--allowedTools'" >&2
-            exit 1
-            """;
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var runner = CreateRunner(UnsupportedCliScript, agentToolsEnabled: false);
 
         var result = await runner.RunPromptAsync("prompt");
@@ -191,18 +211,21 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task RunPromptAsync_ToolUseStreamEvents_InvokeOnToolActivityWithoutPollutingAssistantText()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         const string ToolUseScript = """
-            #!/bin/sh
-            cat > /dev/null
-            cat <<'EOF'
-            {"type":"system","subtype":"init"}
-            {"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"Read"}}}
-            {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"file_path\": \"Foo.cs\"}"}}}
-            {"type":"stream_event","event":{"type":"content_block_stop","index":0}}
-            {"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Done"}}}
-            {"type":"stream_event","event":{"type":"content_block_stop","index":1}}
-            {"type":"result","subtype":"success","is_error":false}
-            EOF
+            import sys
+            sys.stdin.read()
+            print('{"type":"system","subtype":"init"}')
+            print('{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"Read"}}}')
+            print('{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"file_path\\": \\"Foo.cs\\"}"}}}')
+            print('{"type":"stream_event","event":{"type":"content_block_stop","index":0}}')
+            print('{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Done"}}}')
+            print('{"type":"stream_event","event":{"type":"content_block_stop","index":1}}')
+            print('{"type":"result","subtype":"success","is_error":false}')
             """;
         var runner = CreateRunner(ToolUseScript);
         var toolActivities = new List<string>();
@@ -216,7 +239,9 @@ public class ClaudeCliRunnerTests : IDisposable
     [Fact]
     public async Task IsAvailableAsync_ScriptExists_ReturnsTrue()
     {
-        Assert.True(await _runner.IsAvailableAsync());
+        var runner = CreateRunner(FakeClaudeScript);
+
+        Assert.True(await runner.IsAvailableAsync());
     }
 
     [Fact]

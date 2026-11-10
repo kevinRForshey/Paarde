@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Core.Services;
 
-// specs/multi-language-support/design.md: owns zero-or-more StdioLanguageServerClient instances,
+// Owns zero-or-more StdioLanguageServerClient instances,
 // one per detected/available language, keyed by LanguageServerOptions.LanguageId ("csharp",
 // "python", "typescript" - a settings/process key, not necessarily the same string as a given
 // file's own LSP languageId; see LanguageIdResolver). Registered as a DI singleton, same lifetime
@@ -43,7 +43,7 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
 
     public event Action? RunningLanguageIdsChanged;
 
-    // R3.1/R4: evaluates every configured language independently - detected-or-force-enabled and
+    // Evaluates every configured language independently - detected-or-force-enabled and
     // executable-available - so a repo with only some of the configured languages' markers starts
     // only those servers. R3.4: a try/catch per language means one failure never blocks another.
     public async Task StartAllAsync(string workingDirectoryPath, CancellationToken cancellationToken = default)
@@ -155,7 +155,7 @@ public class LanguageServerSessionManager : ILanguageServerSessionManager
     public Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default) =>
         TryGetClient(filePath, out var client) ? client.GetHoverAsync(filePath, position, cancellationToken) : Task.FromResult<LspHover?>(null);
 
-    // R2.2/R2.3: no client registered for the file's resolved server group (unmapped extension, or
+    // No client registered for the file's resolved server group (unmapped extension, or
     // mapped but that language's server never started) is the documented no-op path, not an error.
     private bool TryGetClient(string filePath, out ILanguageServerClient client)
     {

@@ -92,7 +92,7 @@ public class RunSessionStore : IRunSessionStore
 
     // Sortable filename prefix (see RecordRun) means lexicographic order is also run-started order -
     // no need to open every file to compare StartedAt. Newest first, since that's what both
-    // RestoreLastSession and the History page's listing (T7.2.1) want.
+    // RestoreLastSession and the History page's listing want.
     private IEnumerable<string> GetSessionFileNamesNewestFirst()
     {
         if (!Directory.Exists(_sessionsFolderPath))

@@ -17,7 +17,7 @@ namespace Paarde.WinUI.Views;
 
 public sealed partial class ExplorerFileTabControl : UserControl
 {
-    // Epic 17, T17.1.3: display wrapper for the references list - file name + line number.
+    // Display wrapper for the references list - file name + line number.
     private sealed record ReferenceListItem(string DisplayText, LspLocation Location)
     {
         public override string ToString() => DisplayText;
@@ -32,7 +32,7 @@ public sealed partial class ExplorerFileTabControl : UserControl
     private readonly IActiveEditorContext _activeEditorContext;
     private readonly ResizablePaneHelper _outlinePaneHelper;
 
-    // specs/editor-intelligence R3: the outline is refreshed once edits settle - same 400 ms window
+    // The outline is refreshed once edits settle - same 400 ms window
     // as Avalonia's CodeEditor.DocumentSymbolsRequested.
     private readonly DispatcherQueueTimer _documentSymbolsTimer;
 
@@ -199,7 +199,7 @@ public sealed partial class ExplorerFileTabControl : UserControl
         tab.PropertyChanged += OnTabPropertyChanged;
         tab.ScrollToHunkRequested += OnScrollToHunkRequested;
 
-        // specs/editor-intelligence R3: Avalonia asks for the outline when a tab's editor first gets
+        // Avalonia asks for the outline when a tab's editor first gets
         // its file; here the outline is kept on the tab, so only a tab without one asks.
         if (tab.DocumentSymbols is null)
         {
@@ -274,7 +274,7 @@ public sealed partial class ExplorerFileTabControl : UserControl
                 break;
 
             case nameof(OpenFileTabViewModel.DocumentSymbols):
-                // specs/editor-intelligence R7: Go to Symbol never filters a stale outline.
+                // Go to Symbol never filters a stale outline.
                 if (s_activeEditorOwner == this)
                 {
                     _activeEditorContext.SetActiveDocument(tab.FilePath, tab.DocumentSymbols);
@@ -354,7 +354,7 @@ public sealed partial class ExplorerFileTabControl : UserControl
         }
     }
 
-    // specs/editor-intelligence R4: same NavigateToLocation path as a reference pick.
+    // Same NavigateToLocation path as a reference pick.
     private void OnOutlineItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
     {
         if (args.InvokedItem is LspDocumentSymbol symbol && ViewModel is { } tab)
@@ -380,7 +380,7 @@ public sealed partial class ExplorerFileTabControl : UserControl
         ApplyPendingCaretTarget();
     }
 
-    // specs/unified-workbench T13 (R5).
+    // specs/unified-workbench T13.
     private void OnOpenInReviewButtonClick(object sender, RoutedEventArgs e) => Explorer?.AssistantPanel.ShowReview();
 
     private void ApplyPendingCaretTarget()
@@ -391,12 +391,12 @@ public sealed partial class ExplorerFileTabControl : UserControl
         }
     }
 
-    // specs/unified-workbench T14 (R7): DiffHunkGutterMargin's line convention - ProposedStartLine,
+    // DiffHunkGutterMargin's line convention - ProposedStartLine,
     // clamped to at least 1.
     private void OnScrollToHunkRequested(DiffHunk hunk) =>
         Editor.RevealPosition(new LspPosition(Math.Max(hunk.ProposedStartLine, 1) - 1, 0), focus: false);
 
-    // specs/editor-intelligence R7: Go to Symbol only ever jumps within the focused file.
+    // Go to Symbol only ever jumps within the focused file.
     private void JumpCaretTo(LspPosition position) => Editor.RevealPosition(position, focus: true);
 
     private void TakeActiveEditor()

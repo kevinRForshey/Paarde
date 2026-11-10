@@ -8,7 +8,7 @@ using Paarde.Presentation.Services;
 
 namespace Paarde.WinUI.Services;
 
-// specs/winui-frontend R3.1: AppTheme -> ElementTheme on the window's root element. Reads/writes the
+// AppTheme -> ElementTheme on the window's root element. Reads/writes the
 // same setting as Paarde.Avalonia's ThemeSelectorService, so both apps share the chosen theme.
 public class ThemeSelectorService : IThemeSelectorService
 {

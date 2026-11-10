@@ -13,7 +13,7 @@ public class HistoryViewModelTests
     private readonly FakeLocalSettingsService _localSettingsService = new();
     private readonly FakePromptResultStore _promptResultStore = new();
 
-    // Epic 25, T7: Fork/Rerun now drive the docked Assistant panel's own Compose view model
+    // Fork/Rerun now drive the docked Assistant panel's own Compose view model
     // directly rather than navigating with a PromptLaunchRequest parameter, so a real
     // AssistantPanelViewModel (wrapping its own, otherwise-unrelated PromptViewModel/
     // TutorialViewModel pair) stands in for it here too.

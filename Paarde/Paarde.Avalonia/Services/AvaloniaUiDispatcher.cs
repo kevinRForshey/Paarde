@@ -4,7 +4,7 @@ using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Services;
 
-// specs/presentation-extraction R2.2: the Avalonia side of IUiDispatcher.
+// The Avalonia side of IUiDispatcher.
 public class AvaloniaUiDispatcher : IUiDispatcher
 {
     public void Post(Action action) => Dispatcher.UIThread.Post(action);

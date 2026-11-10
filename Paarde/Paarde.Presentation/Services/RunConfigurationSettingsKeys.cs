@@ -1,6 +1,6 @@
 namespace Paarde.Presentation.Services;
 
-// specs/build-and-run/design.md: RunConfiguration itself and IRunConfigurationDetector live in
+// RunConfiguration itself and IRunConfigurationDetector live in
 // Paarde.Core since they have no settings dependency, but these keys (and RunConfigurationsProvider,
 // which reads/writes them) live here instead, next to LanguageServerSettingsKeys/
 // BuildTestSettingsKeys/WorkingDirectorySettingsKeys - ILocalSettingsService is declared in

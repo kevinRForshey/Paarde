@@ -9,7 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Paarde.Presentation.ViewModels;
 
-// specs/editor-intelligence R7: a DI singleton (ShellViewModel property, same "singleton handed
+// A DI singleton (ShellViewModel property, same "singleton handed
 // in" shape as QuickOpenViewModel/CommandPaletteViewModel) so Ctrl+Shift+O reaches the same
 // instance regardless of which page is currently navigated to. Reads/jumps the focused tab's own
 // outline entirely through IActiveEditorContext (DocumentChanged/RequestNavigation) rather than

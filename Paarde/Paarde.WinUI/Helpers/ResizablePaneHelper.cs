@@ -8,7 +8,7 @@ using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.WinUI.Helpers;
 
-// T8.2.3: restores and persists one Grid column's width (a master/browse-list pane) - port of
+// Restores and persists one Grid column's width (a master/browse-list pane) - port of
 // Paarde.Avalonia's ResizablePaneHelper, reading/writing the same WorkspaceLayoutSettingsKeys so a
 // pane width carries over between the two apps. Dragging a pane all the way shut (width 0) and
 // reopening it is this app's "collapsible" - there's no separate collapsed flag to keep in sync.
@@ -43,7 +43,7 @@ public sealed class ResizablePaneHelper
 
     public bool IsCollapsed => _column.Width.Value <= 0;
 
-    // specs/editor-focus-layout R1: collapse/remember-width/restore toggle (used by Explorer, F31.7).
+    // collapse/remember-width/restore toggle (used by Explorer, F31.7).
     public void Collapse()
     {
         if (IsCollapsed)

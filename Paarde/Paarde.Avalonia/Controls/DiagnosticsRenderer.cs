@@ -8,7 +8,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Avalonia.Controls;
 
-// Epic 17, T17.1.2: underlines a server-reported diagnostic's range, same IBackgroundRenderer
+// Underlines a server-reported diagnostic's range, same IBackgroundRenderer
 // extension point as BracketHighlightRenderer/DiffBackgroundRenderer. Deliberately a straight
 // line, not a wavy squiggle - the color already conveys severity, and a true squiggle glyph isn't
 // worth the added geometry complexity for what's otherwise the same underline shape.

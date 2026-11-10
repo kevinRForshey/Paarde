@@ -49,17 +49,17 @@ public sealed partial class ShellView : UserControl
         // A run grabs keyboard focus for its output terminal, the way a real terminal does.
         ViewModel.RunPanelViewModel.PropertyChanged += OnRunPanelViewModelPropertyChanged;
 
-        // R1.1/R2.1: selector bar <-> ActiveTabKey, both ways.
+        // Selector bar <-> ActiveTabKey, both ways.
         ShowDockTab(ViewModel.WorkbenchDockViewModel.ActiveTabKey);
         ViewModel.WorkbenchDockViewModel.PropertyChanged += OnWorkbenchDockViewModelPropertyChanged;
 
-        // R1.4: DiagnosticsAggregator.Diagnostics is a per-file dictionary; the Problems list needs
+        // DiagnosticsAggregator.Diagnostics is a per-file dictionary; the Problems list needs
         // one flat row per diagnostic.
         ProblemsList.ItemsSource = _problemRows;
         RefreshProblemRows();
         ViewModel.WorkbenchDockViewModel.DiagnosticsAggregator.Changed += OnDiagnosticsAggregatorChanged;
 
-        // Epic 24, R1.3/R2.5/R3.3: centre each popup and move keyboard focus into its query box the
+        // Centre each popup and move keyboard focus into its query box the
         // moment it opens - nothing else in the popup would take it.
         ViewModel.QuickOpenViewModel.PropertyChanged += (_, e) =>
             OnPalettePopupPropertyChanged(e, ViewModel.QuickOpenViewModel.IsOpen, QuickOpenPopup, QuickOpenQueryBox);
@@ -139,7 +139,7 @@ public sealed partial class ShellView : UserControl
     private void OnSymbolQuickPickResultDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) =>
         ViewModel.SymbolQuickPickViewModel.ActivateSelectedCommand.Execute(null);
 
-    // R1.3: Up/Down move the ListView's own selection (which SelectedResult is two-way bound to),
+    // Up/Down move the ListView's own selection (which SelectedResult is two-way bound to),
     // same as Avalonia's MoveListBoxSelection. PreviewKeyDown because the TextBox handles Up/Down
     // itself before KeyDown.
     private static bool HandlePaletteKey(VirtualKey key, ListView resultsList, ICommand close, ICommand activate)
@@ -245,7 +245,7 @@ public sealed partial class ShellView : UserControl
         }
     }
 
-    // Epic 26 (specs/interface-mode R3): FlowWizard mode gets Home/Compose/Review menu items ahead
+    // FlowWizard mode gets Home/Compose/Review menu items ahead
     // of EditorFocused mode's Explorer/Terminal/History - inserted here rather than in XAML since
     // which set applies is a runtime setting. Fire-and-forget like Paarde.Avalonia's: the only effect
     // of this resolving after the first navigation is that navigation's selected-item highlight,

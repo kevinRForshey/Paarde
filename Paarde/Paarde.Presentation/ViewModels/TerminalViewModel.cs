@@ -18,17 +18,17 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Presentation.ViewModels;
 
-// T16.1.2: the integrated terminal - a "run a command, stream its output" panel, reusing the
-// working directory last picked on the Prompt page the same way ExplorerViewModel does (T8.1.1),
+// The integrated terminal - a "run a command, stream its output" panel, reusing the
+// working directory last picked on the Prompt page the same way ExplorerViewModel does,
 // via WorkingDirectorySettingsKeys.
-// specs/terminal-emulation T7: runs the typed command through IPtyProcessManager instead of
+// Runs the typed command through IPtyProcessManager instead of
 // ITerminalCommandRunner's line-oriented streaming overload, so full-screen TUI apps typed here
 // render correctly too, not just plain line-oriented commands. This is a *separate* PTY-backed
 // process slot from RunPanelViewModel's (App.axaml.cs registers one keyed by
 // PtyProcessManagerKey) - Run's persistent toolbar and this page are independent features, same
 // as the pre-epic IRunProcessManager/ITerminalCommandRunner split; sharing RunPanelViewModel's
 // singleton would mean typing a command here stops whatever Run has going, and vice versa.
-// specs/ide-workbench-shell R1.3: promoted from AddTransient to AddSingleton - the Terminal page
+// Promoted from AddTransient to AddSingleton - the Terminal page
 // and the workbench dock's Terminal tab now bind to the exact same instance/session rather than
 // each getting an independent PTY, per design.md's decision against two terminals racing to claim
 // the same tab's content.
@@ -73,10 +73,11 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         _logger = logger ?? NullLogger<TerminalViewModel>.Instance;
 
         _ptyProcessManager.OutputReceived += OnProcessOutputReceived;
+        OutputBuffer.ResponseReady += _ptyProcessManager.WriteInput;
         _ptyProcessManager.Exited += OnProcessExited;
     }
 
-    // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void, same reasoning as
+    // Async void because INavigationAware.OnNavigatedTo returns void, same reasoning as
     // ExplorerViewModel.OnNavigatedTo - a corrupt settings file is logged rather than unwound
     // unobserved out of NavigationService.OnNavigated.
     public async void OnNavigatedTo(object parameter)
@@ -91,7 +92,7 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         }
     }
 
-    // specs/ide-workbench-shell R1.3: a no-op now that this ViewModel is a DI singleton shared
+    // A no-op now that this ViewModel is a DI singleton shared
     // with the workbench dock's Terminal tab - unlike the old per-page-transient lifetime this
     // subscribe-in-constructor/unsubscribe-here pattern was written for, leaving this page no
     // longer means nobody is watching: the dock tab may still be visible, and even if it isn't,
@@ -149,7 +150,7 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
     [RelayCommand]
     private void ClearOutput() => OutputBuffer.Feed(ClearScreenSequence);
 
-    // specs/terminal-emulation T6/T7: thin passthroughs so TerminalView.axaml.cs can wire
+    // Thin passthroughs so TerminalView.axaml.cs can wire
     // OutputTerminal.InputReceived/.Resized directly, same shape RunPanelViewModel already
     // exposes for ShellView.axaml.cs.
     public void WriteInput(byte[] input) => _ptyProcessManager.WriteInput(input);

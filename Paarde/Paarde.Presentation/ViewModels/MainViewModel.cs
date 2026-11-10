@@ -11,8 +11,8 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Epic 26 (specs/interface-mode R5): the FlowWizard shell's landing page - recent runs and recent
-// projects pulled from the same IRunSessionStore the History page (F7.2) already reads, plus a
+// The FlowWizard shell's landing page - recent runs and recent
+// projects pulled from the same IRunSessionStore the History page already reads, plus a
 // quick-prompt entry point that hands off to the Compose page (PromptViewModel) rather than
 // duplicating its folder-picking/CLI-invocation logic here. Takes PromptViewModel directly
 // (instead of routing through a nav parameter) because PromptViewModel no longer implements

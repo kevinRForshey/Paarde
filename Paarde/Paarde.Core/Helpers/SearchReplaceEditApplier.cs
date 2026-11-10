@@ -3,12 +3,12 @@ using Paarde.Core.Models;
 namespace Paarde.Core.Helpers;
 
 // Applies the F5.2 search/replace edit blocks (ClaudeJsonEdit) against a file's real current content,
-// so the model can send only the changed lines instead of echoing the whole file (T5.2.1). Tries
-// progressively fuzzier line-matching strategies before giving up on an edit (T5.2.2). An edit whose
+// so the model can send only the changed lines instead of echoing the whole file. Tries
+// progressively fuzzier line-matching strategies before giving up on an edit. An edit whose
 // "search" text can't be located under any strategy - including because it matches more than once,
 // which is just as unusable as not matching at all - is reported as failed rather than guessed at;
 // callers (see ClaudeJsonResponseParser) are expected to treat any failed edit as reason to reject the
-// whole response, not silently apply the edits that did succeed (T5.2.3), since there would be no way
+// whole response, not silently apply the edits that did succeed, since there would be no way
 // to tell a step that was skipped because it failed apart from one that never needed to touch the file.
 public static class SearchReplaceEditApplier
 {

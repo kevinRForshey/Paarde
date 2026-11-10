@@ -28,18 +28,18 @@ public partial class PromptViewModel : ObservableRecipient
     private const string ContextPathsSettingsKey = "SavedContextPaths";
     private const int DefaultTimeoutSeconds = 300;
 
-    // T8.2.4: keeps the quick-switch list to a glance-able size, same rationale/value as
+    // Keeps the quick-switch list to a glance-able size, same rationale/value as
     // MainViewModel.MaxRecentProjects (T8.2.1's dashboard list this mirrors).
     private const int MaxRecentWorkingDirectories = 5;
 
-    // T5.3.1: the instructions prepended to every prompt sent to Claude Code used to live here as a
+    // The instructions prepended to every prompt sent to Claude Code used to live here as a
     // hard-coded const; now it's Paarde.Core/Prompts/TutorialInstructionPromptV1.txt,
     // loaded through IPromptTemplateProvider so the schema contract can change (a new versioned
     // .txt file) without touching this ViewModel, and so T5.3.2 can later let a user override it
     // from Settings behind the same interface. The response contract is a single JSON object
     // (Paarde.Core.Models.ClaudeJsonResponse) instead of markdown headers, parsed by
     // Paarde.Core.Helpers.ClaudeJsonResponseParser; the old markdown parser
-    // (ClaudeResponseParser) is kept only as a last-resort fallback (T5.1.3) via
+    // (ClaudeResponseParser) is kept only as a last-resort fallback via
     // StructuredResponseParser.
     private const string RetryInstructionSuffix =
         "\n\nYour previous response could not be parsed: {0}\n\nRespond again with ONLY a single corrected JSON object matching the schema above - no markdown fences, no commentary.";
@@ -79,8 +79,8 @@ public partial class PromptViewModel : ObservableRecipient
     [ObservableProperty]
     private string workingDirectoryPath = string.Empty;
 
-    // T8.2.4: fast project switching without leaving this page - MainViewModel's Recent Projects
-    // (T8.2.1) only helps when landing on the Main page, not while already here. Selecting an
+    // Fast project switching without leaving this page - MainViewModel's Recent Projects
+    // only helps when landing on the Main page, not while already here. Selecting an
     // item just switches WorkingDirectoryPath and resets back to null (see
     // OnSelectedRecentWorkingDirectoryChanged) rather than staying "selected", since the real
     // current value is already shown in the working-directory text box above.
@@ -94,7 +94,7 @@ public partial class PromptViewModel : ObservableRecipient
     [ObservableProperty]
     private int timeoutSeconds = DefaultTimeoutSeconds;
 
-    // T5.3.3: named presets/depth controls that append extra guidance onto the instruction
+    // Named presets/depth controls that append extra guidance onto the instruction
     // preamble (default or user-overridden, T5.3.2) ahead of the user's own prompt text.
     [ObservableProperty]
     private PromptPreset selectedPreset = PromptPreset.General;
@@ -106,7 +106,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     public IReadOnlyList<TutorialDepth> AvailableDepths { get; } = Enum.GetValues<TutorialDepth>();
 
-    // T5.4.1: files/folders the user attaches as extra context. A folder is read non-recursively -
+    // files/folders the user attaches as extra context. A folder is read non-recursively -
     // only the files directly inside it - so attaching one can't silently sweep in .git/bin/obj/
     // node_modules; the user can attach a subfolder explicitly if they want more. Unreadable/binary
     // files are skipped when building the prompt (see BuildContextFilesBlock) rather than failing
@@ -116,7 +116,7 @@ public partial class PromptViewModel : ObservableRecipient
     [ObservableProperty]
     private string? selectedAttachedPath;
 
-    // T14.1.1: the prompt TextBox's `@`-mention popup content, driven by MentionTriggerDetector
+    // The prompt TextBox's `@`-mention popup content, driven by MentionTriggerDetector
     // (code-behind, since it needs Text/CaretIndex) calling UpdateMentionSuggestions below. Empty
     // means the popup is closed - there's no separate "is it open" flag to fall out of sync with
     // this list.
@@ -124,7 +124,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     public bool HasMentionSuggestions => MentionSuggestions.Count > 0;
 
-    // T14.2.3: an opt-in "suggest relevant files" step, populated only when the user clicks
+    // An opt-in "suggest relevant files" step, populated only when the user clicks
     // SuggestRelevantFilesCommand - never auto-injected. Separate from MentionSuggestions, which
     // is the @-trigger popup's own state and has different lifecycle (closes on every keystroke
     // outside a mention) and selection semantics (one pick closes it; here each suggestion can be
@@ -133,7 +133,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     public bool HasSuggestedRelevantFiles => SuggestedRelevantFiles.Count > 0;
 
-    // T14.1.1: built lazily from WorkingDirectoryPath (same FileTreeBuilder walk Explorer uses, so
+    // Built lazily from WorkingDirectoryPath (same FileTreeBuilder walk Explorer uses, so
     // gitignored/`.git` entries never show up as mention candidates) and cached across keystrokes -
     // invalidated only when WorkingDirectoryPath itself changes (see OnWorkingDirectoryPathChanged),
     // not on every suggestion request, since re-walking the tree per keystroke would make typing
@@ -141,7 +141,7 @@ public partial class PromptViewModel : ObservableRecipient
     private FileTreeEntry? _cachedMentionFileTree;
     private string? _cachedMentionFileTreeWorkingDirectory;
 
-    // T6.2.3: live "Xs" readout ticking while a run is in progress, and a post-run cost/token
+    // Live "Xs" readout ticking while a run is in progress, and a post-run cost/token
     // summary once the CLI's final result line has been parsed.
     [ObservableProperty]
     private string elapsedTimeDisplay = string.Empty;
@@ -149,15 +149,15 @@ public partial class PromptViewModel : ObservableRecipient
     [ObservableProperty]
     private string usageSummary = string.Empty;
 
-    // Epic 11 (F11.2.2): one entry per completed read-only tool call during the current run,
+    // One entry per completed read-only tool call during the current run,
     // cleared at the start of each run - same "Expander, visible only once non-empty" pattern
-    // ExplorerViewModel.FileOverview (T10.1.4) uses, not a new control. Empty whenever
+    // ExplorerViewModel.FileOverview uses, not a new control. Empty whenever
     // AgentToolsEnabled is off, since onToolActivity is then simply never invoked.
     public ObservableCollection<string> ToolActivityLog { get; } = new();
 
     public bool HasToolActivity => ToolActivityLog.Count > 0;
 
-    // T7.3.1: lets the next run ask the CLI to resume this one's conversation instead of starting
+    // Lets the next run ask the CLI to resume this one's conversation instead of starting
     // a fresh one, so a follow-up prompt carries the prior turn's context. HasPreviousSession
     // gates the checkbox - there's nothing to continue until a run has actually returned a session
     // id, and a working directory change invalidates it (see OnWorkingDirectoryPathChanged), since
@@ -170,7 +170,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     private string? _lastSessionId;
 
-    // T5.4.2: a live "~N tokens" estimate of the exact prompt BuildFullPromptAsync would send,
+    // A live "~N tokens" estimate of the exact prompt BuildFullPromptAsync would send,
     // recomputed whenever something that feeds into it changes (text, working directory, preset/
     // depth, attachments) - so the user has a size sense before clicking Send, not just after.
     [ObservableProperty]
@@ -181,18 +181,18 @@ public partial class PromptViewModel : ObservableRecipient
     // settings reads in this class) since typing triggers a recompute on every keystroke.
     private int _tokenEstimateVersion;
 
-    // T6.1.1: lives only for the duration of one RunPromptAsync call, so CancelPromptCommand has
+    // Lives only for the duration of one RunPromptAsync call, so CancelPromptCommand has
     // something to cancel and the run's own cleanup has something to dispose - null the rest of
     // the time (including CanCancelPrompt's guard) rather than relying solely on IsRunning, in case
     // a run finishes and clears it in the same moment the user clicks Cancel.
     private CancellationTokenSource? _runCancellationTokenSource;
 
-    // T6.1.2: cancels independently of _runCancellationTokenSource so RunPromptAsync's catch block
+    // Cancels independently of _runCancellationTokenSource so RunPromptAsync's catch block
     // can tell *why* the run stopped - checking which of the two sources actually requested
     // cancellation - rather than guessing from a single shared token.
     private CancellationTokenSource? _timeoutCancellationTokenSource;
 
-    // T6.2.3: ticks ElapsedTimeDisplay once a second while a run is in progress.
+    // Ticks ElapsedTimeDisplay once a second while a run is in progress.
     private IUiTimer? _elapsedTimer;
 
     private Stopwatch? _runStopwatch;
@@ -213,7 +213,7 @@ public partial class PromptViewModel : ObservableRecipient
         _workingDirectoryContext = workingDirectoryContext;
         _logger = logger ?? NullLogger<PromptViewModel>.Instance;
 
-        // T5.4.2: ObservableCollection<T> doesn't go through an [ObservableProperty]'s On*Changed
+        // ObservableCollection<T> doesn't go through an [ObservableProperty]'s On*Changed
         // hook, so attachments need their own recompute trigger here instead.
         AttachedPaths.CollectionChanged += (_, _) => UpdateEstimatedTokenCountDisplay();
         RecentWorkingDirectories.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentWorkingDirectories));
@@ -221,7 +221,7 @@ public partial class PromptViewModel : ObservableRecipient
         MentionSuggestions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMentionSuggestions));
         SuggestedRelevantFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSuggestedRelevantFiles));
 
-        // Epic 25, T3: this used to run on every INavigationAware.OnNavigatedTo (the Prompt page
+        // This used to run on every INavigationAware.OnNavigatedTo (the Prompt page
         // was re-entered on each navigation). Now that Compose is a singleton living inside the
         // always-docked Assistant panel rather than a page, there is no navigation event to hang
         // this off - it only ever needs to happen once, when the app starts.
@@ -258,7 +258,7 @@ public partial class PromptViewModel : ObservableRecipient
             StatusMessage = string.Empty;
             StatusSeverity = NotificationSeverity.Informational;
 
-            // T8.2.4: newest-first (IRunSessionStore.ListSessions' own contract), same
+            // Newest-first (IRunSessionStore.ListSessions' own contract), same
             // Distinct()-keeps-most-recent approach as MainViewModel's Recent Projects.
             RecentWorkingDirectories.Clear();
             foreach (var path in _runSessionStore.ListSessions()
@@ -281,7 +281,7 @@ public partial class PromptViewModel : ObservableRecipient
     }
 
     // T7.2.3 (carried over from the removed INavigationAware.OnNavigatedTo's
-    // PromptLaunchRequest branch): called directly by HistoryViewModel's Fork/Rerun (R8) now that
+    // PromptLaunchRequest branch): called directly by HistoryViewModel's Fork/Rerun now that
     // there's no navigation-parameter path to deliver it through. Re-run additionally sends it
     // immediately, same as if the user had clicked RunPromptCommand themselves, guarded by the
     // same CanRunPrompt the button itself respects.
@@ -365,7 +365,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     private Task SaveAttachedPathsAsync() => _localSettingsService.SaveSettingAsync(ContextPathsSettingsKey, AttachedPaths.ToList());
 
-    // T14.1.1: called by the view's code-behind on every keystroke once MentionTriggerDetector
+    // Called by the view's code-behind on every keystroke once MentionTriggerDetector
     // says the caret is inside an `@mention` - a null/blank WorkingDirectoryPath (nothing to
     // search) or a missing directory (stale/typo'd path) just closes the popup rather than
     // throwing, since there's no set of candidate files to show either way.
@@ -394,7 +394,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     public void CloseMentionPopup() => MentionSuggestions.Clear();
 
-    // T14.2.1/T14.2.3: the opt-in "suggest relevant files" step - ranks the working directory's
+    // The opt-in "suggest relevant files" step - ranks the working directory's
     // files against the current PromptText via ICodebaseIndexService (TF-IDF, not embeddings; see
     // TfIdfCodebaseIndexService) and lists them for the user to accept individually. Files already
     // attached are filtered out since suggesting them again would be noise, not news.
@@ -420,7 +420,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     private bool CanSuggestRelevantFiles() => !string.IsNullOrWhiteSpace(WorkingDirectoryPath) && !string.IsNullOrWhiteSpace(PromptText);
 
-    // T14.2.3: accepting one suggestion attaches it (same mechanism AttachMentionedFile already
+    // Accepting one suggestion attaches it (same mechanism AttachMentionedFile already
     // uses) and removes just that entry - the rest of the list stays up so the user can accept
     // more than one without re-running the suggestion step.
     public void AttachSuggestedFile(string relativePath)
@@ -434,7 +434,7 @@ public partial class PromptViewModel : ObservableRecipient
     [RelayCommand]
     private void DismissSuggestedRelevantFiles() => SuggestedRelevantFiles.Clear();
 
-    // T14.1.2: a faster entry point into the same attachment mechanism AddContextFilesAsync already
+    // A faster entry point into the same attachment mechanism AddContextFilesAsync already
     // uses (dedup + persist), not a new one - the relative path (what the mention popup shows and
     // what gets inserted into the prompt text) is resolved against WorkingDirectoryPath to get the
     // absolute path AttachedPaths actually stores.
@@ -451,7 +451,7 @@ public partial class PromptViewModel : ObservableRecipient
     {
         if (!await _llmRunner.IsAvailableAsync())
         {
-            // T6.3.2: ILlmRunner now has two implementations behind LlmRunnerSelector, so this can no
+            // ILlmRunner now has two implementations behind LlmRunnerSelector, so this can no
             // longer assume it's specifically the CLI that's missing - could just as easily be a
             // blank Anthropic API key.
             StatusMessage = "Prompt_LlmRunnerNotAvailable".Resolve();
@@ -484,7 +484,7 @@ public partial class PromptViewModel : ObservableRecipient
         {
             var fullPrompt = await BuildFullPromptAsync();
 
-            // T6.2.1: fires on a background thread as the CLI streams assistant text, so UI state is
+            // Fires on a background thread as the CLI streams assistant text, so UI state is
             // only ever touched after marshaling onto the UI thread. This used to re-parse the whole
             // growing CliOutput with the legacy markdown parser and push the result into
             // IPromptResultStore on every single token delta (T6.2.2's live file-reveal) - with
@@ -499,11 +499,11 @@ public partial class PromptViewModel : ObservableRecipient
                 StreamProgressDisplay = string.Format("Prompt_StreamProgress".Resolve(), CliOutput.Length);
             });
 
-            // Epic 11 (F11.2.2): fires once per completed read-only tool call, on the same
+            // Fires once per completed read-only tool call, on the same
             // background thread as OnTextDelta above - same UI-thread marshaling requirement.
             void OnToolActivity(string description) => _uiDispatcher.Post(() => ToolActivityLog.Add(description));
 
-            // T7.3.1: both this attempt and its retry below are the same logical turn, so they
+            // Both this attempt and its retry below are the same logical turn, so they
             // resume from the same prior session (if any) rather than the retry starting its own.
             var resumeSessionId = ContinuePreviousConversation ? _lastSessionId : null;
 
@@ -514,8 +514,8 @@ public partial class PromptViewModel : ObservableRecipient
             {
                 parseResult = StructuredResponseParser.Parse(result.Output, WorkingDirectoryPath);
 
-                // T5.1.2: one retry, feeding the schema validation error back to the model, before
-                // settling for the markdown fallback (T5.1.3). A failed retry call (cancelled, CLI
+                // One retry, feeding the schema validation error back to the model, before
+                // settling for the markdown fallback. A failed retry call (cancelled, CLI
                 // error) keeps the original attempt's already-fallback-parsed result rather than
                 // discarding it for an error state.
                 if (parseResult.UsedFallback && parseResult.ValidationError is not null)
@@ -531,7 +531,7 @@ public partial class PromptViewModel : ObservableRecipient
                 }
             }
 
-            // T7.3.1: captured regardless of ContinuePreviousConversation, so checking the box
+            // Captured regardless of ContinuePreviousConversation, so checking the box
             // right after this run (to continue it) has a session id ready to resume from.
             _lastSessionId = result.SessionId ?? _lastSessionId;
             HasPreviousSession = _lastSessionId is not null;
@@ -570,7 +570,7 @@ public partial class PromptViewModel : ObservableRecipient
                 StatusSeverity = NotificationSeverity.Error;
             }
 
-            // T7.1.1: persist this run (the prompt actually sent, its raw output, the parsed
+            // Persist this run (the prompt actually sent, its raw output, the parsed
             // files/selections currently in IPromptResultStore, and the apply log so far) now that
             // it has reached a terminal success/failure state - not for a cancelled run or one that
             // threw before producing a CLI result (caught below), since there's nothing meaningful
@@ -585,7 +585,7 @@ public partial class PromptViewModel : ObservableRecipient
         catch (OperationCanceledException)
         {
             // Both sources funnel into the same linked token, so the only way to tell a timeout
-            // apart from a user-initiated cancel (T6.1.2) is which underlying source actually
+            // apart from a user-initiated cancel is which underlying source actually
             // requested it.
             StatusMessage = _timeoutCancellationTokenSource.IsCancellationRequested
                 ? string.Format("Prompt_RunTimedOut".Resolve(), TimeoutSeconds)
@@ -594,7 +594,7 @@ public partial class PromptViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            // Deliberately broad, not narrowed to specific exception types (T9.2.2): this wraps an
+            // Deliberately broad, not narrowed to specific exception types: this wraps an
             // entire external CLI invocation plus JSON parsing of whatever it returned, and neither
             // of those has an enumerable closed set of exception types worth special-casing - a
             // user-facing status message and a log entry matter more here than which exception type
@@ -620,7 +620,7 @@ public partial class PromptViewModel : ObservableRecipient
     [RelayCommand(CanExecute = nameof(CanCancelPrompt))]
     private void CancelPrompt() => _runCancellationTokenSource?.Cancel();
 
-    // T5.1.2's retry is a second full LLM call, so cost/token/duration reporting (T6.2.3) has to add
+    // T5.1.2's retry is a second full LLM call, so cost/token/duration reporting has to add
     // both calls together rather than silently reporting only the retry's - otherwise a schema-failure
     // retry would under-report what the run actually spent.
     private static LlmRunResult CombineUsage(LlmRunResult original, LlmRunResult retry) => new()
@@ -636,12 +636,12 @@ public partial class PromptViewModel : ObservableRecipient
         SessionId = retry.SessionId ?? original.SessionId,
     };
 
-    // T5.4.2: the exact string that would be sent to the LLM - shared by RunPromptAsync and the
+    // The exact string that would be sent to the LLM - shared by RunPromptAsync and the
     // live token estimate (UpdateEstimatedTokenCount) so the estimate can't drift from what a run
     // actually sends.
     private async Task<string> BuildFullPromptAsync()
     {
-        // T5.3.2: read fresh on every call (not cached on OnNavigatedTo) so a change made on the
+        // Read fresh on every call (not cached on OnNavigatedTo) so a change made on the
         // Settings page takes effect immediately - same rationale as ClaudeCliOptionsProvider
         // reading its settings fresh on every call.
         var instructionTemplateOverride = await _localSettingsService.ReadSettingAsync<string>(PromptTemplateSettingsKeys.Override);
@@ -649,7 +649,7 @@ public partial class PromptViewModel : ObservableRecipient
             ? _promptTemplateProvider.GetTutorialInstructionPrompt()
             : instructionTemplateOverride;
 
-        // T5.3.3: preset/depth guidance is additive to whatever the effective preamble is (default
+        // preset/depth guidance is additive to whatever the effective preamble is (default
         // or user-overridden) - it's extra instruction text, not schema, so it applies the same way
         // regardless of where the preamble came from.
         var presetInstruction = _promptTemplateProvider.GetPresetInstruction(SelectedPreset);
@@ -658,7 +658,7 @@ public partial class PromptViewModel : ObservableRecipient
             string.IsNullOrEmpty(presetInstruction) ? string.Empty : "\n\n" + presetInstruction,
             string.IsNullOrEmpty(depthInstruction) ? string.Empty : "\n\n" + depthInstruction);
 
-        // T5.4.1: user-attached files/folders, embedded ahead of the user's own prompt text so the
+        // User-attached files/folders, embedded ahead of the user's own prompt text so the
         // model has their content before reading what to do with it.
         var contextFilesBlock = BuildContextFilesBlock(AttachedPaths);
 
@@ -672,7 +672,7 @@ public partial class PromptViewModel : ObservableRecipient
         return fullPrompt;
     }
 
-    // T5.4.1: a folder attachment is expanded to the files directly inside it (non-recursive, see
+    // A folder attachment is expanded to the files directly inside it (non-recursive, see
     // AttachedPaths' own comment); a file attachment is used as-is. A file that can't be read as
     // text (binary, permissions, deleted since being attached) is skipped rather than failing the
     // whole run - folder attachment in particular can easily pick up a non-text file alongside the
@@ -731,7 +731,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     partial void OnWorkingDirectoryPathChanged(string value)
     {
-        // T7.3.1: a resumed CLI session is scoped to the directory it ran in, so switching
+        // A resumed CLI session is scoped to the directory it ran in, so switching
         // directories invalidates whatever conversation was in progress.
         _lastSessionId = null;
         HasPreviousSession = false;
@@ -741,7 +741,7 @@ public partial class PromptViewModel : ObservableRecipient
         SuggestRelevantFilesCommand.NotifyCanExecuteChanged();
         UpdateEstimatedTokenCountDisplay();
 
-        // Epic 20 (specs/build-and-run): tells RunPanelViewModel's toolbar/output strip - a DI
+        // Tells RunPanelViewModel's toolbar/output strip - a DI
         // singleton with no page-navigation lifecycle of its own - which working directory to
         // detect Run configurations for. Fires on every change, including the initial load from
         // settings in OnNavigatedTo below, which is also how the toolbar learns the saved working
@@ -763,7 +763,7 @@ public partial class PromptViewModel : ObservableRecipient
 
     partial void OnSelectedAttachedPathChanged(string? value) => RemoveAttachedPathCommand.NotifyCanExecuteChanged();
 
-    // T8.2.4: picking a recent working directory switches to it immediately and persists it the
+    // Picking a recent working directory switches to it immediately and persists it the
     // same way BrowseWorkingDirectoryAsync does, then clears the selection back to null so the
     // dropdown returns to its placeholder rather than appearing permanently "stuck" on one entry.
     partial void OnSelectedRecentWorkingDirectoryChanged(string? value)

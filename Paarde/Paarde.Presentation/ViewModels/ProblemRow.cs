@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Presentation.ViewModels;
 
-// specs/ide-workbench-shell R1.4: a pure presentation flattening of IDiagnosticsAggregator's
+// A pure presentation flattening of IDiagnosticsAggregator's
 // per-file diagnostics into rows the Problems tab's ListBox binds to - built in
 // ShellView.axaml.cs's code-behind, not a new ViewModel-level collection type (design.md).
 public record ProblemRow(string FilePath, LspPosition Position, LspDiagnosticSeverity Severity, string Message)

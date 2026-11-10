@@ -989,7 +989,7 @@ public class PromptViewModelTests
     [Fact]
     public async Task RunPromptAsync_PriorToolActivityLogEntries_ClearsThemAtTheStartOfTheRun()
     {
-        // Epic 11 (F11.2.2): onToolActivity dispatches through Dispatcher.UIThread.Post, same as
+        // onToolActivity dispatches through Dispatcher.UIThread.Post, same as
         // OnTextDelta above - not exercised here since nothing pumps the dispatcher in this plain
         // xunit host (see RunPromptAsync_StreamedTextDeltas_DoNotReparseOrStoreUntilTheRunFinishes'
         // own comment), so this only verifies the synchronous Clear() at the start of a run, not a

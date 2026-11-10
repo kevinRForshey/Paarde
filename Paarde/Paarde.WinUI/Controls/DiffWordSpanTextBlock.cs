@@ -11,7 +11,7 @@ using Windows.UI;
 
 namespace Paarde.WinUI.Controls;
 
-// Port of Paarde.Avalonia's DiffWordSpanTextBlock (T8.3.3/T8.3.4): one diff line's text, combining
+// Port of Paarde.Avalonia's DiffWordSpanTextBlock: one diff line's text, combining
 // DiffBuilder's word-level diff (changed tokens get a background) with SyntaxTokenizer's TextMate
 // tokens (syntax-colored foreground). WinUI's TextBlock is sealed and its Run has no Background, so
 // this wraps a TextBlock and draws the changed-word backgrounds with TextHighlighters.

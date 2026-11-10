@@ -1,6 +1,6 @@
 namespace Paarde.Core.Models;
 
-// specs/editor-intelligence R1: mirrors LSP's hierarchical DocumentSymbol shape. GetDocumentSymbolsAsync
+// Mirrors LSP's hierarchical DocumentSymbol shape. GetDocumentSymbolsAsync
 // returns a single synthetic root (Name = the file name, Children = the server's actual top-level
 // symbols) rather than IReadOnlyList<LspDocumentSymbol>, so the outline TreeView and the breadcrumb
 // computation (BreadcrumbPathBuilder) both walk one shape instead of special-casing "no parent at

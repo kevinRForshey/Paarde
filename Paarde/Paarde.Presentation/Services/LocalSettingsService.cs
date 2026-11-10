@@ -17,6 +17,10 @@ public class LocalSettingsService : ILocalSettingsService
     private readonly string _applicationDataFolder;
     private readonly string _localsettingsFile;
 
+    // Serializes loading, changing and writing the file; two saves at once (e.g. switching the
+    // working directory) would otherwise write it concurrently and one fails with an IOException.
+    private readonly SemaphoreSlim _lock = new(1, 1);
+
     private IDictionary<string, object> _settings;
 
     private bool _isInitialized;
@@ -44,22 +48,38 @@ public class LocalSettingsService : ILocalSettingsService
 
     public async Task<T?> ReadSettingAsync<T>(string key)
     {
-        await InitializeAsync();
+        object? obj;
 
-        if (_settings != null && _settings.TryGetValue(key, out var obj))
+        await _lock.WaitAsync();
+        try
         {
-            return await Json.ToObjectAsync<T>((string)obj);
+            await InitializeAsync();
+            _settings.TryGetValue(key, out obj);
+        }
+        finally
+        {
+            _lock.Release();
         }
 
-        return default;
+        return obj == null ? default : await Json.ToObjectAsync<T>((string)obj);
     }
 
     public async Task SaveSettingAsync<T>(string key, T value)
     {
-        await InitializeAsync();
+        var json = await Json.StringifyAsync(value);
 
-        _settings[key] = await Json.StringifyAsync(value);
+        await _lock.WaitAsync();
+        try
+        {
+            await InitializeAsync();
 
-        await Task.Run(() => _fileService.Save(_applicationDataFolder, _localsettingsFile, _settings));
+            _settings[key] = json;
+
+            await Task.Run(() => _fileService.Save(_applicationDataFolder, _localsettingsFile, _settings));
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 }

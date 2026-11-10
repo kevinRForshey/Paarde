@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Contracts.Services;
 
-// Epic 20 (specs/build-and-run R2): the Run-configuration analogue of IProjectTypeDetector - that
+// The Run-configuration analogue of IProjectTypeDetector - that
 // contract answers "which languages does this working directory contain, and where"; this one
 // answers the narrower "which specific project/script in there is something you'd press Run on."
 // Language-specific detection knowledge lives entirely inside the implementation as data (file

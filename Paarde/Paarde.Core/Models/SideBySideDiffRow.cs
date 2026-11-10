@@ -4,7 +4,7 @@ namespace Paarde.Core.Models;
 // each other. Either side can be null/empty padding (no DiffLine on that side) - an unpaired
 // removal has nothing on the proposed side and vice versa for an unpaired addition - rather than
 // leaving a null DiffLineKind? to mean "Unchanged", which would collide with a real Unchanged line.
-// OriginalWordSpans/ProposedWordSpans (T8.3.3) are the word-level diff of this row's own
+// OriginalWordSpans/ProposedWordSpans are the word-level diff of this row's own
 // OriginalText/ProposedText, set only when both sides are a genuine paired Removed/Added line (not
 // padding and not an Unchanged line, which has nothing to highlight within itself) - null otherwise,
 // meaning "highlight the whole line the usual way, nothing more precise is available".

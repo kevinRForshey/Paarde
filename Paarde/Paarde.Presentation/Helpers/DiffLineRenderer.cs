@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Presentation.Helpers;
 
-// T8.3.3/T8.3.4: merges two independent tokenizations of the same line - DiffBuilder's word-level
+// Merges two independent tokenizations of the same line - DiffBuilder's word-level
 // diff (which words changed against this line's Removed/Added partner, as a background highlight)
 // and SyntaxTokenizer's TextMate tokens (what color each token's syntax gets, as a foreground) -
 // into one ordered list of runs, each with a single unambiguous Kind/Color pair, since neither

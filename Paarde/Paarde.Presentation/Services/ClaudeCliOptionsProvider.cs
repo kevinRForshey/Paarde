@@ -3,11 +3,11 @@ using Paarde.Core.Models;
 
 namespace Paarde.Presentation.Services;
 
-// Reads the Settings page's CLI path/arguments (T6.1.4) fresh on every call rather than caching, so
+// Reads the Settings page's CLI path/arguments fresh on every call rather than caching, so
 // a change made there takes effect on the very next run without needing to revisit the Prompt page.
 // This is the seam between Avalonia's settings storage and ClaudeCliRunner (Core, which has no
 // reference to ILocalSettingsService) - registered as the Func<Task<ClaudeCliOptions>> that
-// ClaudeCliRunner's constructor takes (T6.3.1).
+// ClaudeCliRunner's constructor takes.
 public class ClaudeCliOptionsProvider
 {
     private readonly ILocalSettingsService _localSettingsService;

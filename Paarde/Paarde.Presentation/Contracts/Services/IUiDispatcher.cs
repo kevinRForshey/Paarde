@@ -1,6 +1,6 @@
 namespace Paarde.Presentation.Contracts.Services;
 
-// specs/presentation-extraction R2.2: view models marshal background-thread callbacks (LLM
+// View models marshal background-thread callbacks (LLM
 // streaming deltas, PTY output, working-directory change notifications) back onto the UI thread
 // through this instead of a framework-specific dispatcher - Avalonia's Dispatcher.UIThread today,
 // WinUI 3's DispatcherQueue later. Tests supply a synchronous fake.

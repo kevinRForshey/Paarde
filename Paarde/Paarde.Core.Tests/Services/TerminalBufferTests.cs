@@ -36,6 +36,17 @@ public class TerminalBufferTests : IDisposable
     }
 
     [Fact]
+    public void Feed_CursorPositionQuery_RaisesResponseReadyWithReport()
+    {
+        var responses = new List<string>();
+        _buffer.ResponseReady += bytes => responses.Add(Encoding.UTF8.GetString(bytes));
+
+        _buffer.Feed(Encoding.UTF8.GetBytes("\x1b[3;4H\x1b[6n"));
+
+        Assert.Equal(["\x1b[3;4R"], responses);
+    }
+
+    [Fact]
     public void Feed_BasicAnsiColorSequence_ResolvesForegroundToPaletteColor()
     {
         // SGR 31 = basic red. Verified against the real library (XTerm.NET 3.0.0's default

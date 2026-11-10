@@ -5,7 +5,7 @@ using TextMateSharp.Registry;
 
 namespace Paarde.Presentation.Helpers;
 
-// T8.3.4: tokenizes a single line of source into syntax-highlighted runs using the same
+// Tokenizes a single line of source into syntax-highlighted runs using the same
 // TextMateSharp grammars/theme CodeEditor uses for the full-file editor view, so a line shown in
 // the Diffs page gets the same colors it would in the editor - just driven one line at a time
 // (there's no single AvaloniaEdit document backing a diff row) rather than through

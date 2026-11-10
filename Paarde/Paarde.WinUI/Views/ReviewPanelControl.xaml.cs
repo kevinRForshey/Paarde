@@ -9,7 +9,7 @@ namespace Paarde.WinUI.Views;
 
 public sealed partial class ReviewPanelControl : UserControl
 {
-    // Epic 25, T11: this control's DataContext is supplied externally (ReviewView, or the Assistant
+    // This control's DataContext is supplied externally (ReviewView, or the Assistant
     // panel's Review tab), so ViewModel just mirrors it for x:Bind rather than resolving from DI.
     public TutorialViewModel? ViewModel { get; private set; }
 

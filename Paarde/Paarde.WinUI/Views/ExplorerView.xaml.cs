@@ -24,20 +24,20 @@ public sealed partial class ExplorerView : Page
 
     private readonly ResizablePaneHelper _paneHelper;
 
-    // Epic 26 (specs/interface-mode R7): the first-run default depends on the interface mode, an
+    // The first-run default depends on the interface mode, an
     // async read, so this is created on Loaded; null until then.
     private ResizablePaneHelper? _assistantPanelHelper;
 
-    // specs/editor-focus-layout R2: the split group's column, opened and shut by
+    // The split group's column, opened and shut by
     // HasSecondaryGroupTabs.
     private readonly ResizablePaneHelper _splitGroupHelper;
 
-    // specs/editor-focus-layout R1: zen mode only reopens the panes it closed itself.
+    // Zen mode only reopens the panes it closed itself.
     private bool _isZenModeActive;
     private bool _wasTreeCollapsedBeforeZenMode;
     private bool _wasAssistantPanelCollapsedBeforeZenMode;
 
-    // specs/editor-focus-layout R1: Ctrl+K then Z, outside the editor (the editor page recognises
+    // Ctrl+K then Z, outside the editor (the editor page recognises
     // the chord itself and forwards it whole).
     private readonly DispatcherQueueTimer _chordTimeoutTimer;
     private bool _isCtrlKArmed;
@@ -330,7 +330,7 @@ public sealed partial class ExplorerView : Page
         _chordTimeoutTimer.Stop();
     }
 
-    // specs/editor-focus-layout R1/R5: Ctrl+K then Z toggles zen mode; Ctrl+Tab (held, repeated)
+    // Ctrl+K then Z toggles zen mode; Ctrl+Tab (held, repeated)
     // opens/advances the MRU switcher and releasing Ctrl commits it.
     private void OnViewPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {

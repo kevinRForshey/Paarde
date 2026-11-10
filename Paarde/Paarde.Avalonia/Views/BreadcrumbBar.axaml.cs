@@ -8,8 +8,8 @@ using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Views;
 
-// specs/editor-intelligence R5: thin breadcrumb strip sitting above CodeEditor inside
-// ExplorerFileTabControl.axaml, bound to the same DocumentSymbols the outline panel (T4) uses plus
+// Thin breadcrumb strip sitting above CodeEditor inside
+// ExplorerFileTabControl.axaml, bound to the same DocumentSymbols the outline panel uses plus
 // CodeEditor's own CaretPosition - BreadcrumbPathBuilder.Build (a pure function, independently
 // tested) does the actual enclosing-chain computation.
 public partial class BreadcrumbBar : UserControl
@@ -23,7 +23,7 @@ public partial class BreadcrumbBar : UserControl
     public static readonly StyledProperty<IReadOnlyList<LspDocumentSymbol>> SegmentsProperty =
         AvaloniaProperty.Register<BreadcrumbBar, IReadOnlyList<LspDocumentSymbol>>(nameof(Segments), defaultValue: []);
 
-    // specs/editor-intelligence R4/R5: same deviation as the outline panel (T4) - this control
+    // Same deviation as the outline panel - this control
     // isn't a child of CodeEditor and can't raise an event CodeEditor itself declares, so it raises
     // its own event instead, forwarded by ExplorerFileTabControl.axaml.cs through the same
     // NavigateToLocation/ApplyPendingCaretTarget path.

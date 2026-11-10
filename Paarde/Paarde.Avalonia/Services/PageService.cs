@@ -20,7 +20,7 @@ public class PageService : IPageService
         Configure<TerminalViewModel, TerminalView>();
         Configure<SettingsViewModel, SettingsView>();
 
-        // Epic 26 (specs/interface-mode R5/R6): FlowWizard mode's Home/Review pages.
+        // FlowWizard mode's Home/Review pages.
         Configure<MainViewModel, MainView>();
         Configure<TutorialViewModel, ReviewView>();
     }

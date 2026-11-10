@@ -12,9 +12,9 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Paarde.Presentation.ViewModels;
 
-// History page (F7.2): lists every persisted RunSession (T7.2.1), lets the user reopen one
-// read-only via the same DiffsDetailControl the Diffs page uses (T7.2.2), and re-run or fork its
-// prompt back onto the Prompt page (T7.2.3). Sessions/their Files are read fresh from
+// History page: lists every persisted RunSession, lets the user reopen one
+// read-only via the same DiffsDetailControl the Diffs page uses, and re-run or fork its
+// prompt back onto the Prompt page. Sessions/their Files are read fresh from
 // IRunSessionStore on every navigation rather than cached, since a new run may have happened since
 // this page was last visited.
 public partial class HistoryViewModel : ObservableRecipient, INavigationAware

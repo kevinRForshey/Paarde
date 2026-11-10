@@ -1,6 +1,7 @@
 using System.Diagnostics;
 
 using Paarde.Core.Services;
+using Paarde.Core.Tests.TestSupport;
 
 namespace Paarde.Core.Tests.Services;
 
@@ -15,13 +16,7 @@ public class GitStatusServiceTests : IDisposable
         _workingDirectory = Directory.CreateTempSubdirectory("PaardeTests_").FullName;
     }
 
-    public void Dispose()
-    {
-        if (Directory.Exists(_workingDirectory))
-        {
-            Directory.Delete(_workingDirectory, recursive: true);
-        }
-    }
+    public void Dispose() => TempDirectory.Delete(_workingDirectory);
 
     [Fact]
     public void GetStatus_NotAGitRepository_ReturnsNotARepository()

@@ -21,9 +21,8 @@ namespace Paarde.WinUI.Controls;
 
 // Port of Paarde.Avalonia's TerminalControl (specs/terminal-emulation T3-T5): a character grid for a
 // TerminalBuffer. Avalonia draws every cell in Render(DrawingContext); WinUI has no immediate-mode
-// drawing without Win2D, whose NuGet package is under Microsoft's Win2D license rather than MIT
-// (specs/winui-frontend R2.4), so this lays the grid out with plain XAML elements on a Canvas
-// instead:
+// drawing without Win2D, whose NuGet package is under Microsoft's Win2D license rather than MIT,
+// so this lays the grid out with plain XAML elements on a Canvas instead:
 // - one Rectangle per run of same-background cells,
 // - one TextBlock per run of same-style text, placed at its exact column, so a monospace font can't
 //   drift out of the grid by more than the run itself (wide characters always get a run of their
@@ -121,7 +120,7 @@ public sealed partial class TerminalControl : UserControl
     }
 
     // Raw bytes the control wants written to the PTY, already encoded as a real terminal would
-    // send them (R4.1).
+    // send them.
     public event Action<byte[]>? InputReceived;
 
     // Raised after a resize recomputes the grid so a consumer can call IPtyProcessManager.Resize.

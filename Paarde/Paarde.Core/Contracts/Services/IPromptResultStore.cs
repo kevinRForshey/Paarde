@@ -16,9 +16,9 @@ public interface IPromptResultStore : INotifyPropertyChanged
 
     string WorkingDirectoryPath { get; }
 
-    // T7.3.2: the session id of the run that produced the current result, if any - lets an inline
+    // The session id of the run that produced the current result, if any - lets an inline
     // follow-up action (Tutorial page's "explain further"/"refine this file") resume that same CLI
-    // conversation (T7.3.1) instead of starting a fresh one. Null until a run has completed with a
+    // conversation instead of starting a fresh one. Null until a run has completed with a
     // session id.
     string? SessionId { get; }
 

@@ -16,13 +16,13 @@ public sealed partial class ReviewFileDetailControl : UserControl
     private readonly IFileChangeApplyService _fileChangeApplyService;
     private readonly ILlmRunner _llmRunner;
 
-    // Epic 25: the hosting ReviewPanelControl's TutorialViewModel, found once this control is in the
+    // The hosting ReviewPanelControl's TutorialViewModel, found once this control is in the
     // visual tree (DataContext is usually assigned before that, so the first RebuildSteps from
     // DataContextChanged can't see it yet) and reused when the template recycles this instance for
     // a different file.
     private TutorialViewModel? _owner;
 
-    // T8.4.3: which step Previous/Next and the progress indicator point at - reset to the first step
+    // Which step Previous/Next and the progress indicator point at - reset to the first step
     // whenever Steps is rebuilt (new file selected).
     private int _currentStepIndex;
 
@@ -91,7 +91,7 @@ public sealed partial class ReviewFileDetailControl : UserControl
         RefreshStepNavigation();
     }
 
-    // T8.4.5: scrolls to the step a TutorialJumpRequest targeted, if any - found by reference within
+    // Scrolls to the step a TutorialJumpRequest targeted, if any - found by reference within
     // the just-rebuilt Steps rather than trusting an index.
     private void ApplyPendingStepTarget()
     {
@@ -126,7 +126,7 @@ public sealed partial class ReviewFileDetailControl : UserControl
         StepsList.ScrollIntoView(Steps[index], ScrollIntoViewAlignment.Leading);
     }
 
-    // T8.4.3: no step-navigation UI at all for a file with no resolved steps; otherwise keeps the
+    // No step-navigation UI at all for a file with no resolved steps; otherwise keeps the
     // buttons' enabled state, the "Step X of Y" label and the progress bar in sync.
     private void RefreshStepNavigation()
     {

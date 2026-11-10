@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Epic 23, T23.1.1: one instance per open Explorer tab, carrying everything that used to be a
+// One instance per open Explorer tab, carrying everything that used to be a
 // single slot (SelectedFilePath/SelectedFileContent/FileOverview/Diagnostics/etc.) on
 // ExplorerViewModel itself. Owns Save/Revert/Explain/ghost-text/completion directly (same
 // self-contained shape ProposedFileChangeViewModel already uses for a single file) since none of
@@ -73,7 +73,7 @@ public partial class OpenFileTabViewModel : ObservableObject
     [ObservableProperty]
     private ProposedFileChangeViewModel? pendingChange;
 
-    // specs/editor-focus-layout R3: ExplorerViewModel is the one that owns PrimaryGroupTabs/
+    // ExplorerViewModel is the one that owns PrimaryGroupTabs/
     // SecondaryGroupTabs and actually repositions this tab within whichever group it's in -
     // this just raises the event, same "tab raises, ExplorerViewModel reacts" split
     // ScrollToHunkRequested below already establishes.
@@ -93,7 +93,7 @@ public partial class OpenFileTabViewModel : ObservableObject
     [RelayCommand]
     private void TogglePin() => IsPinned = !IsPinned;
 
-    // specs/editor-focus-layout R2: 0 = primary group, 1 = secondary (split) group - at most 2
+    // 0 = primary group, 1 = secondary (split) group - at most 2
     // groups per the epic's non-goals, so this doesn't need to be an enum.
     [ObservableProperty]
     private int tabGroup;
@@ -115,7 +115,7 @@ public partial class OpenFileTabViewModel : ObservableObject
 
     public void RequestScrollTo(DiffHunk hunk) => ScrollToHunkRequested?.Invoke(hunk);
 
-    // Epic 25, T1: the view binds this instead of Content so a tab carrying a pending LLM proposal
+    // The view binds this instead of Content so a tab carrying a pending LLM proposal
     // edits the shared ProposedFileChangeViewModel (keeping Review's apply/refine flow and
     // Explorer's own tab in sync) while a plain, non-proposal tab keeps editing Content directly.
     public string EffectiveContent
@@ -198,7 +198,7 @@ public partial class OpenFileTabViewModel : ObservableObject
     {
         var relativePath = Path.GetRelativePath(_workingDirectoryPath, FilePath).Replace(Path.DirectorySeparatorChar, '/');
 
-        // T10.2.3: refuses outright rather than offering an "apply anyway" override, same scope
+        // Refuses outright rather than offering an "apply anyway" override, same scope
         // decision as before - this is a single ad-hoc edit, not the batch apply flow.
         if (ProtectedPathChecker.IsProtected(_workingDirectoryPath, relativePath))
         {
@@ -207,7 +207,7 @@ public partial class OpenFileTabViewModel : ObservableObject
             return;
         }
 
-        // T10.2.4: refuses rather than silently clobbering if the file changed on disk since it
+        // Refuses rather than silently clobbering if the file changed on disk since it
         // was opened here.
         var currentDiskContent = FileContentReader.ReadOrEmpty(FilePath);
 
@@ -318,7 +318,7 @@ public partial class OpenFileTabViewModel : ObservableObject
         }
     }
 
-    // specs/editor-intelligence R3: raised by CodeEditor.DocumentSymbolsRequested on file open and
+    // Raised by CodeEditor.DocumentSymbolsRequested on file open and
     // after every settled edit (its own 400ms debounce) - same round-trip shape RequestCompletionAsync
     // above already uses.
     public async Task RequestDocumentSymbolsAsync()
@@ -333,7 +333,7 @@ public partial class OpenFileTabViewModel : ObservableObject
         }
     }
 
-    // specs/editor-intelligence R6: raised by CodeEditor.HoverRequested once its own pointer-hover
+    // Raised by CodeEditor.HoverRequested once its own pointer-hover
     // debounce settles - same round-trip shape RequestCompletionAsync above already uses.
     public async Task RequestHoverAsync(LspPosition position)
     {

@@ -7,7 +7,7 @@ public class FakeLlmRunner : ILlmRunner
 {
     public LlmRunResult ResultToReturn { get; set; } = new() { Success = true, Output = string.Empty };
 
-    // T5.1.2: when set, each successive call to RunPromptAsync dequeues the next result instead of
+    // When set, each successive call to RunPromptAsync dequeues the next result instead of
     // always returning ResultToReturn - lets retry tests give the first (schema-invalid) and second
     // (corrected) call different outputs. Falls back to ResultToReturn once exhausted.
     public Queue<LlmRunResult>? ResultsToReturnInOrder { get; set; }
@@ -35,10 +35,10 @@ public class FakeLlmRunner : ILlmRunner
 
     public bool AvailableToReturn { get; set; } = true;
 
-    // T6.2.1: text chunks RunPromptAsync should hand to onTextDelta, in order, before returning.
+    // Text chunks RunPromptAsync should hand to onTextDelta, in order, before returning.
     public IReadOnlyList<string> TextDeltasToEmit { get; set; } = Array.Empty<string>();
 
-    // Epic 11 (F11.3.3): descriptions RunPromptAsync should hand to onToolActivity, in order,
+    // Descriptions RunPromptAsync should hand to onToolActivity, in order,
     // before returning - same shape as TextDeltasToEmit above.
     public IReadOnlyList<string> ToolActivitiesToEmit { get; set; } = Array.Empty<string>();
 

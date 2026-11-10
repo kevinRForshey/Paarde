@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Presentation.ViewModels;
 
-// specs/ide-workbench-shell, R3: a DI singleton (constructed as a ShellViewModel property, same
+// A DI singleton (constructed as a ShellViewModel property, same
 // pattern as RunPanelViewModel) so it backs ShellView's status bar across every page navigation
 // rather than being created and torn down with one page.
 public partial class StatusBarViewModel : ObservableObject
@@ -34,7 +34,7 @@ public partial class StatusBarViewModel : ObservableObject
     [ObservableProperty]
     private string languageServerStatus = "LSP: none";
 
-    // R3.5: null hides this slot entirely - there's no "Ln 0, Col 0" placeholder when no
+    // Null hides this slot entirely - there's no "Ln 0, Col 0" placeholder when no
     // CodeEditor has focus.
     [ObservableProperty]
     private string? caretPositionText;
@@ -131,7 +131,7 @@ public partial class StatusBarViewModel : ObservableObject
         RunConfigurationName = runPanelViewModel.SelectedConfiguration?.Name ?? "(none)";
     }
 
-    // R3.4: re-read whenever a server publishes anything (evidence of its running state changing),
+    // Re-read whenever a server publishes anything (evidence of its running state changing),
     // and whenever RunningLanguageIds' underlying set actually changes (StartAllAsync/StopAllAsync
     // completing) - the two together cover every state transition without this class needing to
     // know those two methods are the only things that change it.

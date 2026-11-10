@@ -2,10 +2,10 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Contracts.Services;
 
-// Provider-agnostic LSP client (T17.1.1) - mirrors ILlmRunner's shape (an IsAvailableAsync
+// Provider-agnostic LSP client - mirrors ILlmRunner's shape (an IsAvailableAsync
 // preflight, a single implementation today) but one implementation is a long-lived process tied to
 // a working directory rather than a one-shot-per-call process, so it also owns explicit
-// start/stop lifecycle (T17.2.1) and a diagnostics push subscription instead of a single
+// start/stop lifecycle and a diagnostics push subscription instead of a single
 // request/response per call.
 public interface ILanguageServerClient
 {
@@ -24,7 +24,7 @@ public interface ILanguageServerClient
 
     Task StopAsync();
 
-    // Epic 18: languageId is the LSP languageId for this specific file (e.g. "typescriptreact"
+    // languageId is the LSP languageId for this specific file (e.g. "typescriptreact"
     // for a .tsx file) - not necessarily the same string as whichever configured
     // LanguageServerOptions/process is handling it (one typescript-language-server process
     // handles typescript/typescriptreact/javascript/javascriptreact alike; see
@@ -41,17 +41,17 @@ public interface ILanguageServerClient
 
     Task<IReadOnlyList<LspLocation>> GetReferencesAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 
-    // specs/editor-autocomplete: textDocument/completion at position. Result ordering mirrors
-    // whatever order the server returned (no client-side re-sorting) - CompletionWindow (R3.1)
+    // textDocument/completion at position. Result ordering mirrors
+    // whatever order the server returned (no client-side re-sorting) - CompletionWindow
     // does its own filtering/ordering as the user keeps typing.
     Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 
-    // specs/editor-intelligence R1: textDocument/documentSymbol - null means the server returned
+    // textDocument/documentSymbol - null means the server returned
     // nothing (unsupported, or a parse the client couldn't make sense of), not an empty-but-valid
     // outline; see LspDocumentSymbol's own remark on the synthetic-root shape.
     Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default);
 
-    // specs/editor-intelligence R2: textDocument/hover - null means no hover text applies at this
+    // textDocument/hover - null means no hover text applies at this
     // position (the documented "nothing to show" case, not an error).
     Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 }

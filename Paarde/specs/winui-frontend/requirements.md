@@ -50,7 +50,7 @@ Confirmed by direct inspection, 2026-11-09:
 
   The code editor is the only control with no straightforward WinUI equivalent, and it's confined
   to one view.
-- Settings live under `%AppData%/Paarde.Avalonia/ApplicationData` (`LocalSettingsOptions`
+- Settings live under `%AppData%/Paarde/ApplicationData` (formerly `Paarde.Avalonia/ApplicationData`, moved on first start) (`LocalSettingsOptions`
   default in `LocalSettingsService` and `appsettings.json`).
 - There is no CI; `dotnet build Paarde.slnx` is the documented build and is expected to work on
   Linux/macOS for the Avalonia app.

@@ -7,9 +7,9 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Services;
 
-// Shells out to run an arbitrary command (T12.1.1) - the same Process-based pattern
+// Shells out to run an arbitrary command - the same Process-based pattern
 // ClaudeCliRunner already uses for `claude` and GitStatusService uses for `git`, generalized to
-// whatever command Settings has configured for build/test (Epic 12). Epic 16's terminal panel and
+// whatever command Settings has configured for build/test. Epic 16's terminal panel and
 // Epic 20's Run toolbar both moved onto IPtyProcessManager instead (specs/terminal-emulation T6/
 // T7) - this class is IBuildTestRunner's wait-for-exit implementation only, untouched by that
 // epic since nothing watches IBuildTestRunner's output live (design.md "Summary").
@@ -23,9 +23,11 @@ public class ProcessCommandRunner : IBuildTestRunner
         // token out as the executable - unlike ClaudeCliOptions (one known executable plus fixed
         // arguments), a build/test command is user-typed and commonly relies on shell resolution
         // (PATH, shell builtins, `&&`-chained commands) that invoking the first token directly
-        // would not get.
+        // would not get. On Windows the command line is written verbatim in the `cmd /s /c "<command>"`
+        // form (PtyProcessManager's): ArgumentList would escape the command's own quotes as \", which
+        // cmd.exe doesn't understand, so any command with a quoted path failed.
         var startInfo = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? new ProcessStartInfo { FileName = "cmd.exe", ArgumentList = { "/c", command } }
+            ? new ProcessStartInfo { FileName = "cmd.exe", Arguments = $"/s /c \"{command}\"" }
             : new ProcessStartInfo { FileName = "/bin/sh", ArgumentList = { "-c", command } };
 
         startInfo.WorkingDirectory = workingDirectoryPath;
@@ -67,7 +69,7 @@ public class ProcessCommandRunner : IBuildTestRunner
         }
         catch (OperationCanceledException)
         {
-            // Same as ClaudeCliRunner.RunPromptAsync (T6.1.1): WaitForExitAsync throwing doesn't
+            // Same as ClaudeCliRunner.RunPromptAsync: WaitForExitAsync throwing doesn't
             // stop the child on its own, so a cancelled/timed-out build would otherwise keep
             // running in the background after this call returns.
             if (!process.HasExited)

@@ -15,7 +15,7 @@ public partial class DiffsDetailControl : UserControl
     {
         InitializeComponent();
 
-        // T8.3.1/T8.3.2: recomputes both views' display rows whenever the file being shown changes
+        // Recomputes both views' display rows whenever the file being shown changes
         // (switching files reuses this one control instance) or that file's DiffLines changes (an
         // edit, or OriginalContent refreshing from disk) - kept up to date even while the other view
         // is the one currently visible, so toggling modes never shows stale rows.
@@ -25,18 +25,18 @@ public partial class DiffsDetailControl : UserControl
 
     private ProposedFileChangeViewModel? _subscribedViewModel;
 
-    // T8.3.2: which collapsed regions (keyed by CollapsibleDiffRow.LineIndex) the user has expanded
+    // Which collapsed regions (keyed by CollapsibleDiffRow.LineIndex) the user has expanded
     // back to their real lines, for the file currently shown. Reset whenever DiffLines changes for
     // any reason (see OnDataContextChanged/OnViewModelPropertyChanged below) since a new diff means
     // those indices no longer necessarily point at the same regions.
     private readonly HashSet<int> _expandedSegments = [];
 
-    // T8.3.2: the inline view's current rows, cached so ApplyPendingScrollTarget/ScrollToHunk can
+    // The inline view's current rows, cached so ApplyPendingScrollTarget/ScrollToHunk can
     // look one up by LineIndex rather than assuming a DiffLines index maps 1:1 onto a display row
     // index.
     private IReadOnlyList<CollapsibleDiffRow> _inlineRows = [];
 
-    // T8.3.4: the current file's hunks (same grouping GroupIntoHunks already provides for T8.4.5's
+    // The current file's hunks (same grouping GroupIntoHunks already provides for T8.4.5's
     // jump-from-tutorial-step feature) and which one next/previous-change navigation last scrolled
     // to, as an index into this list - -1 means "haven't navigated to one yet".
     private IReadOnlyList<DiffHunk> _hunks = [];
@@ -56,7 +56,7 @@ public partial class DiffsDetailControl : UserControl
         }
     }
 
-    // T8.3.1: Inline/side-by-side is local UI state (not persisted, not on the shared Core view
+    // Inline/side-by-side is local UI state (not persisted, not on the shared Core view
     // model, which multiple pages bind to) - a ToggleButton rather than a settings-backed flag,
     // same "no separate state to keep in sync" reasoning as T8.2.3's collapsible panes just
     // applied to a two-way local switch instead.
@@ -76,7 +76,7 @@ public partial class DiffsDetailControl : UserControl
 
         _subscribedViewModel = DataContext as ProposedFileChangeViewModel;
 
-        // T8.3.2: switching files invalidates any expanded-region indices from the previous file's
+        // Switching files invalidates any expanded-region indices from the previous file's
         // DiffLines.
         _expandedSegments.Clear();
 
@@ -92,7 +92,7 @@ public partial class DiffsDetailControl : UserControl
     {
         if (e.PropertyName == nameof(ProposedFileChangeViewModel.DiffLines))
         {
-            // T8.3.2: an edit or an original-content refresh means DiffLines was recomputed from
+            // An edit or an original-content refresh means DiffLines was recomputed from
             // scratch, so no previously expanded index is guaranteed to still refer to the same
             // region.
             _expandedSegments.Clear();
@@ -108,7 +108,7 @@ public partial class DiffsDetailControl : UserControl
         DiffLinesItemsControl.ItemsSource = _inlineRows;
         SideBySideItemsControl.ItemsSource = DiffBuilder.BuildCollapsibleSideBySideRows(diffLines, _expandedSegments);
 
-        // T8.3.4: a previous hunk index isn't guaranteed to still mean the same change once
+        // A previous hunk index isn't guaranteed to still mean the same change once
         // DiffLines has been recomputed (a file switch or an edit), so next/previous navigation
         // always restarts from "haven't navigated to one yet".
         _hunks = DiffBuilder.GroupIntoHunks(diffLines);
@@ -116,7 +116,7 @@ public partial class DiffsDetailControl : UserControl
         UpdateChangeNavigationState();
     }
 
-    // T8.3.2: shared by both views' collapsed-region placeholders (CollapsibleDiffRow and
+    // Shared by both views' collapsed-region placeholders (CollapsibleDiffRow and
     // CollapsibleSideBySideDiffRow both implement ICollapsedDiffRegion) - expanding re-renders that
     // region's real lines in place rather than navigating anywhere.
     private void OnExpandCollapsedRegionClick(object? sender, RoutedEventArgs e)
@@ -128,7 +128,7 @@ public partial class DiffsDetailControl : UserControl
         }
     }
 
-    // T8.3.4: scrolls the inline view to one of the current file's hunks by index - shared by the
+    // Scrolls the inline view to one of the current file's hunks by index - shared by the
     // Next/Previous change buttons. Always switches to inline first - the side-by-side view has no
     // equivalent index-based scroll target.
     private void ScrollToHunk(int hunkIndex)
@@ -170,7 +170,7 @@ public partial class DiffsDetailControl : UserControl
         }
     }
 
-    // T8.3.2/T8.3.4: target.SourceRangeStart (or a hunk's own SourceRangeStart) is an index into
+    // target.SourceRangeStart (or a hunk's own SourceRangeStart) is an index into
     // DiffLines, which no longer maps 1:1 onto a display row index once collapsing is involved -
     // look the row up by LineIndex instead. It's always present as its own row (never folded into a
     // placeholder) because BuildCollapsibleRows defaults to the same contextLines as

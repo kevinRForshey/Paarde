@@ -8,7 +8,7 @@ namespace Paarde.Avalonia.Views;
 
 public partial class ReviewPanelControl : UserControl
 {
-    // Epic 25, T11: unlike TutorialView (a navigated page that resolved its own TutorialViewModel
+    // Unlike TutorialView (a navigated page that resolved its own TutorialViewModel
     // from DI), this control's DataContext is supplied externally - AssistantPanelControl binds it
     // to AssistantPanel.Review - so there's no ViewModel property/DataContext assignment here; every
     // binding in the XAML resolves against whatever DataContext is handed to this control.

@@ -7,7 +7,7 @@ using Paarde.Core.ViewModels;
 namespace Paarde.Core.Helpers;
 
 // Builds a self-contained Markdown or HTML document from a tutorial run's state, for the user to
-// save and share outside the app (T8.4.4). Mirrors what TutorialView/TutorialDetailControl actually
+// save and share outside the app. Mirrors what TutorialView/TutorialDetailControl actually
 // show - the overview, and each file's steps numbered the same way TutorialStepViewModel.StepLabel
 // numbers them - rather than anything app-internal (status messages, applied state, the snippet
 // text that's only ever sent to the LLM, never shown in either view).
@@ -86,7 +86,7 @@ public static class TutorialExporter
         return builder.ToString();
     }
 
-    // Reuses MarkdownInlineParser (T8.4.2) rather than a second parser, so overview/explanation text
+    // Reuses MarkdownInlineParser rather than a second parser, so overview/explanation text
     // renders consistently between the in-app MarkdownTextBlock and this export.
     private static void AppendMarkdownAsHtml(StringBuilder builder, string text)
     {

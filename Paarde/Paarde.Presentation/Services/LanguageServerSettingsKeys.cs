@@ -2,7 +2,7 @@ namespace Paarde.Presentation.Services;
 
 // Shared between SettingsViewModel (where these are edited) and LanguageServerOptionsProvider
 // (where they're read to build each language's LanguageServerOptions) - same split
-// ClaudeCliSettingsKeys/ClaudeCliOptionsProvider established (T6.1.4), now keyed by language
+// ClaudeCliSettingsKeys/ClaudeCliOptionsProvider established, now keyed by language
 // instead of one flat pair.
 public static class LanguageServerSettingsKeys
 {

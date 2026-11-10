@@ -18,14 +18,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Epic 20 (specs/build-and-run F20.3): a DI singleton, not a page ViewModel - it backs
-// ShellView's persistent toolbar/output strip (R5.1/R5.2), so it has to survive every page
+// A DI singleton, not a page ViewModel - it backs
+// ShellView's persistent toolbar/output strip, so it has to survive every page
 // navigation rather than being created and torn down with one page. Learns the working directory
 // via IWorkingDirectoryContext (design.md's "working-directory-changed pub/sub hook") instead of
 // INavigationAware.OnNavigatedTo, which this class has no equivalent lifecycle hook for.
 public partial class RunPanelViewModel : ObservableObject
 {
-    // specs/terminal-emulation T6 (R5.1): one \x1b[2J\x1b[H (clear screen + home cursor) fed to
+    // One \x1b[2J\x1b[H (clear screen + home cursor) fed to
     // OutputBuffer in place of the old OutputText = string.Empty - there's no "clear" concept on a
     // TerminalBuffer beyond feeding it the same escape sequence a real terminal would receive.
     private static readonly byte[] ClearScreenSequence = Encoding.ASCII.GetBytes("\x1b[2J\x1b[H");
@@ -40,7 +40,7 @@ public partial class RunPanelViewModel : ObservableObject
 
     public ObservableCollection<RunConfiguration> Configurations { get; } = [];
 
-    // specs/ide-workbench-shell R1.2: Build and Run get independent TerminalBuffers (previously
+    // Build and Run get independent TerminalBuffers (previously
     // one shared OutputBuffer, specs/terminal-emulation T6) so the workbench dock's Build and Run
     // tabs each keep their own scroll-back instead of one clobbering the other's output.
     public TerminalBuffer BuildOutputBuffer { get; } = new(cols: 80, rows: 24);
@@ -82,6 +82,7 @@ public partial class RunPanelViewModel : ObservableObject
 
         workingDirectoryContext.Changed += OnWorkingDirectoryChanged;
         _ptyProcessManager.OutputReceived += OnProcessOutputReceived;
+        RunOutputBuffer.ResponseReady += _ptyProcessManager.WriteInput;
         _ptyProcessManager.Exited += OnProcessExited;
 
         // Covers the case where the user never visits the Prompt page this session - the saved
@@ -162,9 +163,9 @@ public partial class RunPanelViewModel : ObservableObject
 
     private bool CanBuild() => !IsBuilding && SelectedConfiguration is not null;
 
-    // R4.3: builds first by default (if a build command is configured); a build failure stops
+    // Builds first by default (if a build command is configured); a build failure stops
     // the sequence before the run command ever starts, surfacing the same way a standalone Build
-    // failure would (R3.2).
+    // failure would.
     [RelayCommand(CanExecute = nameof(CanRun))]
     private async Task RunAsync()
     {
@@ -190,7 +191,7 @@ public partial class RunPanelViewModel : ObservableObject
 
         try
         {
-            // R4.5: StartAsync() stops whatever's already active first, so re-pressing Run while a
+            // StartAsync() stops whatever's already active first, so re-pressing Run while a
             // previous session is live restarts it rather than erroring.
             await _ptyProcessManager.StartAsync(configuration.RunCommand, configuration.WorkingDirectoryPath, RunOutputBuffer.Cols, RunOutputBuffer.Rows);
             IsRunning = true;
@@ -215,7 +216,7 @@ public partial class RunPanelViewModel : ObservableObject
             return false;
         }
 
-        // R3.3: a blank build command (legitimate for an interpreted-language configuration)
+        // A blank build command (legitimate for an interpreted-language configuration)
         // skips the build step entirely rather than erroring.
         if (string.IsNullOrWhiteSpace(configuration.BuildCommand))
         {
@@ -255,7 +256,7 @@ public partial class RunPanelViewModel : ObservableObject
     private static string CombineOutput(string standardOutput, string standardError) =>
         string.IsNullOrEmpty(standardError) ? standardOutput : standardOutput + Environment.NewLine + standardError;
 
-    // specs/terminal-emulation T6: IBuildTestRunner's result comes from a plain, non-PTY Process
+    // IBuildTestRunner's result comes from a plain, non-PTY Process
     // redirect, so its strings carry bare \n. XTerm.NET's Terminal treats \n strictly per VT100
     // semantics - it moves down a row without returning to column 0 - so feeding bare \n produces
     // a "staircase" (each line starting one column further right than the last), confirmed
@@ -270,7 +271,7 @@ public partial class RunPanelViewModel : ObservableObject
 
     private bool CanStop() => IsRunning;
 
-    // specs/terminal-emulation T6: thin passthroughs so ShellView.axaml.cs can wire
+    // Thin passthroughs so ShellView.axaml.cs can wire
     // OutputTerminal.InputReceived/.Resized directly (the same "stay ignorant of the service"
     // shape TerminalControl itself uses for those events) without the View reaching past this
     // ViewModel to IPtyProcessManager.

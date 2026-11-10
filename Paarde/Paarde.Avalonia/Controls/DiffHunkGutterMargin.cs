@@ -24,7 +24,7 @@ public sealed class DiffHunkAcceptRejectEventArgs(DiffHunk hunk, bool accept) : 
 // Left-margin gutter: one Accept/Reject button pair per pending diff hunk that's currently
 // scrolled into view - an alternate entry point into the same per-step selection
 // (ProposedFileChangeViewModel.SetDiffHunkSelection, driving ProposedHunk.IsSelected) the Tutorial
-// page's step checkboxes already use, not a second accept/reject model (T13.1.3). Follows the same
+// page's step checkboxes already use, not a second accept/reject model. Follows the same
 // pattern as AvaloniaEdit's own FoldingMargin: one real child Control per visible anchor, rebuilt
 // whenever the visible VisualLines change (scroll, resize, or an edit reflowing the document) rather
 // than trying to keep stale child controls positioned by hand. Collapses to zero width when there
@@ -40,7 +40,7 @@ public sealed class DiffHunkGutterMargin : AbstractMargin
 
     public event EventHandler<DiffHunkAcceptRejectEventArgs>? HunkActionRequested;
 
-    // T13.2.1: replaces _hunks wholesale (never patched in place) so a rebuild always reflects the
+    // Replaces _hunks wholesale (never patched in place) so a rebuild always reflects the
     // current diff, including after an edit re-anchors every hunk's line range.
     public void UpdateHunks(IReadOnlyList<DiffHunk>? hunks)
     {

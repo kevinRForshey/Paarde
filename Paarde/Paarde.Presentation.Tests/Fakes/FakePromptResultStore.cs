@@ -20,7 +20,7 @@ public class FakePromptResultStore : IPromptResultStore
 
     public int SetResultCallCount { get; private set; }
 
-    // T6.2.2: lets a test observe intermediate SetResult calls made while a prompt is still streaming,
+    // Lets a test observe intermediate SetResult calls made while a prompt is still streaming,
     // not just the final one.
     public Action? OnSetResult { get; set; }
 

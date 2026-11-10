@@ -6,7 +6,7 @@ using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Presentation.Tests.ViewModels;
 
-// Epic 26 (specs/interface-mode R5): the FlowWizard shell's landing page. Takes a real
+// The FlowWizard shell's landing page. Takes a real
 // PromptViewModel (rather than a fake) the same way HistoryViewModelTests' AssistantPanelViewModel
 // does, since OpenRecentRun/OpenRecentProject/SendQuickPrompt need the genuine
 // LoadLaunchRequest/WorkingDirectoryPath wiring, not just a constructor to satisfy.

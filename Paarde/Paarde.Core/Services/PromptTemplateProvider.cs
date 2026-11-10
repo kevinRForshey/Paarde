@@ -51,6 +51,8 @@ public class PromptTemplateProvider : IPromptTemplateProvider
             ?? throw new InvalidOperationException($"Embedded prompt template resource '{resourceName}' was not found.");
         using var reader = new StreamReader(stream);
 
-        return reader.ReadToEnd();
+        // A Windows checkout (core.autocrlf) gives the template CRLF line endings; the prompt sent
+        // to the model is the same on every OS.
+        return reader.ReadToEnd().ReplaceLineEndings("\n");
     }
 }

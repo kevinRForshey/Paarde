@@ -10,7 +10,7 @@ using Paarde.Presentation.Helpers;
 
 namespace Paarde.WinUI.Controls;
 
-// T13.1.3: raised when the gutter's Accept/Reject glyph for a hunk is clicked.
+// Raised when the gutter's Accept/Reject glyph for a hunk is clicked.
 public sealed class DiffHunkAcceptRejectEventArgs(DiffHunk hunk, bool accept) : EventArgs
 {
     public DiffHunk Hunk { get; } = hunk;
@@ -18,13 +18,13 @@ public sealed class DiffHunkAcceptRejectEventArgs(DiffHunk hunk, bool accept) : 
     public bool Accept { get; } = accept;
 }
 
-// Epic 17, T17.1.3: F12 / Shift+F12 - the host decides what to ask the language server.
+// F12 / Shift+F12 - the host decides what to ask the language server.
 public sealed class CodeNavigationRequestedEventArgs(LspPosition position) : EventArgs
 {
     public LspPosition Position { get; } = position;
 }
 
-// specs/winui-frontend F31.7: the WinUI code editor - Monaco (MIT) in WebView2, chosen by the F31.6
+// The WinUI code editor - Monaco (MIT) in WebView2, chosen by the F31.6
 // spike (design.md "Code editor"). Unlike Paarde.Avalonia's CodeEditor (one AvaloniaEdit instance
 // per open tab, everything bound), one of these serves every tab of an Explorer tab group: each
 // open file is its own Monaco model, and the host calls ShowDocument as the group's tab changes.

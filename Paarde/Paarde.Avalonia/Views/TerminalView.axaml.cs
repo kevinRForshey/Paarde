@@ -19,7 +19,7 @@ public partial class TerminalView : UserControl
         DataContext = ViewModel;
         InitializeComponent();
 
-        // specs/terminal-emulation T7: OutputTerminal stays ignorant of IPtyProcessManager, same
+        // OutputTerminal stays ignorant of IPtyProcessManager, same
         // shape ShellView.axaml.cs already uses for RunPanelViewModel's TerminalControl.
         OutputTerminal.InputReceived += ViewModel.WriteInput;
         OutputTerminal.Resized += ViewModel.Resize;

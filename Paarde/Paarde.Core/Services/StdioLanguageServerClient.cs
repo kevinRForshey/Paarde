@@ -79,10 +79,10 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
             ["processId"] = Environment.ProcessId,
             ["rootUri"] = rootUri,
 
-            // specs/multi-language-support/requirements.md R5: previously an empty object - this
+            // Previously an empty object - this
             // app always relied on publishDiagnostics/definition/references without ever telling a
             // server it supports them. Structured so adding "completion" later
-            // (specs/editor-autocomplete) is a one-property addition, not a restructure.
+            // is a one-property addition, not a restructure.
             ["capabilities"] = new JObject
             {
                 ["textDocument"] = new JObject
@@ -91,7 +91,7 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
                     ["definition"] = new JObject(),
                     ["references"] = new JObject(),
 
-                    // specs/editor-autocomplete/requirements.md R2.1: snippetSupport is false,
+                    // snippetSupport is false,
                     // matching this spec's non-goal of snippet-placeholder expansion.
                     ["completion"] = new JObject
                     {
@@ -329,8 +329,8 @@ public class StdioLanguageServerClient : ILanguageServerClient, IAsyncDisposable
     }
 
     // Result is either a bare CompletionItem[] or a CompletionList { isIncomplete, items: [...] } -
-    // the LSP spec allows a server to return either (R2.2). isIncomplete isn't surfaced to callers:
-    // v1 requests completions exactly once per trigger (R1.4) and never re-queries to page in more
+    // the LSP spec allows a server to return either. isIncomplete isn't surfaced to callers:
+    // v1 requests completions exactly once per trigger and never re-queries to page in more
     // results.
     private static IReadOnlyList<LspCompletionItem> ParseCompletionItems(JToken? result)
     {

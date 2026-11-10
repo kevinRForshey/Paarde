@@ -6,7 +6,7 @@ namespace Paarde.Core.Helpers;
 
 // Detects the encoding and line-ending convention an existing file is actually using on disk, so
 // FileChangeApplyService.Apply can write back in the same format instead of always normalizing to
-// UTF-8 (no BOM) with LF line endings (T4.1.3). Deliberately mirrors the BOM detection built into
+// UTF-8 (no BOM) with LF line endings. Deliberately mirrors the BOM detection built into
 // File.ReadAllText (which FileContentReader relies on for OriginalContent) so the two agree about
 // what encoding a given file is in.
 public static class FileEncodingDetector

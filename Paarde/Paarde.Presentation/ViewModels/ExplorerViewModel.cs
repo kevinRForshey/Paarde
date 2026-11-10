@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Presentation.ViewModels;
 
-// T8.1.1: project explorer - a gitignore-aware file-tree view of the working directory last
+// Project explorer - a gitignore-aware file-tree view of the working directory last
 // picked on the Prompt page (same persisted setting, via WorkingDirectorySettingsKeys, rather
 // than IPromptResultStore.WorkingDirectoryPath - the tree should be browsable as soon as a folder
 // is picked, not only after a prompt has actually been run).
@@ -35,12 +35,12 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     private readonly IFolderPickerService _folderPickerService;
     private readonly ILogger<ExplorerViewModel> _logger;
 
-    // Epic 25, T5: the docked Assistant panel - Review (TutorialViewModel) needs to see this
+    // The docked Assistant panel - Review (TutorialViewModel) needs to see this
     // view model's SelectedTab and to push newly-proposed files into it as tabs, which is why
     // ExplorerViewModel owns the AttachExplorer/event wiring below rather than the reverse.
     public AssistantPanelViewModel AssistantPanel { get; }
 
-    // Epic 17, T17.1.3: set by NavigateToLocation, consumed once by the active tab's
+    // Set by NavigateToLocation, consumed once by the active tab's
     // ExplorerFileTabControl.axaml.cs's Editor.TextChanged handler - same "take once, after the
     // target content has already loaded" pull pattern TutorialViewModel.TakePendingStepTarget()
     // already established, needed because a cross-file jump only reflects into Editor.Text after
@@ -62,7 +62,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     [ObservableProperty]
     private FileTreeNodeViewModel? selectedNode;
 
-    // Epic 23, T23.1.1: every file opened from the tree this visit, each with its own content/
+    // Every file opened from the tree this visit, each with its own content/
     // dirty/overview/diagnostics state (OpenFileTabViewModel) - replaces the single
     // SelectedFilePath/SelectedFileContent slot this page used to have, same OpenTabs/Selected
     // shape TutorialViewModel already established for its own tabbed detail pane.
@@ -71,12 +71,12 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     [ObservableProperty]
     private OpenFileTabViewModel? selectedTab;
 
-    // Epic 23, T23.1.1: drives ExplorerView.axaml's choice between the tab strip and the "select a
+    // Drives ExplorerView.axaml's choice between the tab strip and the "select a
     // file" placeholder, same OpenTabs.CollectionChanged -> HasOpenTabs shape TutorialViewModel
     // already uses for its own tab strip.
     public bool HasOpenTabs => OpenTabs.Count > 0;
 
-    // specs/editor-focus-layout R1: ExplorerView.axaml.cs owns the live ColumnDefinitions this
+    // ExplorerView.axaml.cs owns the live ColumnDefinitions this
     // needs to collapse/restore, so the command just raises an event rather than touching any
     // layout itself - same "ViewModel raises, View's code-behind that owns the live visual state
     // reacts" split OnToggleAssistantPanelButtonClick already established for a single pane.
@@ -85,7 +85,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     [RelayCommand]
     private void ToggleZenMode() => ZenModeToggled?.Invoke();
 
-    // specs/editor-focus-layout R2: the active tab's "Split right" action moves it into this
+    // The active tab's "Split right" action moves it into this
     // second group; ExplorerView.axaml projects both onto their own TabView. Real, independently
     // ordered ObservableCollections (not a recomputed LINQ projection over OpenTabs) so each
     // TabView's native drag-reorder (CanReorderTabs) has a stable list to mutate directly.
@@ -98,7 +98,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     // automatically."
     public bool HasSecondaryGroupTabs => SecondaryGroupTabs.Count > 0;
 
-    // specs/editor-focus-layout R5: most-recently-activated order, updated on every SelectedTab
+    // Most-recently-activated order, updated on every SelectedTab
     // change below - separate from OpenTabs'/the group collections' own display order. Not an
     // ObservableCollection - nothing binds to it directly; MruSwitcherItems below is the live
     // snapshot the popup actually shows.
@@ -146,11 +146,11 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         SecondaryGroupTabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSecondaryGroupTabs));
     }
 
-    // T10.2.5: IConfirmNavigationAway - checked by NavigationService.OnNavigating before leaving
+    // IConfirmNavigationAway - checked by NavigationService.OnNavigating before leaving
     // this page, same mechanism TutorialViewModel already uses for its own unsaved edits.
     public bool HasUnsavedChanges => OpenTabs.Any(tab => tab.IsDirty);
 
-    // Epic 23, T23.1.1: selecting a tree node opens that file as a tab (or activates its existing
+    // Selecting a tree node opens that file as a tab (or activates its existing
     // tab if it's already open) rather than replacing a single slot - VS Code's convention, and
     // the closer precedent to TutorialViewModel.OnSelectedChanged's "add to OpenTabs if not
     // already there" than inventing a double-click-only rule for this app's TreeView. Because
@@ -167,7 +167,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         OpenOrActivateTab(value.FullPath);
     }
 
-    // Epic 25, T5: grew a second, optional parameter (R3/R4) so a file newly proposed by a
+    // Grew a second, optional parameter so a file newly proposed by a
     // prompt run (OnPromptResultFilesChanged) or re-focused from Review (OnReviewFileFocusRequested)
     // can carry its ProposedFileChangeViewModel straight into the tab it opens/activates, while
     // every pre-existing call site (tree clicks, Quick Open, LSP navigation) keeps compiling
@@ -190,7 +190,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
             PendingChange = pendingChange,
         };
 
-        // specs/editor-focus-layout R2/R3: OpenFileTabViewModel raises these for the pin/split
+        // OpenFileTabViewModel raises these for the pin/split
         // actions it exposes on itself (same "tab raises, ExplorerViewModel reacts" shape
         // ScrollToHunkRequested already uses) - ExplorerViewModel is the one that owns the group
         // collections these actually mutate.
@@ -205,7 +205,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         return tab;
     }
 
-    // Epic 25, T5 (R4): a prompt run just added file(s) to IPromptResultStore.Files - open/activate
+    // A prompt run just added file(s) to IPromptResultStore.Files - open/activate
     // a tab for each one carrying its proposed change, mirroring what used to be Review's own
     // separate tab strip.
     private void OnPromptResultFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -221,7 +221,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // Epic 25, T5 (R7): Review's file list / a step card's "View in Diff" asks to focus a
+    // Review's file list / a step card's "View in Diff" asks to focus a
     // proposed change - open/activate its tab and, if a specific hunk was targeted, ask the tab
     // to scroll its editor there once it's loaded.
     private void OnReviewFileFocusRequested(ProposedFileChangeViewModel change, DiffHunk? hunk)
@@ -233,11 +233,11 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // Epic 25, T5 (R4): factored out of RefreshTree's touchedFullPaths computation so both it and
+    // Factored out of RefreshTree's touchedFullPaths computation so both it and
     // the two handlers above share the same relative-path-against-WorkingDirectoryPath join.
     private string ResolveFullPath(string relativePath) => Path.GetFullPath(Path.Combine(WorkingDirectoryPath, relativePath));
 
-    // Epic 23, T23.1.2: close-selects-neighbor, same shape as TutorialViewModel.CloseSelectedTab -
+    // Close-selects-neighbor, same shape as TutorialViewModel.CloseSelectedTab -
     // confirms first if the tab being closed has unsaved edits, since closing (unlike switching
     // tabs now) really does discard them.
     [RelayCommand(CanExecute = nameof(CanCloseSelectedTab))]
@@ -267,7 +267,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         GroupCollectionFor(tab).Remove(tab);
         _mruOrder.Remove(tab);
 
-        // Epic 17, T17.2.1: tells the server this file is no longer open - a no-op if the server
+        // Tells the server this file is no longer open - a no-op if the server
         // isn't running for this language.
         _ = _languageServerSessionManager.NotifyDocumentClosedAsync(tab.FilePath);
 
@@ -276,7 +276,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
 
     private bool CanCloseSelectedTab() => SelectedTab is not null;
 
-    // specs/editor-focus-layout R5: moves the newly-activated tab to the front of the MRU order -
+    // Moves the newly-activated tab to the front of the MRU order -
     // a plain List<T>, not an ObservableCollection, since nothing binds to it directly (only the
     // Ctrl+Tab popup's own snapshot, MruSwitcherItems, does).
     partial void OnSelectedTabChanged(OpenFileTabViewModel? value)
@@ -293,7 +293,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     private ObservableCollection<OpenFileTabViewModel> GroupCollectionFor(OpenFileTabViewModel tab) =>
         tab.TabGroup == 1 ? SecondaryGroupTabs : PrimaryGroupTabs;
 
-    // specs/editor-focus-layout R3: pinning clusters a tab with every other already-pinned tab in
+    // Pinning clusters a tab with every other already-pinned tab in
     // its own group, right after the last of them - unpinning leaves its position untouched (only
     // pinning's effect on ordering is specified/tested).
     private void OnTabPinToggled(OpenFileTabViewModel tab)
@@ -317,7 +317,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // specs/editor-focus-layout R2: "split right" is a one-way move into the second TabView's
+    // "split right" is a one-way move into the second TabView's
     // group - matches the "split view, not tiling" non-goal, which never asks for a tab to move
     // back out of the secondary group.
     private void OnTabSplitRightRequested(OpenFileTabViewModel tab)
@@ -332,7 +332,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         SecondaryGroupTabs.Add(tab);
     }
 
-    // specs/editor-focus-layout R5: opens the Ctrl+Tab popup - ExplorerView.axaml.cs calls this on
+    // Opens the Ctrl+Tab popup - ExplorerView.axaml.cs calls this on
     // the first Ctrl+Tab keydown, then AdvanceMruSwitcher on every repeated Tab while Ctrl stays
     // held. Highlights the second entry (the previously-active tab) rather than the first (the
     // still-current tab), matching every mainstream editor's own "Ctrl+Tab jumps to the previous
@@ -375,7 +375,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         IsMruSwitcherOpen = false;
     }
 
-    // T9.2.3: async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
+    // Async void because INavigationAware.OnNavigatedTo returns void - wrapped so a
     // corrupt settings file (the one thing ReadSettingAsync can actually throw on) is logged
     // rather than unwound unobserved out of NavigationService.OnNavigated; RefreshTree's own
     // try/catch below already covers everything that can go wrong once WorkingDirectoryPath is in
@@ -387,7 +387,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
             WorkingDirectoryPath = await _localSettingsService.ReadSettingAsync<string>(WorkingDirectorySettingsKeys.WorkingDirectory) ?? string.Empty;
             RefreshTree();
 
-            // Epic 17, T17.2.1/Epic 18: lifecycle tied to Explorer's working directory -
+            // Lifecycle tied to Explorer's working directory -
             // StartAllAsync itself detects which configured languages are relevant here (project
             // markers) and skips any whose executable isn't installed, per-language, rather than
             // this call site gating on a single IsAvailableAsync check.
@@ -396,7 +396,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
                 await _languageServerSessionManager.StartAllAsync(WorkingDirectoryPath);
             }
 
-            // Epic 24, R1.4: Quick Open navigates here with the absolute path of the file to open.
+            // Quick Open navigates here with the absolute path of the file to open.
             if (parameter is string filePath && File.Exists(filePath))
             {
                 OpenOrActivateTab(filePath);
@@ -408,7 +408,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // Epic 17, T17.2.1: ExplorerViewModel is AddTransient (App.axaml.cs) - a fresh instance is
+    // ExplorerViewModel is AddTransient (App.axaml.cs) - a fresh instance is
     // constructed on every navigation to this page, but DiagnosticsPublished is raised by the
     // singleton ILanguageServerClient, so the subscription taken in the constructor must be
     // unhooked here or it accumulates one stale handler per visit to this page. The server process
@@ -416,7 +416,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
     // subscription is page-navigation-scoped.
     public void OnNavigatedFrom() => _languageServerSessionManager.DiagnosticsPublished -= OnDiagnosticsPublished;
 
-    // Epic 17, T17.1.2: fires on the server's notification-read background thread - marshaled to
+    // Fires on the server's notification-read background thread - marshaled to
     // the UI thread before touching Diagnostics, same caveat ILlmRunner's onTextDelta callbacks
     // already carry. Epic 23: routed to whichever open tab matches filePath (there can be several
     // now) rather than a single active-file slot; a push for a file that isn't open as a tab is
@@ -431,7 +431,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
             }
         });
 
-    // Epic 17, T17.1.3: go-to-definition - navigates straight to the first result, same "don't
+    // Go-to-definition - navigates straight to the first result, same "don't
     // build a disambiguation UI for the common single-result case" scope decision FindReferencesAsync
     // below explains for its own (genuinely multi-result) case. Epic 23: takes the requesting
     // tab's own FilePath explicitly, since there's no longer a single SelectedFilePath to assume.
@@ -451,7 +451,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // Epic 17, T17.1.3: find-references - returns every result for ExplorerView's minimal flyout to
+    // Find-references - returns every result for ExplorerView's minimal flyout to
     // list, rather than jumping straight to one, since references (unlike a definition) are
     // routinely more than one and there's no single "right" result to prefer.
     public async Task<IReadOnlyList<LspLocation>> FindReferencesAsync(string filePath, LspPosition position)
@@ -467,7 +467,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // Epic 17, T17.1.3: jumps to location - opens or activates a tab for the target file (Epic 23:
+    // Jumps to location - opens or activates a tab for the target file (Epic 23:
     // the same open-or-activate path tree selection uses) before leaving the caret position for
     // ExplorerView to apply via TakePendingCaretTarget.
     public void NavigateToLocation(LspLocation location)
@@ -540,7 +540,7 @@ public partial class ExplorerViewModel : ObservableObject, INavigationAware, ICo
         }
     }
 
-    // Epic 25, T5 (R10): lets the user pick a working directory from the Explorer page itself,
+    // Lets the user pick a working directory from the Explorer page itself,
     // rather than only ever inheriting whichever one Compose/Prompt last saved.
     [RelayCommand]
     private async Task OpenFolderAsync()

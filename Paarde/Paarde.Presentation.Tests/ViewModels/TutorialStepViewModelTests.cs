@@ -11,7 +11,7 @@ public class TutorialStepViewModelTests
     private readonly FakeFileChangeApplyService _fileChangeApplyService = new();
     private readonly FakeLlmRunner _llmRunner = new();
 
-    // Epic 25, R7: TutorialStepViewModel's "View in Diff" now raises FileFocusRequested on its
+    // TutorialStepViewModel's "View in Diff" now raises FileFocusRequested on its
     // owning TutorialViewModel instead of navigating - a real one (rather than a fake) since the
     // tests below need its actual FileFocusRequested event, not just a constructor to satisfy.
     private readonly TutorialViewModel _owner = new(

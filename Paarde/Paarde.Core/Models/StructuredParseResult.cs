@@ -1,6 +1,6 @@
 namespace Paarde.Core.Models;
 
-// Result of StructuredResponseParser.Parse (Epic 5 / F5.1). UsedFallback is true whenever the JSON
+// Result of StructuredResponseParser.Parse. UsedFallback is true whenever the JSON
 // contract (ClaudeJsonResponseParser) couldn't be parsed/validated and Response instead came from the
 // legacy markdown parser (ClaudeResponseParser) as a best-effort last resort; ValidationError carries
 // the JSON schema failure so a caller can retry once with it fed back to the model before falling

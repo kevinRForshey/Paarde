@@ -66,7 +66,7 @@ public partial class App : Application
         Host = Microsoft.Extensions.Hosting.Host.
         CreateDefaultBuilder().
         UseContentRoot(AppContext.BaseDirectory).
-        // T9.2.1: replaces CreateDefaultBuilder's default ILoggerFactory wiring with Serilog, writing
+        // Replaces CreateDefaultBuilder's default ILoggerFactory wiring with Serilog, writing
         // a daily-rolling log file under <ApplicationDataFolder>/Logs - this is the one a user without
         // a terminal/debugger attached can actually find and include in a bug report. Serilog's File
         // sink also handles rotation/retention (14 days) for free, which a hand-rolled provider would
@@ -88,7 +88,7 @@ public partial class App : Application
         }).
         ConfigureServices((context, services) =>
         {
-            // specs/winui-frontend R1: the Core + Presentation graph shared with every front end.
+            // The Core + Presentation graph shared with every front end.
             services.AddPaardePresentation();
 
             // Avalonia-specific implementations of Presentation contracts.
@@ -104,7 +104,7 @@ public partial class App : Application
             services.AddSingleton<IFrameNavigationService>(sp => sp.GetRequiredService<NavigationService>());
             services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<NavigationService>());
 
-            // specs/presentation-extraction R2.2: view models marshal onto the UI thread through
+            // View models marshal onto the UI thread through
             // this rather than Avalonia's Dispatcher directly.
             services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
             services.AddSingleton<IWindowAppearanceService, WindowAppearanceService>();
@@ -127,17 +127,24 @@ public partial class App : Application
         Build();
     }
 
-    // T9.2.1: the logging setup above runs ahead of DI and so only has IConfiguration to read
-    // LocalSettingsOptions from; ApplicationDataPaths is the one shared resolution (specs/winui-frontend R1.4).
-    private static string ResolveApplicationDataFolder(IConfiguration configuration) =>
-        ApplicationDataPaths.Resolve(configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>()?.ApplicationDataFolder);
+    // The logging setup above runs ahead of DI and so only has IConfiguration to read
+    // LocalSettingsOptions from; ApplicationDataPaths is the one shared resolution.
+    private static string ResolveApplicationDataFolder(IConfiguration configuration)
+    {
+        var configuredFolder = configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>()?.ApplicationDataFolder;
+
+        // Logging is the first thing to open a file in the folder, so the one-time move happens here.
+        ApplicationDataPaths.MoveLegacyFolder(configuredFolder);
+
+        return ApplicationDataPaths.Resolve(configuredFolder);
+    }
 
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
     }
 
-    // T9.2.2: a last-resort safety net for whatever an inner try/catch didn't - these are the two
+    // A last-resort safety net for whatever an inner try/catch didn't - these are the two
     // places .NET surfaces an exception that unwound past every frame on its own thread/task
     // rather than one this app explicitly awaited. Neither handler can stop the process from
     // terminating (AppDomain.UnhandledException always precedes a crash; an unobserved task
@@ -174,8 +181,8 @@ public partial class App : Application
 
 #if DEBUG
             // Avalonia.Diagnostics is Debug-only (Paarde.Avalonia.csproj), same as this call.
-            // The Avalonia.Generators default (F12) is disabled in that csproj because it collides
-            // with CodeEditor's own F12 go-to-definition binding (Epic 17) - Ctrl+Shift+F12 instead.
+            // The Avalonia.Generators default is disabled in that csproj because it collides
+            // with CodeEditor's own F12 go-to-definition binding - Ctrl+Shift+F12 instead.
             window.AttachDevTools(new KeyGesture(Key.F12, KeyModifiers.Control | KeyModifiers.Shift));
 #endif
 
@@ -186,17 +193,17 @@ public partial class App : Application
             // InvokeShutdown() call, sidesteps the race instead of letting Avalonia's internal teardown hit it.
             desktop.Exit += (_, _) =>
             {
-                // Epic 17 (T17.2.1)/Epic 18: every language server is a child process with no
+                // Epic 17/Epic 18: every language server is a child process with no
                 // owner other than this app - Environment.Exit(0) below terminates this process
                 // immediately and would otherwise orphan it/them. Each client's StopAsync kill is
                 // bounded (a couple of seconds at most), so blocking briefly here is acceptable on
                 // the way out.
                 GetService<ILanguageServerSessionManager>().StopAllAsync().GetAwaiter().GetResult();
 
-                // Epic 20 (specs/build-and-run R4.6)/Epic 21 (specs/terminal-emulation R1.2, T6,
+                // Epic 20/Epic 21 (specs/terminal-emulation R1.2, T6,
                 // T7): a Run or Terminal session is the same kind of app-owned, otherwise-orphaned
                 // child process - Stop() is synchronous and already bounded by killing the process
-                // tree, so no extra waiting is needed here. Two separately keyed instances (T7),
+                // tree, so no extra waiting is needed here. Two separately keyed instances,
                 // so both need stopping independently.
                 GetService<IPtyProcessManager>().Stop();
                 GetKeyedService<IPtyProcessManager>(TerminalViewModel.PtyProcessManagerKey).Stop();
@@ -210,7 +217,7 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    // T9.2.3: async void because OnFrameworkInitializationCompleted (an override, so its own
+    // Async void because OnFrameworkInitializationCompleted (an override, so its own
     // signature can't change) can't await it - any exception thrown here would otherwise unwind
     // past that override and surface as an AppDomain.UnhandledException crash (see
     // RegisterGlobalCrashHandlers above) instead of a reported, recoverable failure. Wrapping it
@@ -224,19 +231,19 @@ public partial class App : Application
             await themeSelectorService.InitializeAsync();
             await themeSelectorService.SetRequestedThemeAsync();
 
-            // T7.1.2: pushes the last recorded run's tutorial/files/apply-log into IPromptResultStore/
+            // Pushes the last recorded run's tutorial/files/apply-log into IPromptResultStore/
             // IApplyHistoryLog before anything navigates, so the Tutorial and Diffs pages already have
             // it whenever the user first visits them - a no-op if no run has ever been recorded.
             GetService<IRunSessionStore>().RestoreLastSession();
 
-            // Epic 26 (specs/interface-mode R2): which shell the app starts into - EditorFocused
+            // Which shell the app starts into - EditorFocused
             // keeps today's Explorer-first behavior, FlowWizard starts on the Home/Compose/Review
             // flow instead.
             var interfaceMode = await GetService<ILocalSettingsService>().ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
             var startupViewModelType = interfaceMode == InterfaceMode.FlowWizard ? typeof(MainViewModel) : typeof(ExplorerViewModel);
             GetService<INavigationService>().NavigateTo(startupViewModelType.FullName!);
 
-            // specs/fluent-design-pass R1: off by default - see AppearanceSettingsKeys/
+            // Off by default - see AppearanceSettingsKeys/
             // MainWindow.ApplyTransparency.
             var transparencyEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
             (MainWindow as Views.MainWindow)?.ApplyTransparency(transparencyEnabled);

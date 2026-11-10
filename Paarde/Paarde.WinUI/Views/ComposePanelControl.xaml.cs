@@ -10,11 +10,11 @@ namespace Paarde.WinUI.Views;
 
 public sealed partial class ComposePanelControl : UserControl
 {
-    // Epic 25, T9: DataContext is supplied externally (PromptView, later the Assistant panel), so
+    // DataContext is supplied externally (PromptView, later the Assistant panel), so
     // ViewModel just mirrors it for x:Bind rather than resolving from DI.
     public PromptViewModel? ViewModel { get; private set; }
 
-    // T14.1.1: which `@mention` (if any) the caret is currently inside, as of the last TextChanged -
+    // Which `@mention` (if any) the caret is currently inside, as of the last TextChanged -
     // null means the mention popup is closed. Kept here (not on the ViewModel) since it's purely
     // about this TextBox's own Text/caret, not application state.
     private MentionTrigger? _activeMentionTrigger;
@@ -54,7 +54,7 @@ public sealed partial class ComposePanelControl : UserControl
         }
     }
 
-    // T14.1.1/T14.1.2: Up/Down move the highlighted suggestion, Enter/Tab accept it (and must not
+    // Up/Down move the highlighted suggestion, Enter/Tab accept it (and must not
     // also insert their usual newline/tab into the AcceptsReturn TextBox - e.Handled = true
     // suppresses that), Escape just closes the popup without touching the typed text.
     private void OnPromptTextBoxPreviewKeyDown(object sender, KeyRoutedEventArgs e)
@@ -102,7 +102,7 @@ public sealed partial class ComposePanelControl : UserControl
         }
     }
 
-    // T14.2.3: unlike a mention pick, this doesn't touch the prompt text - it only attaches the
+    // Unlike a mention pick, this doesn't touch the prompt text - it only attaches the
     // file, so the suggestion list can lose just this one entry rather than closing entirely.
     private void OnSuggestedRelevantFileDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
@@ -145,7 +145,7 @@ public sealed partial class ComposePanelControl : UserControl
         MentionList.ScrollIntoView(MentionList.SelectedItem);
     }
 
-    // T14.1.2: replaces the typed "@query" with the full "@relative/path " token and attaches the
+    // Replaces the typed "@query" with the full "@relative/path " token and attaches the
     // file through ViewModel.AttachMentionedFile - the same AddContextFilesAsync mechanism, just
     // reached from the popup instead of the file picker.
     private void InsertMention(string relativePath)

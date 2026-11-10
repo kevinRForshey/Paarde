@@ -1,6 +1,6 @@
 namespace Paarde.Core.Helpers;
 
-// T14.1.1: how much of the typed text is an in-progress `@mention` - deliberately plain string/int
+// How much of the typed text is an in-progress `@mention` - deliberately plain string/int
 // math (no Avalonia TextBox dependency) so PromptView's code-behind can feed it Text/CaretIndex on
 // every keystroke and this stays unit-testable on its own.
 public readonly record struct MentionTrigger(int TriggerStart, string Query);

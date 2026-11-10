@@ -144,7 +144,7 @@ public class ResizablePaneHelperTests
         Assert.False(sut.IsCollapsed);
     }
 
-    // specs/editor-focus-layout R1: zen mode collapses two independent panes as a pair - this
+    // Zen mode collapses two independent panes as a pair - this
     // just confirms two ResizablePaneHelper instances don't interfere with each other, since each
     // one owns its own ColumnDefinition/settings key.
     [Fact]

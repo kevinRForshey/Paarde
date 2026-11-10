@@ -36,7 +36,7 @@ public partial class TutorialStepViewModel : ObservableObject
     // than this class forwarding/duplicating them.
     public ProposedHunk Hunk { get; }
 
-    // T8.4.3: this step's 1-based position among its file's steps, and how many there are in total -
+    // This step's 1-based position among its file's steps, and how many there are in total -
     // set by TutorialDetailControl.RebuildSteps from the hunk's index in ProposedFileChangeViewModel.
     // Hunks, which is also the order the steps list (and step-navigation) displays them in.
     public int StepNumber { get; }
@@ -48,14 +48,14 @@ public partial class TutorialStepViewModel : ObservableObject
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
-    // T7.3.2: the deeper explanation from ExplainFurtherCommand, empty until that's been clicked.
+    // The deeper explanation from ExplainFurtherCommand, empty until that's been clicked.
     [ObservableProperty]
     private string furtherExplanation = string.Empty;
 
     [ObservableProperty]
     private bool isExplaining;
 
-    // T7.3.3: a free-form question the user types about this step, as opposed to ExplainFurther's
+    // A free-form question the user types about this step, as opposed to ExplainFurther's
     // fixed "go deeper" prompt.
     [ObservableProperty]
     private string questionText = string.Empty;
@@ -120,7 +120,7 @@ public partial class TutorialStepViewModel : ObservableObject
 
     private bool CanApply() => !Hunk.IsApplied && !string.IsNullOrWhiteSpace(_workingDirectoryPath);
 
-    // Epic 25, R7: asks the owning TutorialViewModel to focus this step's change - replaces the old
+    // Asks the owning TutorialViewModel to focus this step's change - replaces the old
     // DiffJumpRequest/NavigateTo(DiffsViewModel) jump now that there's no separate Diffs page to
     // navigate to. Disabled when the step's Location didn't resolve to any DiffHunk (e.g. the
     // snippet turned out identical to what was already there) - there's nothing to focus in that case.
@@ -129,8 +129,8 @@ public partial class TutorialStepViewModel : ObservableObject
 
     private bool CanViewInDiff() => Hunk.MatchedDiffHunks.Count > 0;
 
-    // T7.3.2: a scoped follow-up asking Claude to go deeper on just this one step, resuming the
-    // conversation that produced it (T7.3.1) rather than starting fresh - so it already has the
+    // A scoped follow-up asking Claude to go deeper on just this one step, resuming the
+    // conversation that produced it rather than starting fresh - so it already has the
     // whole file/tutorial as context and only needs to be told which step to elaborate on.
     [RelayCommand(CanExecute = nameof(CanExplainFurther))]
     private async Task ExplainFurtherAsync()
@@ -158,7 +158,7 @@ public partial class TutorialStepViewModel : ObservableObject
 
     private bool CanExplainFurther() => !IsExplaining;
 
-    // T7.3.3: lets the user ask anything about this step - not just "go deeper" - while still
+    // Lets the user ask anything about this step - not just "go deeper" - while still
     // resuming the same session so Claude already has the whole file/tutorial as context.
     [RelayCommand(CanExecute = nameof(CanAskQuestion))]
     private async Task AskQuestionAsync()

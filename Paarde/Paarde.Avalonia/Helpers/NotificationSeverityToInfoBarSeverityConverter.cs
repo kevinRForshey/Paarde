@@ -8,7 +8,7 @@ using Paarde.Presentation.Models;
 
 namespace Paarde.Avalonia.Helpers;
 
-// specs/presentation-extraction R2.1: view models expose the UI-agnostic NotificationSeverity;
+// View models expose the UI-agnostic NotificationSeverity;
 // InfoBar.Severity needs FluentAvalonia's InfoBarSeverity. Member names/order are kept identical
 // (guarded by NotificationSeverityToInfoBarSeverityConverterTests), so this is a plain cast.
 public class NotificationSeverityToInfoBarSeverityConverter : IValueConverter

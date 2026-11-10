@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Helpers;
 
-// T14.1.1: backs the prompt box's `@`-triggered autocomplete popup. Operates on a FileTreeEntry
+// Backs the prompt box's `@`-triggered autocomplete popup. Operates on a FileTreeEntry
 // tree (the same shape FileTreeBuilder.Build already produces for Explorer, T8.1.1) rather than
 // walking the filesystem itself, so it stays gitignore-agnostic (whatever tree it's given is
 // already filtered) and trivially testable against an in-memory fake tree - no temp directories

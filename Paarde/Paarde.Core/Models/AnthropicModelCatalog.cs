@@ -2,7 +2,7 @@ namespace Paarde.Core.Models;
 
 public record AnthropicModelInfo(string Id, string DisplayName);
 
-// The models T6.3.3's Settings picker offers for AnthropicApiRunner (T6.3.2) - current as of this
+// The models T6.3.3's Settings picker offers for AnthropicApiRunner - current as of this
 // project's last update; Anthropic doesn't expose a "list models" endpoint that works with a plain
 // API key, so this has to be a maintained list rather than something fetched at runtime.
 public static class AnthropicModelCatalog

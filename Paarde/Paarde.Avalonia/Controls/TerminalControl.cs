@@ -12,12 +12,12 @@ using Paarde.Core.Services;
 
 namespace Paarde.Avalonia.Controls;
 
-// specs/terminal-emulation, T3: custom-drawn character grid for a TerminalBuffer. Render(DrawingContext)
+// Custom-drawn character grid for a TerminalBuffer. Render(DrawingContext)
 // rather than a templated control - the same way every terminal emulator draws itself, since a screen's
 // worth of individually-styled cells isn't expressible as nested TextBlocks at any reasonable
 // performance.
 //
-// T4 (R4.1/R4.2): keystrokes are encoded here and handed off via InputReceived rather than this
+// Keystrokes are encoded here and handed off via InputReceived rather than this
 // control taking a direct dependency on IPtyProcessManager - the same "stay ignorant of the
 // service, raise an event" shape CodeEditor already uses for GhostTextRequestedEventArgs etc. The
 // byte[] shape intentionally matches IPtyProcessManager.WriteInput(byte[]) exactly, so a consumer
@@ -110,7 +110,7 @@ public sealed class TerminalControl : Control
     }
 
     // Raw bytes the control wants written to the PTY, already encoded as a real terminal would
-    // send them (R4.1).
+    // send them.
     public event Action<byte[]>? InputReceived;
 
     protected override void OnTextInput(TextInputEventArgs e)

@@ -98,9 +98,11 @@ and existing tests must keep their counts after every task.
 
   Avalonia doesn't navigate to Review after a run either, so the Home page's "you'll be taken to
   the Review tab" wording is out of date in both apps.
-  **Found (shared code, both apps, not fixed here):** `LocalSettingsService.SaveSettingAsync` writes
+  **Found (shared code, both apps):** `LocalSettingsService.SaveSettingAsync` writes
   `LocalSettings.json` from `Task.Run` with no lock. Switching the working directory triggered two
   saves at once, and one failed with an `IOException`, logged as a WRN by `RunPanelViewModel`.
+  _Fixed 2026-11-10: `LocalSettingsService` and `SecureStorageService` serialize load/change/write
+  with a `SemaphoreSlim`._
   **Not yet exercised:** the pickers (Browse, Add files/folder) and Suggest relevant files.
   Both solutions build with 0 warnings/0 errors; test counts unchanged.
 
@@ -126,12 +128,20 @@ and existing tests must keep their counts after every task.
     program, its green output rendered, and the exit code was reported. Stop reported "Stopped."
   - Rows snap to device pixels; before that fix, faint seams showed between rows.
 
-  **Found (shared Core, both apps, not fixed here):**
+  **Found (shared Core, both apps):**
   - `TerminalBuffer` never answers terminal queries (DA/DSR/OSC colour), so a TUI that waits for
     a reply (Microsoft `edit`) hangs on "…".
   - Ctrl+C reaches cmd (a new prompt appears), but a running `ping` isn't interrupted.
   - Cancel/Stop end only the top-level process: `edit.exe` (under `cmd`) and `Greeter.exe`
     (under `dotnet run`) were left running.
+
+  _All three fixed 2026-11-10 (tests added; real TUI apps not re-checked by hand):_
+  - XTerm.NET already generates the replies (its `DataReceived` event). `TerminalBuffer` raises
+    them as `ResponseReady`, and the Run and Terminal view models write them to the PTY.
+  - Ctrl+C: a process started in a new process group ignores Ctrl+C, and its children inherit
+    that. `PtyProcessManager` clears the flag (`SetConsoleCtrlHandler(NULL, FALSE)`) before
+    spawning.
+  - Stop kills the shell's whole process tree. Porta.Pty's `Kill()` ends only the shell.
 
   **Not exercised:** the Problems tab with real diagnostics (needs a language server, F31.7).
   Both solutions build with 0 warnings/0 errors; test counts unchanged.
@@ -233,9 +243,14 @@ and existing tests must keep their counts after every task.
     fixed: on Windows, DPAPI throws a plain `CryptographicException`, not the AES-GCM subclass the
     test expected.
   - Avalonia 51/51: 7 tests moved out.
-  - Core is unchanged by this feature. It shows 40 failures in this shell, all in tests that start
-    external processes (the language-server stubs, the Claude CLI runner, git, Headroom) or check
-    CRLF.
+  - Core 565/565, after a follow-up that made the suite run on Windows. Before it, 40 Core tests
+    failed there:
+    - The fake CLIs were Unix shell scripts. They're now Python, behind a `.cmd` wrapper on
+      Windows (`TestSupport/FakeExecutable`).
+    - Git's read-only object files blocked temp cleanup (`TestSupport/TempDirectory`).
+    - The prompt template picked up CRLF line endings from the checkout.
+    - `ProcessCommandRunner` broke quoted commands under `cmd.exe`. This was a real bug: Headroom
+      commands failed on Windows.
 
 ## F31.8 — Wrap-up
 

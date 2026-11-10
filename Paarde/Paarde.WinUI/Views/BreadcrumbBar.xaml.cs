@@ -6,7 +6,7 @@ using Paarde.Presentation.Helpers;
 
 namespace Paarde.WinUI.Views;
 
-// specs/editor-intelligence R5: thin breadcrumb strip above the code editor, bound to the tab's
+// Thin breadcrumb strip above the code editor, bound to the tab's
 // DocumentSymbols plus the editor's CaretPosition - port of Paarde.Avalonia's BreadcrumbBar.
 public sealed partial class BreadcrumbBar : UserControl
 {
@@ -16,7 +16,7 @@ public sealed partial class BreadcrumbBar : UserControl
     public static readonly DependencyProperty CaretPositionProperty =
         DependencyProperty.Register(nameof(CaretPosition), typeof(LspPosition), typeof(BreadcrumbBar), new PropertyMetadata(null, OnInputChanged));
 
-    // specs/editor-intelligence R4/R5: the host forwards this through the same
+    // The host forwards this through the same
     // NavigateToLocation path the outline panel uses.
     public event EventHandler<LspDocumentSymbol>? SegmentClicked;
 

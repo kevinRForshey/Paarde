@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Presentation.Helpers;
 
-// specs/editor-intelligence R5: pure function (no Avalonia dependency) so BreadcrumbPathBuilderTests
+// Pure function (no Avalonia dependency) so BreadcrumbPathBuilderTests
 // can exercise it directly - BreadcrumbBar.axaml only ever renders whatever this returns.
 public static class BreadcrumbPathBuilder
 {

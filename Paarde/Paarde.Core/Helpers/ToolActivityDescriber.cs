@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Paarde.Core.Helpers;
 
-// Epic 11 (F11.2): turns one read-only tool call into a short, human-readable description for
+// Turns one read-only tool call into a short, human-readable description for
 // ILlmRunner's onToolActivity callback. Shared between ClaudeCliRunner (whose tool names/fields
 // come straight from the CLI's own built-in Read/Grep/Glob tools) and AnthropicApiRunner (whose
 // read_file/grep/glob tool schemas are this app's own, with different names and field names) so

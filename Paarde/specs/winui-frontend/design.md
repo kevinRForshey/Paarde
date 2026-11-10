@@ -267,5 +267,8 @@ navigation) on the simplest page.
 - ~~O1 — Code editor control (spike in F31.6).~~ Decided: Monaco in `WebView2` (see "Code editor").
 - ~~O3 — How `monaco-editor`'s `min/vs` gets into the build.~~ Decided in F31.7: downloaded at
   build time with a pinned SHA-512 (see "Code editor").
-- O2 — Should the settings folder eventually be renamed from `Paarde.Avalonia/ApplicationData` to
-  something host-neutral? Not in this epic (would need a migration); sharing the current one is fine.
+- ~~O2 — Should the settings folder be renamed from `Paarde.Avalonia/ApplicationData` to something
+  host-neutral?~~ Done 2026-11-10: it's now `Paarde/ApplicationData`. At startup each host moves
+  the legacy folder across (`ApplicationDataPaths.MoveLegacyFolder`), but only when it's using the
+  default folder. If the move fails (an older build holds a log file open), `Resolve` keeps
+  returning the legacy folder and the move is retried at the next start.

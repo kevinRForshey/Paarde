@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Presentation.ViewModels;
 
-// Epic 24, R1: a DI singleton (ShellViewModel property, same "singleton handed in" shape as
+// A DI singleton (ShellViewModel property, same "singleton handed in" shape as
 // RunPanelViewModel/StatusBarViewModel) so Ctrl+P reaches the same instance regardless of which
 // page is currently navigated to. Keeps its own FileTreeEntry cache rather than sharing
 // PromptViewModel's @mention cache - same duplication Epic 14 already accepts between its own
@@ -29,7 +29,7 @@ public partial class QuickOpenViewModel : ObservableObject
     private FileTreeEntry? _cachedTree;
     private string? _cachedTreeWorkingDirectory;
 
-    // Epic 24, R3.2: set once by ShellViewModel after both singletons exist, so opening this
+    // Set once by ShellViewModel after both singletons exist, so opening this
     // popup can close the command palette without the two depending on each other through DI
     // construction (which would be a circular singleton dependency).
     private CommandPaletteViewModel? _commandPaletteViewModel;

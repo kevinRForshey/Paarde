@@ -29,7 +29,7 @@ public class LanguageServerOptionsProvider
     public Task SaveOptionsAsync(IReadOnlyList<LanguageServerOptions> options) =>
         _localSettingsService.SaveSettingAsync(LanguageServerSettingsKeys.Collection, options.ToList());
 
-    // specs/multi-language-support/requirements.md R1.3: a user who already customized Epic 17's
+    // A user who already customized Epic 17's
     // single global C# executable/arguments keeps that customization instead of silently reverting
     // to "csharp-ls" the first time this per-language collection is read - folded into the new
     // defaults exactly once; the legacy keys themselves are never written to again after this.

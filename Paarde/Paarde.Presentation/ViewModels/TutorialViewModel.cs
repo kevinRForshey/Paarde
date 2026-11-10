@@ -33,18 +33,18 @@ public partial class TutorialViewModel : ObservableRecipient
     private readonly IBuildTestRunner _buildTestRunner;
     private readonly ILogger<TutorialViewModel> _logger;
 
-    // T8.4.5: the step TutorialDetailControl should scroll to once it's materialized for the file a
+    // The step TutorialDetailControl should scroll to once it's materialized for the file a
     // TutorialJumpRequest selected - "take once" (read and cleared by TutorialDetailControl.axaml.cs)
     // so a later, unrelated re-materialization of the same control never re-triggers the scroll.
     private ProposedHunk? _pendingStepTarget;
 
-    // T8.4.1: the `## Tutorial` overview PromptViewModel parses into PromptResultStore.Tutorial but
+    // The `## Tutorial` overview PromptViewModel parses into PromptResultStore.Tutorial but
     // no view previously read - refreshed from the store eagerly at construction and again on every
     // subsequent run, now that this view model is a singleton with no OnNavigatedTo to re-pull it on.
     [ObservableProperty]
     private string tutorial = string.Empty;
 
-    // Epic 25: the file list's own selection is now just a "focus this file in Explorer" trigger
+    // The file list's own selection is now just a "focus this file in Explorer" trigger
     // (see OnSelectedFileListItemChanged below) rather than the page's actual detail-pane state -
     // Selected itself (just below) reads Explorer's currently focused tab instead.
     [ObservableProperty]
@@ -52,7 +52,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
     private ExplorerViewModel? _explorer;
 
-    // Epic 25: Explorer's own tabs are now the single place a file's content/diff lives (no second
+    // Explorer's own tabs are now the single place a file's content/diff lives (no second
     // tab strip here - see the removed OpenTabs) - Selected just mirrors whichever of those tabs is
     // currently focused. AttachExplorer (called once, by ExplorerViewModel's own constructor) breaks
     // what would otherwise be a constructor-injection cycle
@@ -73,7 +73,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
     public ProposedFileChangeViewModel? Selected => _explorer?.SelectedTab?.PendingChange;
 
-    // Epic 25, R7: replaces the old DiffJumpRequest/TutorialJumpRequest navigation - raised by the
+    // Replaces the old DiffJumpRequest/TutorialJumpRequest navigation - raised by the
     // file list's own selection (below, with a null hunk) and by a step card's "View in Diff" action
     // (TutorialStepViewModel, with the hunk it resolved to) so Explorer can open/focus the right tab
     // without either side depending on navigation.
@@ -93,7 +93,7 @@ public partial class TutorialViewModel : ObservableRecipient
     [ObservableProperty]
     private bool stageAppliedFilesInGit = true;
 
-    // T7.3.2: the scoped "refine this file" follow-up - a resumed-session request to change only
+    // The scoped "refine this file" follow-up - a resumed-session request to change only
     // Selected, reusing the same instruction template/parsing pipeline as the main run rather than
     // a bespoke one.
     [ObservableProperty]
@@ -105,13 +105,13 @@ public partial class TutorialViewModel : ObservableRecipient
     [ObservableProperty]
     private bool isRefining;
 
-    // Epic 15, T15.2: no bindable GhostTextSuggestion property here like ExplorerViewModel's -
+    // No bindable GhostTextSuggestion property here like ExplorerViewModel's -
     // TutorialDetailControl's Editor binds to a ProposedFileChangeViewModel, not this VM, so there's
     // nothing for an AXAML binding to reach. RequestGhostTextCompletionAsync below just returns the
     // suggestion directly and TutorialDetailControl's code-behind assigns it to Editor.GhostTextSuggestion.
     private CancellationTokenSource? _ghostTextCancellationTokenSource;
 
-    // T8.4.4: status for the export-to-file commands below, surfaced the same inline way as
+    // Status for the export-to-file commands below, surfaced the same inline way as
     // ApplyStatusMessage rather than a dialog - exporting isn't a destructive/multi-outcome
     // operation worth interrupting the user for.
     [ObservableProperty]
@@ -119,7 +119,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
     public ObservableCollection<ProposedFileChangeViewModel> Files { get; } = new();
 
-    // T4.2.3: display-ready rows for the apply-history log, newest first. Populated from
+    // Display-ready rows for the apply-history log, newest first. Populated from
     // IApplyHistoryLog rather than bound to it directly, since that store's Entries is a plain
     // IReadOnlyList<ApplyHistoryEntry> with no change notification the view could bind to.
     public ObservableCollection<string> ApplyHistoryEntries { get; } = new();
@@ -154,7 +154,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
         ApplyHistoryEntries.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasApplyHistory));
 
-        // Epic 25: this view model is now a singleton with no OnNavigatedTo to re-pull the store on
+        // This view model is now a singleton with no OnNavigatedTo to re-pull the store on
         // - refresh eagerly once (covers a run that finished before this was constructed) and again
         // on every subsequent run. FakePromptResultStore.SetResult raises PropertyChanged with a
         // null PropertyName for its own bulk-invalidation callers (see AssistantPanelViewModelTests'
@@ -219,7 +219,7 @@ public partial class TutorialViewModel : ObservableRecipient
         ExportTutorialAsHtmlCommand.NotifyCanExecuteChanged();
     }
 
-    // Epic 25, R7: selecting a file from the master list is now just a "focus this file in
+    // Selecting a file from the master list is now just a "focus this file in
     // Explorer" request - Explorer opening/activating the tab is what actually updates Selected
     // (via AttachExplorer's subscription above), not this handler itself.
     partial void OnSelectedFileListItemChanged(ProposedFileChangeViewModel? value)
@@ -245,9 +245,9 @@ public partial class TutorialViewModel : ObservableRecipient
         return target;
     }
 
-    // F3.3: applies every selected hunk/whole-file change across every file in the tutorial, not
+    // Applies every selected hunk/whole-file change across every file in the tutorial, not
     // just the one file currently shown in the detail pane. Confirms with a pre-apply summary
-    // (T3.3.1) before touching disk, then reports what happened per file (T3.3.3 conflicts,
+    // before touching disk, then reports what happened per file (T3.3.3 conflicts,
     // T3.3.4 partial failures) rather than assuming the whole batch succeeded.
     [RelayCommand]
     private async Task ApplySelectedAsync()
@@ -271,7 +271,7 @@ public partial class TutorialViewModel : ObservableRecipient
             return;
         }
 
-        // Asked separately from the general apply-confirm above (T4.3.2): unlike protected paths,
+        // Asked separately from the general apply-confirm above: unlike protected paths,
         // overwriting a file that's already dirty in git isn't something a per-file skip can make
         // safe - there's no commit to fall back on for it either way - so declining here cancels
         // the whole apply rather than just excluding those files from the batch.
@@ -290,7 +290,7 @@ public partial class TutorialViewModel : ObservableRecipient
             }
         }
 
-        // Asked separately from the general apply-confirm above (T4.1.2), so declining it only
+        // Asked separately from the general apply-confirm above, so declining it only
         // skips the protected files (reported below as ProtectedPathBlockedCount) rather than
         // aborting the whole batch - consistent with T3.3.4's "one file's problem never stops the
         // rest" philosophy.
@@ -333,7 +333,7 @@ public partial class TutorialViewModel : ObservableRecipient
             messageParts.Add("Tutorial_ApplySelectedResultStaged".Resolve());
         }
 
-        // F12.2: only worth checking the build/test commands configured on the Settings page if
+        // Only worth checking the build/test commands configured on the Settings page if
         // something actually changed on disk - skipped entirely (rather than just skipping the
         // confirm dialog) on a no-op apply, same as the dirty-files/protected-paths checks above
         // never run for a batch with nothing selected.
@@ -351,13 +351,13 @@ public partial class TutorialViewModel : ObservableRecipient
             "Tutorial_ApplySelectedResultClose".Resolve());
     }
 
-    // T12.1.3: a hung build/test command must not hang the whole apply flow - mirrors the safety
+    // A hung build/test command must not hang the whole apply flow - mirrors the safety
     // property (not the UI) of Prompt_RunTimedOut's CLI-run timeout, but fixed rather than a second
     // Settings-configurable value: unlike a long-running agentic CLI turn, a build or test command
     // that's still running after this long is realistically stuck, not just slow.
     private const int BuildTestTimeoutSeconds = 300;
 
-    // F12.2: runs the Settings-page-configured build/test commands (F12.1.2) against the working
+    // Runs the Settings-page-configured build/test commands against the working
     // directory right after an apply, appending their outcome to the same messageParts list
     // ApplySelectedAsync is already building up. A blank command (saved-but-blank, not merely
     // unset - see SettingsViewModel's own comment on this) skips that step entirely; the test
@@ -443,7 +443,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
     private static string FirstNonBlank(string preferred, string fallback) => string.IsNullOrWhiteSpace(preferred) ? fallback : preferred;
 
-    // T12.2.2: lets SendBuildTestErrorsToClaudeCommand act on the most recent build/test failure -
+    // Lets SendBuildTestErrorsToClaudeCommand act on the most recent build/test failure -
     // cleared at the start of every RunConfiguredBuildAndTestAsync call so a stale failure from an
     // earlier apply never lingers once a newer one has run (whether or not that newer run failed
     // too; a fresh SetPendingBuildTestFailure call right after this one re-populates it if it did).
@@ -476,12 +476,12 @@ public partial class TutorialViewModel : ObservableRecipient
 
     partial void OnIsSendingBuildTestErrorsToClaudeChanged(bool value) => SendBuildTestErrorsToClaudeCommand.NotifyCanExecuteChanged();
 
-    // T12.2.2/T12.2.3: builds a follow-up prompt from the captured build/test failure and resumes
-    // the same CLI conversation (T7.3.1), the same resumeSessionId approach RefineSelectedFileAsync
+    // Builds a follow-up prompt from the captured build/test failure and resumes
+    // the same CLI conversation, the same resumeSessionId approach RefineSelectedFileAsync
     // already uses - Claude already has the original instruction/tutorial in that conversation's
     // history, so this only needs to describe what broke, not restate the whole original ask. Any
     // corrected files it returns flow through StructuredResponseParser and merge into Files the
-    // same way a normal run's response does - no second, unreviewed write path (T12.2.3).
+    // same way a normal run's response does - no second, unreviewed write path.
     [RelayCommand(CanExecute = nameof(CanSendBuildTestErrorsToClaude))]
     private async Task SendBuildTestErrorsToClaudeAsync()
     {
@@ -545,7 +545,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
     private bool CanSendBuildTestErrorsToClaude() => HasPendingBuildTestFailure && !IsSendingBuildTestErrorsToClaude;
 
-    // T4.2.2: reverts the files touched by the most recent ApplySelected batch to their content
+    // Reverts the files touched by the most recent ApplySelected batch to their content
     // from immediately before that batch, confirming first since it overwrites whatever's on disk
     // now. Nothing-to-undo is reported the same way ApplySelectedAsync reports nothing-selected -
     // inline via ApplyStatusMessage - rather than disabling the command, consistent with how this
@@ -580,7 +580,7 @@ public partial class TutorialViewModel : ObservableRecipient
             "Tutorial_UndoLastApplyResultClose".Resolve());
     }
 
-    // T4.2.2: reverts every file this session has applied a change to, back to its content from
+    // Reverts every file this session has applied a change to, back to its content from
     // before this session touched it at all - not just the most recent batch, so this is confirmed
     // separately and more strongly worded than UndoLastApplyAsync.
     [RelayCommand]
@@ -615,8 +615,8 @@ public partial class TutorialViewModel : ObservableRecipient
             "Tutorial_RevertAllAppliedResultClose".Resolve());
     }
 
-    // T7.3.2: a scoped follow-up that only asks Claude to change Selected, resuming the conversation
-    // that produced the current result (T7.3.1) so it already has the whole tutorial as context.
+    // A scoped follow-up that only asks Claude to change Selected, resuming the conversation
+    // that produced the current result so it already has the whole tutorial as context.
     // Reuses the main run's instruction template/JSON contract and StructuredResponseParser rather
     // than a bespoke prompt/parse path, so a successful response is just another file in the same
     // shape Files already holds - deliberately no schema-validation retry loop here (unlike the main
@@ -669,7 +669,7 @@ public partial class TutorialViewModel : ObservableRecipient
 
     private bool CanRefineSelectedFile() => Selected is not null && !string.IsNullOrWhiteSpace(RefineInstruction) && !IsRefining;
 
-    // Epic 15, T15.2.1/T15.2.2: handles TutorialDetailControl's Editor.GhostTextRequested, forwarded
+    // Handles TutorialDetailControl's Editor.GhostTextRequested, forwarded
     // up via FindAncestorOfType<TutorialView>().ViewModel the same way ApplyPendingStepTarget already
     // reaches this page-level view model - Editor's DataContext is the per-file
     // ProposedFileChangeViewModel, which has no ILlmRunner (deliberately - see its own doc comment),
@@ -710,7 +710,7 @@ public partial class TutorialViewModel : ObservableRecipient
         }
     }
 
-    // T8.4.4: builds a self-contained document (TutorialExporter, Core) a user can save and share
+    // Builds a self-contained document (TutorialExporter, Core) a user can save and share
     // outside the app - Markdown and HTML share this one picker-then-write flow, differing only in
     // which exporter/file-type/extension they pass in.
     [RelayCommand(CanExecute = nameof(CanExportTutorial))]
@@ -793,7 +793,7 @@ public partial class TutorialViewModel : ObservableRecipient
         }
     }
 
-    // T4.2.3: re-reads IApplyHistoryLog.Entries (oldest first) and rebuilds the display list
+    // Re-reads IApplyHistoryLog.Entries (oldest first) and rebuilds the display list
     // newest first, so the most recent apply/undo/revert always shows at the top.
     private void RefreshApplyHistoryEntries()
     {

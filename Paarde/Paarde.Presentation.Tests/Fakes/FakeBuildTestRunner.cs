@@ -14,7 +14,7 @@ public class FakeBuildTestRunner : IBuildTestRunner
 
     public int RunAsyncCallCount { get; private set; }
 
-    // Stands in for IBuildTestRunner.RunAsync's real timeout/cancellation behavior (T12.1.3) -
+    // Stands in for IBuildTestRunner.RunAsync's real timeout/cancellation behavior -
     // throwing on the next call rather than the ProcessCommandRunnerTests approach of actually
     // waiting out a real cancellation token, since this fake has no process to cancel.
     public bool ThrowOperationCanceledOnNextRun { get; set; }

@@ -5,10 +5,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace Paarde.Core.ViewModels;
 
 // Wraps a single parsed tutorial step as a selectable unit of change, carrying the resolved line
-// range (if any) its snippet produces in the file. IsSelected drives the per-step checkbox (F3.2)
+// range (if any) its snippet produces in the file. IsSelected drives the per-step checkbox
 // and the owning ProposedFileChangeViewModel's tri-state file-level rollup, and (via
 // ProposedFileChangeViewModel.BuildSelectedContent) determines whether this step's diff hunk(s) end
-// up in what actually gets written (F3.3).
+// up in what actually gets written.
 public partial class ProposedHunk : ObservableObject
 {
     public string Title { get; }

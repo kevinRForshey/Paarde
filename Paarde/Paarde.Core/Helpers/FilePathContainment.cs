@@ -2,7 +2,7 @@ namespace Paarde.Core.Helpers;
 
 // Canonicalizes a tutorial-relative file path against the project's working directory and rejects
 // anything that escapes it (path traversal, or an absolute/rooted LLM-supplied path) - extracted from
-// FileChangeApplyService (T4.1.1) so ApplyOrchestrationService's pre-write conflict check (T3.3.3)
+// FileChangeApplyService so ApplyOrchestrationService's pre-write conflict check
 // can resolve the same path the write itself will use, rather than reading a file outside the
 // project root before the write-time check would have caught it.
 public static class FilePathContainment

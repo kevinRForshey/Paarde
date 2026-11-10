@@ -10,14 +10,14 @@ using Newtonsoft.Json.Linq;
 
 namespace Paarde.Core.Services;
 
-// The CLI implementation of ILlmRunner (T6.3.1) - a direct Anthropic API runner (T6.3.2) is meant
+// The CLI implementation of ILlmRunner - a direct Anthropic API runner is meant
 // to be a second one. CLI-specific configuration (executable path/arguments) is resolved through
 // optionsProvider rather than taken as a per-call parameter, since Core can't depend on the
 // Avalonia-layer settings service that actually stores it (see ClaudeCliOptionsProvider).
 public class ClaudeCliRunner : ILlmRunner
 {
-    // Fixed flags required to get NDJSON stream-json output with token-level text deltas (T6.2.1) -
-    // appended unconditionally after the user-configured arguments (T6.1.4), since streaming is now
+    // Fixed flags required to get NDJSON stream-json output with token-level text deltas -
+    // appended unconditionally after the user-configured arguments, since streaming is now
     // a hard requirement for this service to parse its own output, not an optional CLI choice.
     private static readonly string[] StreamingArguments = { "--output-format", "stream-json", "--include-partial-messages", "--verbose" };
 
@@ -39,12 +39,12 @@ public class ClaudeCliRunner : ILlmRunner
     {
         var options = await _optionsProvider();
 
-        // T7.3.1: --resume continues the CLI's own session identified by an earlier result's
+        // --resume continues the CLI's own session identified by an earlier result's
         // session_id, rather than starting a fresh conversation - this is what makes a follow-up
         // prompt carry the prior turn's context.
         var resumeArguments = string.IsNullOrWhiteSpace(resumeSessionId) ? Enumerable.Empty<string>() : new[] { "--resume", resumeSessionId };
 
-        // Epic 11 (F11.1.2): "default" (not "bypassPermissions") because the CLI itself should still
+        // "default" (not "bypassPermissions") because the CLI itself should still
         // own enforcing the allow-list - Paarde isn't re-implementing permission checking here, just
         // asking the CLI to let its own agent loop read/search the repo.
         var agentToolsArguments = options.AgentToolsEnabled
@@ -92,7 +92,7 @@ public class ClaudeCliRunner : ILlmRunner
         var assistantText = new StringBuilder();
         var standardError = new StringBuilder();
 
-        // Epic 11 (F11.2.1): a tool_use content block's name arrives on content_block_start, but
+        // A tool_use content block's name arrives on content_block_start, but
         // its input only finishes streaming in (via input_json_delta) by content_block_stop - so
         // these track in-progress blocks by index the same way AnthropicApiRunner.ParseStreamAsync
         // does, keyed only for blocks that are actually tool_use (text blocks are still just
@@ -105,7 +105,7 @@ public class ClaudeCliRunner : ILlmRunner
         int? outputTokens = null;
         string? sessionId = null;
 
-        // Each line of stdout is one NDJSON object (T6.2.1) rather than plain text now that the CLI
+        // Each line of stdout is one NDJSON object rather than plain text now that the CLI
         // is invoked with --output-format stream-json. A line that isn't a well-formed JSON object
         // is swallowed rather than crashing the run - the CLI shouldn't produce one, but this is an
         // external process's output, not something this code controls.
@@ -221,7 +221,7 @@ public class ClaudeCliRunner : ILlmRunner
         }
         catch (OperationCanceledException)
         {
-            // WaitForExitAsync throwing doesn't stop the child process on its own (T6.1.1) - without
+            // WaitForExitAsync throwing doesn't stop the child process on its own - without
             // this, cancelling (or a timeout firing) would leave `claude` - and, on Windows, the
             // cmd.exe wrapper's own child - running in the background after this call returns.
             if (!process.HasExited)
@@ -234,7 +234,7 @@ public class ClaudeCliRunner : ILlmRunner
 
         var errorMessage = standardError.ToString().TrimEnd();
 
-        // T11.1.4: a CLI build too old to recognize --allowedTools/--permission-mode fails with its
+        // A CLI build too old to recognize --allowedTools/--permission-mode fails with its
         // own argument-parsing error (e.g. "error: unknown option '--allowedTools'") rather than
         // anything that names the actual problem - only worth checking for when this run is the one
         // that added those flags, since an unrelated argument-parsing failure shouldn't be relabeled.
