@@ -177,7 +177,9 @@ carry an id that C# answers with `paarde.resolve(id, value)`. This matches the e
 - **One `WebView2` per Explorer page, not per tab.** Each open tab gets its own Monaco model, and
   `setModel` plus `saveViewState`/`restoreViewState` switch tabs. This avoids ~90 MB per open tab.
   Avalonia gives each `ExplorerFileTabControl` its own `CodeEditor`, so the WinUI editor will sit
-  outside the `TabView` items and follow the selected tab.
+  outside the `TabView` items and follow the selected tab. _(F31.7: one per tab group, so at most
+  two. The split group's editor is created by `x:Load` when a tab is first split right and thrown
+  away when its last tab closes.)_
 - **Keyboard:** WebView2 has its own input queue, so WinUI `KeyboardAccelerator`s never see keys
   pressed inside the editor. The page forwards Ctrl+P, Ctrl+Shift+P and Ctrl+Shift+O to C#;
   forwarding was verified. `AreBrowserAcceleratorKeysEnabled = false` turns off browser keys such
@@ -193,14 +195,16 @@ carry an id that C# answers with `paarde.resolve(id, value)`. This matches the e
 - **AMD build:** Monaco marks its AMD build (`loader.js`) deprecated in favour of ESM, which needs a
   bundler. AMD is still in 0.57.0, needs no JavaScript build step, and is pinned. Moving to ESM is
   only needed if a future upgrade drops AMD.
-- **Text sync:** the spike sends the full text on every edit. F31.7 should debounce this, as
-  `ExplorerViewModel`'s dirty tracking only needs the final text.
-- **Getting `min/vs` into the build is still open** (about 25 MB). The options are:
-  - commit it to the repo;
-  - an MSBuild target that downloads the pinned npm tarball, checks its SHA-512 and extracts it
-    with Windows' built-in `tar`, so Node isn't needed at build time.
-
-  To decide at the start of F31.7.
+- **Text sync:** the spike sends the full text on every edit. _(F31.7 kept this rather than
+  debouncing: a debounce would let Save write text that's a few keystrokes stale, and the full
+  text of a source file is cheap to post.)_
+- **Getting `min/vs` into the build (O3, decided in F31.7): downloaded at build time.** The
+  `DownloadMonaco` target in `Paarde.WinUI.csproj` fetches the pinned npm tarball
+  (`MonacoVersion`), fails the build unless its SHA-512 matches `MonacoSha512`, and extracts
+  `package/min/vs` and `LICENSE` with Windows' built-in `tar` into `obj/monaco/<version>/`. Node
+  isn't needed, and later builds reuse the extracted copy. `IncludeMonaco` then adds the files as
+  `None` items linked under `Editor\vs\`. Upgrading means changing the version and the hash
+  together.
 
 Original candidate list, kept for reference:
 
@@ -250,8 +254,9 @@ navigation) on the simplest page.
   some (F12 in the editor, Ctrl+Tab) may be swallowed by focused controls and need
   `ProcessKeyboardAccelerators` handling. _(F31.5: the shell's three accelerators work from
   every page and from inside the popups. `TerminalControl` handles keys in `PreviewKeyDown`, so a
-  focused terminal keeps Ctrl+P, as in Avalonia. The editor's F12 and Ctrl+Tab are still open
-  for F31.7.)_
+  focused terminal keeps Ctrl+P, as in Avalonia. F31.7: F12/Shift+F12 are Monaco actions posted to
+  C#; Ctrl+Tab, Ctrl+K Z and the three shell shortcuts are forwarded from the editor page, and
+  `ExplorerView` handles Ctrl+Tab in `PreviewKeyDown` because `TabView` would otherwise take it.)_
 - **Shared settings**: a WinUI-only setting added later must not break the Avalonia app — keep all
   keys in Presentation's `*SettingsKeys`, read with defaults.
 - **Unpackaged APIs**: some Windows APIs (notifications, `ApplicationData`) need package identity;
@@ -260,7 +265,7 @@ navigation) on the simplest page.
 ## Open questions
 
 - ~~O1 — Code editor control (spike in F31.6).~~ Decided: Monaco in `WebView2` (see "Code editor").
-- O3 — How `monaco-editor`'s `min/vs` gets into the build: committed, or downloaded at build time
-  with a pinned hash. To decide at the start of F31.7.
+- ~~O3 — How `monaco-editor`'s `min/vs` gets into the build.~~ Decided in F31.7: downloaded at
+  build time with a pinned SHA-512 (see "Code editor").
 - O2 — Should the settings folder eventually be renamed from `Paarde.Avalonia/ApplicationData` to
   something host-neutral? Not in this epic (would need a migration); sharing the current one is fine.

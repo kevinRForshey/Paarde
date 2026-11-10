@@ -190,10 +190,52 @@ and existing tests must keep their counts after every task.
 
 ## F31.7 — Explorer
 
-- [ ] T14 WinUI `CodeEditor` on the chosen control, covering every R4.4 item. _(R4.4)_
-- [ ] T15 `ExplorerView`, `ExplorerFileTabControl`, `BreadcrumbBar`, `AssistantPanelControl`,
+- [x] T14 WinUI `CodeEditor` on the chosen control, covering every R4.4 item. _(R4.4)_
+  Done 2026-11-09. `Controls/CodeEditor.cs` hosts `Editor/index.html` (the Monaco bridge) in a
+  `WebView2`:
+  - The API is imperative and keyed by file path (`ShowDocument`, `UpdateText`, `SetDiagnostics`,
+    `SetDiff`, `RevealPosition`).
+  - Completion, hover and ghost text are async provider delegates.
+  - The editor's Accept/Reject glyphs, F12, Shift+F12 and the forwarded shortcuts are raised as
+    events.
+
+  O3 was decided as a build-time download with a pinned SHA-512 (design.md "Code editor").
+  Avalonia's `DiffBackgroundRenderer.ComputeBands` moved to
+  `Paarde.Presentation/Helpers/DiffBandBuilder` so both editors share it. Its 7 tests moved with
+  it (`DiffBandBuilderTests`).
+- [x] T15 `ExplorerView`, `ExplorerFileTabControl`, `BreadcrumbBar`, `AssistantPanelControl`,
   pane splitters. Manual check: open/edit/save, diagnostics, completion, ghost text, F12, inline
   diff accept/reject. _(R4.1, R4.4, R5.2)_
+  Done 2026-11-09. Layout notes:
+  - There's one `ExplorerFileTabControl` and editor per tab group, not per tab. The `TabView`s are
+    only tab strips.
+  - Tree, Assistant and split-group widths persist through the same settings keys as Avalonia.
+  - Zen mode, Ctrl+Tab MRU and Split right are ported.
+
+  Manual check against the scratch data folder, with the C# language server:
+  - Open from the tree; editing marks the tab `*` and enables Save; Save writes to disk.
+  - The diagnostic squiggle shows; completion lists the server's items on `.`.
+  - The breadcrumb and the status-bar caret follow the cursor; the outline fills in.
+  - F12 jumps across files.
+  - Ctrl+Tab switches to the most recent tab with its caret restored; Ctrl+K Z works from inside
+    the editor.
+  - Split right opens a second group, and closing its last tab collapses it.
+  - Closing a dirty tab asks first.
+  - Review → file opens the tab with the proposed-change banner, the added/removed decorations and
+    the ✓/✗ glyphs. ✗ sets Review to "0/1 selected", and ✓ sets it back.
+
+  The tree items also got `AutomationProperties.Name`.
+  **Not exercised:** ghost text (it needs a live LLM call; the provider path is the same as
+  completion's) and hover.
+  **Builds and tests:**
+  - Both solutions build with 0 warnings.
+  - Presentation 415/415: 7 tests moved in. `SecureStorageServiceTests`' tamper test was also
+    fixed: on Windows, DPAPI throws a plain `CryptographicException`, not the AES-GCM subclass the
+    test expected.
+  - Avalonia 51/51: 7 tests moved out.
+  - Core is unchanged by this feature. It shows 40 failures in this shell, all in tests that start
+    external processes (the language-server stubs, the Claude CLI runner, git, Headroom) or check
+    CRLF.
 
 ## F31.8 — Wrap-up
 

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!-- specs/winui-frontend F31.7: the page Controls/CodeEditor.cs hosts in WebView2. Monaco (MIT,
+     downloaded at build time into Editor/vs - see Paarde.WinUI.csproj) does the editing; this page
+     is only the bridge. One Monaco model per open file, swapped with setModel, so a single editor
+     serves every tab of a group (design.md "Code editor").
+     JS -> C#: chrome.webview.postMessage({ type, ... }). C# -> JS: calls on window.paarde through
+     ExecuteScriptAsync; request/response features (completion, hover, ghost text) carry an id that
+     C# answers with paarde.resolve(id, value). -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body, #editor { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  /* Same colours as Paarde.Avalonia's DiffBackgroundRenderer. */
+  .paarde-diff-added { background: rgba(46, 160, 67, 0.235); }
+  .paarde-diff-removed-above { box-shadow: inset 0 2px 0 rgba(203, 36, 49, 0.78); }
+  .paarde-diff-removed-below { box-shadow: inset 0 -2px 0 rgba(203, 36, 49, 0.78); }
+  .paarde-hunk-accept, .paarde-hunk-reject { cursor: pointer; font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets'; font-size: 12px; text-align: center; }
+  .paarde-hunk-accept::before { content: '\E73E'; color: #3fb950; }
+  .paarde-hunk-reject::before { content: '\E711'; color: #f85149; }
+</style>
+</head>
+<body>
+<div id="editor"></div>
+<script src="vs/loader.js"></script>
+<script>
+'use strict';
+const post = message => window.chrome.webview.postMessage(message);
+window.addEventListener('error', e => post({ type: 'error', message: String(e.message) }));
+window.addEventListener('unhandledrejection', e => post({ type: 'error', message: String(e.reason) }));
+
+let nextRequestId = 1;
+const pendingRequests = new Map();
+function request(kind, payload) {
+  const id = nextRequestId++;
+  return new Promise(resolve => {
+    pendingRequests.set(id, resolve);
+    post({ type: 'request', kind, id, ...payload });
+  });
+}
+
+// WebView2 has its own input queue, so WinUI KeyboardAccelerators and the Explorer page's own key
+// handlers never see keys pressed in here - forward the ones the app owns. Capture phase, so this
+// runs before Monaco's own keybindings.
+window.addEventListener('keydown', e => {
+  const key = e.key.toLowerCase();
+  let gesture = null;
+  if (e.ctrlKey && !e.altKey && key === 'p') {
+    gesture = e.shiftKey ? 'Ctrl+Shift+P' : 'Ctrl+P';
+  } else if (e.ctrlKey && !e.altKey && e.shiftKey && key === 'o') {
+    gesture = 'Ctrl+Shift+O';
+  } else if (e.ctrlKey && !e.altKey && key === 'tab') {
+    gesture = 'Ctrl+Tab';
+  }
+
+  if (gesture) {
+    e.preventDefault();
+    e.stopPropagation();
+    post({ type: 'shortcut', gesture });
+  }
+}, true);
+window.addEventListener('keyup', e => {
+  if (e.key === 'Control') {
+    post({ type: 'shortcut', gesture: 'CtrlReleased' });
+  }
+}, true);
+
+require.config({ paths: { vs: 'vs' } });
+require(['vs/editor/editor.main'], () => {
+  const editor = monaco.editor.create(document.getElementById('editor'), {
+    model: null,
+    theme: 'vs-dark',
+    automaticLayout: true,
+    glyphMargin: true,
+    matchBrackets: 'always',
+    fontFamily: 'Cascadia Mono, Consolas, monospace',
+    fontSize: 14,
+    minimap: { enabled: false },
+    // Same triggers as Paarde.Avalonia's CodeEditor: "." or Ctrl+Space only - no per-keystroke
+    // completion requests, and no word-based guesses mixed into the language server's list.
+    quickSuggestions: false,
+    wordBasedSuggestions: 'off',
+    inlineSuggest: { enabled: true },
+  });
+
+  const models = new Map();       // file path -> ITextModel
+  const viewStates = new Map();   // file path -> saved scroll/caret/selection
+  const decorations = new Map();  // file path -> { diff: [...ids], hunks: [...ids] }
+  const hunkLines = new Map();    // file path -> [1-based anchor line per hunk index]
+  let applyingFromHost = false;
+
+  const pathOf = model => [...models].find(([, m]) => m === model)?.[0] ?? null;
+  const toPosition = p => ({ line: p.lineNumber - 1, character: p.column - 1 });
+
+  function getOrCreateModel(path, text) {
+    let model = models.get(path);
+    if (!model) {
+      model = monaco.editor.createModel(text, undefined, monaco.Uri.file(path));
+      models.set(path, model);
+      decorations.set(path, { diff: [], hunks: [] });
+    }
+    return model;
+  }
+
+  // External edits (Revert, edits made in Review) go through the undo stack rather than setValue,
+  // which would wipe it.
+  function replaceText(model, text) {
+    if (model.getValue() === text) {
+      return;
+    }
+    applyingFromHost = true;
+    try {
+      model.pushEditOperations([], [{ range: model.getFullModelRange(), text }], () => null);
+    } finally {
+      applyingFromHost = false;
+    }
+  }
+
+  editor.onDidChangeModelContent(() => {
+    const model = editor.getModel();
+    if (!applyingFromHost && model) {
+      post({ type: 'textChanged', path: pathOf(model), text: model.getValue() });
+    }
+  });
+  editor.onDidChangeCursorPosition(e => post({ type: 'caret', ...toPosition(e.position) }));
+  editor.onDidFocusEditorWidget(() => post({ type: 'focus' }));
+  editor.onDidBlurEditorWidget(() => post({ type: 'blur' }));
+
+  // Hunk gutter: the lane comes from the clicked glyph's own class (Monaco's
+  // detail.glyphMarginLane reported the left lane for both in the F31.6 spike).
+  editor.onMouseDown(e => {
+    if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+      return;
+    }
+    const classes = e.target.element?.classList;
+    const accept = classes?.contains('paarde-hunk-accept') ? true : classes?.contains('paarde-hunk-reject') ? false : null;
+    const path = pathOf(editor.getModel());
+    const index = (hunkLines.get(path) ?? []).indexOf(e.target.position.lineNumber);
+    if (accept !== null && index >= 0) {
+      post({ type: 'hunkAction', index, accept });
+    }
+  });
+
+  // F12 / Shift+F12: Paarde resolves the target itself (it may open another tab), so the editor
+  // only reports where the caret is. Actions rather than plain commands so they're also in the
+  // right-click menu.
+  editor.addAction({
+    id: 'paarde.goToDefinition', label: 'Go to Definition', keybindings: [monaco.KeyCode.F12],
+    contextMenuGroupId: 'navigation', contextMenuOrder: 1,
+    run: ed => post({ type: 'definition', ...toPosition(ed.getPosition()) }),
+  });
+  editor.addAction({
+    id: 'paarde.findReferences', label: 'Find All References', keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.F12],
+    contextMenuGroupId: 'navigation', contextMenuOrder: 2,
+    run: ed => post({ type: 'references', ...toPosition(ed.getPosition()) }),
+  });
+  // specs/editor-focus-layout R1: Ctrl+K then Z (zen mode) is a chord Monaco can recognise itself.
+  editor.addCommand(monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, monaco.KeyCode.KeyZ),
+    () => post({ type: 'shortcut', gesture: 'Ctrl+K Z' }));
+
+  // LSP CompletionItemKind (1-based) -> Monaco's own enum, which numbers the same kinds differently.
+  const lspKinds = [null, 'Text', 'Method', 'Function', 'Constructor', 'Field', 'Variable', 'Class', 'Interface', 'Module',
+    'Property', 'Unit', 'Value', 'Enum', 'Keyword', 'Snippet', 'Color', 'File', 'Reference', 'Folder', 'EnumMember',
+    'Constant', 'Struct', 'Event', 'Operator', 'TypeParameter'];
+  const toMonacoKind = kind => monaco.languages.CompletionItemKind[lspKinds[kind] ?? 'Text'] ?? monaco.languages.CompletionItemKind.Text;
+
+  // Registered for every language: Paarde's language servers decide what they can answer, and an
+  // empty reply just shows nothing.
+  monaco.languages.registerCompletionItemProvider('*', {
+    triggerCharacters: ['.'],
+    provideCompletionItems: async (model, position) => {
+      const items = await request('completion', toPosition(position));
+      const word = model.getWordUntilPosition(position);
+      const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+      return {
+        suggestions: (items ?? []).map(item => ({
+          label: item.label, detail: item.detail ?? undefined, insertText: item.insertText ?? item.label,
+          kind: toMonacoKind(item.kind), range,
+        })),
+      };
+    },
+  });
+
+  monaco.languages.registerHoverProvider('*', {
+    provideHover: async (model, position) => {
+      const contents = await request('hover', toPosition(position));
+      return contents ? { contents: [{ value: contents }] } : null;
+    },
+  });
+
+  // Ghost text (Epic 15): same 400 ms settle and caret window as Paarde.Avalonia's CodeEditor. Monaco
+  // cancels this call when typing continues, so the wait doubles as the debounce.
+  monaco.languages.registerInlineCompletionsProvider('*', {
+    provideInlineCompletions: async (model, position, context, token) => {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      if (token.isCancellationRequested) {
+        return { items: [] };
+      }
+      const offset = model.getOffsetAt(position);
+      const text = model.getValue();
+      const before = text.slice(Math.max(0, offset - 4000), offset);
+      const after = text.slice(offset, offset + 1000);
+      const suggestion = await request('ghost', { before, after });
+      if (!suggestion || token.isCancellationRequested) {
+        return { items: [] };
+      }
+      return { items: [{ insertText: suggestion, range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column) }] };
+    },
+    disposeInlineCompletions: () => {},
+  });
+
+  const severities = [monaco.MarkerSeverity.Error, monaco.MarkerSeverity.Warning, monaco.MarkerSeverity.Info, monaco.MarkerSeverity.Hint];
+
+  window.paarde = {
+    resolve: (id, value) => {
+      const resolve = pendingRequests.get(id);
+      pendingRequests.delete(id);
+      resolve?.(value);
+    },
+
+    showDocument: (path, text) => {
+      const current = editor.getModel();
+      if (current) {
+        viewStates.set(pathOf(current), editor.saveViewState());
+      }
+      const model = getOrCreateModel(path, text);
+      replaceText(model, text);
+      if (model !== current) {
+        editor.setModel(model);
+        const state = viewStates.get(path);
+        if (state) {
+          editor.restoreViewState(state);
+        }
+      }
+    },
+
+    clearDocument: () => editor.setModel(null),
+
+    updateText: (path, text) => {
+      const model = models.get(path);
+      if (model) {
+        replaceText(model, text);
+      }
+    },
+
+    closeDocument: path => {
+      const model = models.get(path);
+      if (model) {
+        if (editor.getModel() === model) {
+          editor.setModel(null);
+        }
+        model.dispose();
+        models.delete(path);
+        viewStates.delete(path);
+        decorations.delete(path);
+        hunkLines.delete(path);
+      }
+    },
+
+    setDiagnostics: (path, diagnostics) => {
+      const model = models.get(path);
+      if (model) {
+        monaco.editor.setModelMarkers(model, 'lsp', diagnostics.map(d => ({
+          severity: severities[d.severity] ?? monaco.MarkerSeverity.Info, message: d.message,
+          startLineNumber: d.startLine + 1, startColumn: d.startCharacter + 1,
+          endLineNumber: d.endLine + 1, endColumn: d.endCharacter + 1,
+        })));
+      }
+    },
+
+    // bands: DiffBandBuilder output (1-based); hunks: 1-based anchor line per hunk, in index order.
+    setDiff: (path, bands, hunks) => {
+      const model = models.get(path);
+      if (!model) {
+        return;
+      }
+      const lineCount = model.getLineCount();
+      const clamp = line => Math.min(Math.max(line, 1), lineCount);
+      const ids = decorations.get(path);
+
+      ids.diff = model.deltaDecorations(ids.diff, bands.map(band => band.isAddition
+        ? { range: new monaco.Range(clamp(band.startLine), 1, clamp(band.startLine + band.lineCount - 1), 1), options: { isWholeLine: true, className: 'paarde-diff-added' } }
+        : { range: new monaco.Range(clamp(band.startLine), 1, clamp(band.startLine), 1), options: { isWholeLine: true, className: band.startLine > lineCount ? 'paarde-diff-removed-below' : 'paarde-diff-removed-above' } }));
+
+      const anchors = hunks.map(clamp);
+      hunkLines.set(path, anchors);
+      ids.hunks = model.deltaDecorations(ids.hunks, anchors.flatMap(line => [
+        { range: new monaco.Range(line, 1, line, 1), options: { glyphMarginClassName: 'paarde-hunk-accept', glyphMarginHoverMessage: { value: 'Accept this change.' }, glyphMargin: { position: monaco.editor.GlyphMarginLane.Left } } },
+        { range: new monaco.Range(line, 1, line, 1), options: { glyphMarginClassName: 'paarde-hunk-reject', glyphMarginHoverMessage: { value: 'Reject this change.' }, glyphMargin: { position: monaco.editor.GlyphMarginLane.Right } } },
+      ]));
+    },
+
+    reveal: (line, character, focus) => {
+      const model = editor.getModel();
+      if (!model) {
+        return;
+      }
+      const position = model.validatePosition({ lineNumber: line + 1, column: character + 1 });
+      editor.setPosition(position);
+      editor.revealPositionInCenterIfOutsideViewport(position);
+      if (focus) {
+        editor.focus();
+      }
+    },
+
+    setTheme: dark => monaco.editor.setTheme(dark ? 'vs-dark' : 'vs'),
+    focus: () => editor.focus(),
+  };
+
+  post({ type: 'ready' });
+});
+</script>
+</body>
+</html>

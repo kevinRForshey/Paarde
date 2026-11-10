@@ -8,22 +8,17 @@ using AvaloniaEdit.Document;
 using AvaloniaEdit.Rendering;
 
 using Paarde.Core.Models;
+using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Controls;
-
-// A proposed-side line range to paint: an added run (LineCount > 0, 1-based inclusive start) or a
-// pure-deletion marker (LineCount == 0 - no proposed-side lines to anchor a band to, so StartLine is
-// the insertion point the deleted lines used to sit before).
-internal readonly record struct DiffBand(int StartLine, int LineCount, bool IsAddition);
 
 // Paints translucent green bands behind added lines and a thin red marker at each pure deletion's
 // insertion point, directly over the editable proposal view (TutorialDetailControl's editor) the
 // same way BracketHighlightRenderer paints bracket matches - same IBackgroundRenderer extension
 // point, no new one introduced. Reuses DiffBuilder's existing line-level diff
-// (ProposedFileChangeViewModel.DiffLines) rather than a second diff algorithm. ComputeBands is the
-// pure line-range mapping, kept separate from Draw so it's unit-testable without a running Avalonia
-// TextView (T13.3.1) - AvaloniaEdit's actual paint call isn't unit-testable the same way
-// BracketHighlightRenderer's Draw isn't.
+// (ProposedFileChangeViewModel.DiffLines) rather than a second diff algorithm. The line-range
+// mapping itself is Paarde.Presentation's DiffBandBuilder (shared with the WinUI editor); only the
+// paint calls live here.
 internal sealed class DiffBackgroundRenderer : IBackgroundRenderer
 {
     private readonly TextView _textView;
@@ -57,7 +52,7 @@ internal sealed class DiffBackgroundRenderer : IBackgroundRenderer
             return;
         }
 
-        foreach (var band in ComputeBands(_diffLines))
+        foreach (var band in DiffBandBuilder.Build(_diffLines))
         {
             if (band.IsAddition)
             {
@@ -131,59 +126,4 @@ internal sealed class DiffBackgroundRenderer : IBackgroundRenderer
         }
     }
 
-    // Walks the flat line diff once, tracking the running 1-based line number on the proposed side
-    // (the only side the editor actually shows - EditedContent). Consecutive Added lines coalesce
-    // into one band; a run of one or more consecutive Removed lines (which consume no proposed-side
-    // line number) collapses to a single zero-length marker at the boundary they'd have sat at,
-    // rather than one marker per removed line.
-    internal static IReadOnlyList<DiffBand> ComputeBands(IReadOnlyList<DiffLine> diffLines)
-    {
-        var bands = new List<DiffBand>();
-        var proposedLine = 1;
-        var addedRunStart = -1;
-        var pendingRemovedMarker = false;
-
-        foreach (var line in diffLines)
-        {
-            if (line.Kind == DiffLineKind.Added)
-            {
-                if (addedRunStart < 0)
-                {
-                    addedRunStart = proposedLine;
-                }
-
-                proposedLine++;
-                pendingRemovedMarker = false;
-                continue;
-            }
-
-            if (addedRunStart >= 0)
-            {
-                bands.Add(new DiffBand(addedRunStart, proposedLine - addedRunStart, IsAddition: true));
-                addedRunStart = -1;
-            }
-
-            if (line.Kind == DiffLineKind.Removed)
-            {
-                if (!pendingRemovedMarker)
-                {
-                    bands.Add(new DiffBand(proposedLine, 0, IsAddition: false));
-                    pendingRemovedMarker = true;
-                }
-
-                continue;
-            }
-
-            // Unchanged
-            proposedLine++;
-            pendingRemovedMarker = false;
-        }
-
-        if (addedRunStart >= 0)
-        {
-            bands.Add(new DiffBand(addedRunStart, proposedLine - addedRunStart, IsAddition: true));
-        }
-
-        return bands;
-    }
 }

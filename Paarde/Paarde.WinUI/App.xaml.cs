@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
@@ -12,6 +13,7 @@ using Paarde.Presentation.Models;
 using Paarde.Presentation.Services;
 using Paarde.Presentation.ViewModels;
 using Paarde.WinUI.Contracts.Services;
+using Paarde.WinUI.Controls;
 using Paarde.WinUI.Services;
 using Paarde.WinUI.ViewModels;
 using Paarde.WinUI.Views;
@@ -141,6 +143,12 @@ public partial class App : Application
     {
         RegisterGlobalCrashHandlers();
         GetService<ILogger<App>>().LogInformation("Application starting.");
+
+        // The editor's WebView2 cache lives with everything else this app writes, rather than next
+        // to the executable (which may not be writable once installed).
+        CodeEditor.UserDataFolder = Path.Combine(
+            ApplicationDataPaths.Resolve(GetService<IOptions<LocalSettingsOptions>>().Value.ApplicationDataFolder),
+            "WebView2");
 
         var window = new MainWindow();
         window.SetShell(GetService<ShellView>());

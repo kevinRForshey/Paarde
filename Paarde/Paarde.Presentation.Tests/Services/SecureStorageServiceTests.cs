@@ -76,7 +76,8 @@ public class SecureStorageServiceTests : IDisposable
 
     // AES-GCM's whole point over plain AES-CBC: a single flipped bit in the stored ciphertext must
     // be detected rather than either silently decrypting to the wrong plaintext or failing with an
-    // unrelated padding error.
+    // unrelated padding error. ThrowsAny: on Windows the service uses DPAPI, which reports tampering
+    // as a plain CryptographicException; AES-GCM's AuthenticationTagMismatchException derives from it.
     [Fact]
     public async Task ReadAsync_TamperedCiphertext_ThrowsRatherThanReturningGarbage()
     {
@@ -93,6 +94,6 @@ public class SecureStorageServiceTests : IDisposable
 
         var secondInstance = CreateSut(fileService);
 
-        await Assert.ThrowsAsync<AuthenticationTagMismatchException>(() => secondInstance.ReadAsync("AnthropicApiKey"));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => secondInstance.ReadAsync("AnthropicApiKey"));
     }
 }
