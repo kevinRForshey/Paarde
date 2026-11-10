@@ -68,6 +68,13 @@ public class ApplicationDataPathsTests : IDisposable
     [Fact]
     public void MoveLegacyFolder_AFileInItIsOpen_LeavesItForTheNextStart()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            // Only Windows refuses to move a folder with an open file in it; elsewhere the move
+            // just succeeds.
+            return;
+        }
+
         CreateLegacySettings();
         using (File.Open(Path.Combine(LegacyPath, "LocalSettings.json"), FileMode.Open, FileAccess.Read, FileShare.None))
         {
