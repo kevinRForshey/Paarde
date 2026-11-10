@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
@@ -32,6 +33,12 @@ public sealed partial class ComposePanelControl : UserControl
             }
         };
     }
+
+    // Inside the ScrollViewer the grid is measured with unlimited height, so its * row would only
+    // ever get the prompt box's MinHeight; a minimum of the viewport's height (less RootGrid's
+    // margin) gives that row the spare space back whenever everything fits.
+    private void OnRootScrollViewerSizeChanged(object sender, SizeChangedEventArgs e) =>
+        RootGrid.MinHeight = Math.Max(0, e.NewSize.Height - RootGrid.Margin.Top - RootGrid.Margin.Bottom);
 
     private void OnPromptTextBoxTextChanged(object sender, TextChangedEventArgs e)
     {

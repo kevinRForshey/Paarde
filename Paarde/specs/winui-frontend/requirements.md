@@ -50,8 +50,9 @@ Confirmed by direct inspection, 2026-11-09:
 
   The code editor is the only control with no straightforward WinUI equivalent, and it's confined
   to one view.
-- Settings live under `%AppData%/Paarde/ApplicationData` (formerly `Paarde.Avalonia/ApplicationData`, moved on first start) (`LocalSettingsOptions`
-  default in `LocalSettingsService` and `appsettings.json`).
+- Settings live under `%AppData%/Paarde/ApplicationData`, the `LocalSettingsOptions` default in
+  `LocalSettingsService` and `appsettings.json`. They used to live under
+  `Paarde.Avalonia/ApplicationData`, and are moved across on first start.
 - There is no CI; `dotnet build Paarde.slnx` is the documented build and is expected to work on
   Linux/macOS for the Avalonia app.
 
@@ -126,5 +127,6 @@ R5.3 New automated tests only where logic lives outside XAML and isn't already c
 - MSIX packaging, Store submission, auto-update, code signing.
 - Removing or freezing `Paarde.Avalonia`.
 - New features or UX redesigns beyond what Avalonia has today.
-- A WinUI UI-automation test suite.
+- A full WinUI UI-automation test suite. A small FlaUI smoke suite was added later
+  (`Paarde.WinUI.UiTests`; see tasks.md).
 - Moving `ShellViewModel` into Presentation (each shell's nav sync is framework-specific).

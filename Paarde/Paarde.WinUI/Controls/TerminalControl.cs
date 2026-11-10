@@ -77,7 +77,6 @@ public sealed partial class TerminalControl : UserControl
         SizeChanged += (_, e) => OnSizeChanged(e.NewSize);
         GotFocus += (_, _) => UpdateCursor();
         LostFocus += (_, _) => UpdateCursor();
-        PointerPressed += (_, _) => Focus(FocusState.Pointer);
         CharacterReceived += OnCharacterReceived;
 
         // Buffers are long-lived singletons while this control is recreated with its page, so the
@@ -147,6 +146,15 @@ public sealed partial class TerminalControl : UserControl
         var cols = Math.Max(1, (int)(pixelSize.Width / cellSize.Width));
         var rows = Math.Max(1, (int)(pixelSize.Height / cellSize.Height));
         return (cols, rows);
+    }
+
+    // Handled, or the press bubbles on to an ancestor that takes focus back on the same click and
+    // typed keys never reach the PTY.
+    protected override void OnPointerPressed(PointerRoutedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        Focus(FocusState.Pointer);
+        e.Handled = true;
     }
 
     // PreviewKeyDown rather than KeyDown so Tab and the arrow keys reach the PTY instead of moving

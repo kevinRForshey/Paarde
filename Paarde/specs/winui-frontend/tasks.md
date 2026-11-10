@@ -252,7 +252,77 @@ and existing tests must keep their counts after every task.
     - `ProcessCommandRunner` broke quoted commands under `cmd.exe`. This was a real bug: Headroom
       commands failed on Windows.
 
+## UI smoke tests (added 2026-11-10, outside the original plan)
+
+`Paarde.WinUI.UiTests` (in `Paarde.Windows.slnx` only) launches the built `Paarde.WinUI.exe` with
+FlaUI. Each test class runs one app instance with its own temporary settings folder
+(`LocalSettingsOptions__ApplicationDataFolder`), seeded with a small project as the working
+directory. 12 tests, about 20 s in total:
+- Every page in both interface modes opens without crashing or logging `[ERR]`/`[FTL]`.
+- Every button, combo box, list/tree/tab item etc. has a UIA name, and the name isn't a model's
+  `ToString()`.
+- No button or combo box sticks out past the window's left or right edge (window fixed at
+  1280×800 DIPs).
+- Explorer lists the working directory and opens a file in a tab; Ctrl+P opens Quick Open and
+  Escape closes it; FlowWizard's Assistant panel starts shut and the Assistant button opens it.
+
+The tests need an interactive desktop. Keyboard tests refuse to send keys unless Paarde is the
+foreground window, so using the desktop while they run makes them fail rather than type elsewhere.
+`PAARDE_WINUI_EXE` overrides which exe is launched.
+
+What the first run found (all fixed):
+- 39 buttons whose content is an icon plus a `TextBlock` had an empty UIA name (WinUI only
+  derives a name from string content). Each now has `AutomationProperties.Name` matching its text.
+- 5 combo boxes had no name (Run configuration, Model, Preset, Tutorial detail, Recent working
+  directories).
+- Editor tabs were named `Paarde.Presentation.ViewModels.OpenFileTabViewModel`.
+- Compose's "Run options" row ran past the window's edge in Explorer's 280 px Assistant panel;
+  it's now a label/control grid.
+- In FlowWizard mode the Assistant button couldn't open the panel: its default width was 0 and
+  `ResizablePaneHelper.Restore` reopened at the default (both apps). The helpers now take
+  `startsCollapsed` instead. In WinUI a shut pane is also collapsed (`pane:`), so Tab and screen
+  readers no longer reach the hidden controls, and a toggle persists the requested width rather
+  than the not-yet-updated `ActualWidth`.
+
 ## F31.8 — Wrap-up
 
-- [ ] T16 Full side-by-side parity pass against the Avalonia app; final build/test counts. _(R5)_
-- [ ] T17 `README.md` (WinUI build/run, `Paarde.Windows.slnx`) and `ROADMAP.md` Epic 31 entry.
+- [x] T16 Full side-by-side parity pass against the Avalonia app; final build/test counts. _(R5)_
+  **Static pass:** every binding, command and key binding in the Avalonia views has a WinUI
+  counterpart. The only differences are naming (WinUI's `PromptView` hosts `ComposePanelControl`)
+  and editor keys that Monaco handles itself (Tab, Escape, Ctrl+Space, F12).
+  **By hand, in the WinUI app** (scratch settings folder, a fake `claude` CLI, a one-file project):
+  - Explorer opens a file with syntax colours, outline, breadcrumbs, an LSP squiggle and Ln/Col.
+  - Ghost text appears; Tab accepts it and Escape dismisses it. The CLI received the prompt with
+    `<cursor/>` at the caret.
+  - LSP hover works with the mouse and with Ctrl+K Ctrl+I.
+  - Closing a dirty tab asks first.
+  - `edit Greeter.cs` renders fully in the Terminal page; Cancel ends `edit.exe`; Ctrl+C stops
+    `ping`.
+  - Settings migration is covered by `ApplicationDataPathsTests` against a temporary AppData
+    root. It was not run against a real `%APPDATA%` folder.
+
+  **Found and fixed:**
+  - Clicking the terminal didn't focus it: the press bubbled on to an ancestor that took focus
+    back, so typed keys (including Ctrl+C) never reached the PTY. `TerminalControl` now handles
+    the press.
+  - A TUI killed mid-run (Cancel/Stop) left its colours and alternate screen behind, so the next
+    command drew in `edit`'s blue. Run and Terminal now send RIS (`ESC c`) before each command
+    instead of only clearing.
+  - In Explorer's Assistant panel, the Compose prompt box was squeezed to 0 height and the
+    context-file and Send buttons were cut off. The panel now scrolls, the prompt box has a
+    minimum height and the button rows wrap (`CommunityToolkit.WinUI.Controls.Primitives`
+    `WrapPanel`).
+  - `ApplicationDataPaths` now removes the empty `Paarde.Avalonia` folder after moving the
+    settings, and has tests.
+
+  **Left as is:**
+  - A command stopped with Ctrl+C reports "Process exited (code -1073741510)" as an error. That
+    comes from the shared view model, so both apps do it.
+  - Enter in the Terminal command box doesn't run the command (as in Avalonia).
+  - Avalonia's Assistant panel has the same squeezed prompt box; only WinUI was fixed.
+
+  **Builds and tests:** both solutions build with 0 warnings. Core 569/569, Presentation 420/420,
+  Avalonia 52/52, WinUI UI smoke tests 12/12.
+- [x] T17 `README.md` (WinUI build/run, `Paarde.Windows.slnx`) and `ROADMAP.md` Epic 31 entry.
+  `Paarde/README.md` has a "Windows front end (WinUI 3)" section under "Building and running".
+  `ROADMAP.md` has the Epic 31 entry and item 30 in the execution order.

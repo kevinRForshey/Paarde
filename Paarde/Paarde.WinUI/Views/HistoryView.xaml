@@ -16,14 +16,14 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="8" HorizontalAlignment="Right">
-            <Button Command="{x:Bind ViewModel.ForkCommand}"
+            <Button AutomationProperties.Name="Fork" Command="{x:Bind ViewModel.ForkCommand}"
                     ToolTipService.ToolTip="Load this run's prompt and working directory onto the Prompt page to edit before sending.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Edit" />
                     <TextBlock Text="Fork" />
                 </StackPanel>
             </Button>
-            <Button Command="{x:Bind ViewModel.RerunCommand}"
+            <Button AutomationProperties.Name="Re-run" Command="{x:Bind ViewModel.RerunCommand}"
                     ToolTipService.ToolTip="Load this run's prompt and working directory onto the Prompt page and send it immediately.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Redo" />

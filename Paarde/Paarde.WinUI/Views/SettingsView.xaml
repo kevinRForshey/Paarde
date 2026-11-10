@@ -113,7 +113,8 @@
 
             <StackPanel Margin="0,8,0,0" Spacing="4">
                 <TextBlock Text="Model" Style="{StaticResource HintStyle}" />
-                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableModels}"
+                <ComboBox AutomationProperties.Name="Model"
+                          ItemsSource="{x:Bind ViewModel.AvailableModels}"
                           SelectedItem="{x:Bind ViewModel.SelectedAnthropicModel, Mode=TwoWay}"
                           MinWidth="220">
                     <ComboBox.ItemTemplate>

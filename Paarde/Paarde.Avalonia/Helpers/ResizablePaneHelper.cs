@@ -15,19 +15,21 @@ public sealed class ResizablePaneHelper
     private readonly ILocalSettingsService _settingsService;
     private readonly string _widthSettingKey;
     private readonly double _defaultWidth;
+    private readonly bool _startsCollapsed;
     private double? _widthBeforeCollapse;
 
-    public ResizablePaneHelper(ColumnDefinition column, ILocalSettingsService settingsService, string widthSettingKey, double defaultWidth)
+    public ResizablePaneHelper(ColumnDefinition column, ILocalSettingsService settingsService, string widthSettingKey, double defaultWidth, bool startsCollapsed = false)
     {
         _column = column;
         _settingsService = settingsService;
         _widthSettingKey = widthSettingKey;
         _defaultWidth = defaultWidth;
+        _startsCollapsed = startsCollapsed;
     }
 
     public async Task RestoreAsync()
     {
-        var width = await _settingsService.ReadSettingAsync<double?>(_widthSettingKey) ?? _defaultWidth;
+        var width = await _settingsService.ReadSettingAsync<double?>(_widthSettingKey) ?? (_startsCollapsed ? 0 : _defaultWidth);
         _column.Width = new GridLength(Math.Max(width, 0));
     }
 
@@ -52,7 +54,9 @@ public sealed class ResizablePaneHelper
 
     public void Restore()
     {
-        _column.Width = new GridLength(_widthBeforeCollapse ?? _defaultWidth);
+        // defaultWidth, not 0, when the pane started collapsed or was saved shut - otherwise it
+        // could never be reopened.
+        _column.Width = new GridLength(_widthBeforeCollapse is > 0 ? _widthBeforeCollapse.Value : _defaultWidth);
         _widthBeforeCollapse = null;
     }
 

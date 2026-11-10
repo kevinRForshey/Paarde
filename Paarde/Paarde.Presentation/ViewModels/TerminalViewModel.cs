@@ -38,6 +38,10 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
 
     private static readonly byte[] ClearScreenSequence = Encoding.ASCII.GetBytes("\x1b[2J\x1b[H");
 
+    // RIS: a full reset, not just a clear, before a new command - a TUI that was killed mid-run
+    // (Cancel) leaves its colours, alternate screen and input modes set otherwise.
+    private static readonly byte[] ResetTerminalSequence = Encoding.ASCII.GetBytes("\u001bc");
+
     private readonly IPtyProcessManager _ptyProcessManager;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ILogger<TerminalViewModel> _logger;
@@ -112,7 +116,7 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
             return;
         }
 
-        OutputBuffer.Feed(ClearScreenSequence);
+        OutputBuffer.Feed(ResetTerminalSequence);
         StatusMessage = string.Format("Terminal_Running".Resolve(), CommandText);
         StatusSeverity = NotificationSeverity.Informational;
 

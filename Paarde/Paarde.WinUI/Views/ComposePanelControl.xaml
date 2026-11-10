@@ -3,13 +3,18 @@
     x:Class="Paarde.WinUI.Views.ComposePanelControl"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:helpers="using:Paarde.WinUI.Helpers">
+    xmlns:helpers="using:Paarde.WinUI.Helpers"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls">
 
     <!-- Port of Paarde.Avalonia's ComposePanelControl (Epic 25, T9). DataContext is a
          PromptViewModel supplied by the host (PromptView now, the Assistant panel in F31.7);
          code-behind mirrors it into ViewModel for x:Bind. Avalonia's PromptView duplicates this
          body - here PromptView just hosts this control instead. -->
-    <Grid Margin="16">
+    <!-- Scrolls when the panel is too short for everything (Explorer's Assistant panel); otherwise
+         the prompt box's * row was squeezed to nothing. Code-behind keeps RootGrid at least the
+         viewport's height, so on a tall page the prompt box still fills the spare space. -->
+    <ScrollViewer x:Name="RootScrollViewer" VerticalScrollBarVisibility="Auto" SizeChanged="OnRootScrollViewerSizeChanged">
+    <Grid x:Name="RootGrid" Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -40,6 +45,7 @@
                  Not bound two-way: WinUI's ComboBox ignores the view model clearing the selection
                  from inside its own SelectionChanged, so code-behind does the reset. -->
             <ComboBox x:Name="RecentWorkingDirectoryComboBox"
+                      AutomationProperties.Name="Recent working directories"
                       Grid.Column="1"
                       Margin="8,20,0,0"
                       VerticalAlignment="Top"
@@ -49,7 +55,7 @@
                       ItemsSource="{x:Bind ViewModel.RecentWorkingDirectories, Mode=OneWay}"
                       SelectionChanged="OnRecentWorkingDirectorySelectionChanged"
                       Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasRecentWorkingDirectories), Mode=OneWay}" />
-            <Button Grid.Column="2"
+            <Button AutomationProperties.Name="Browse..." Grid.Column="2"
                     Margin="8,20,0,0"
                     VerticalAlignment="Top"
                     Command="{x:Bind ViewModel.BrowseWorkingDirectoryCommand, Mode=OneWay}">
@@ -61,40 +67,35 @@
         </Grid>
 
         <StackPanel Grid.Row="2" Margin="0,8,0,0" Spacing="4">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Context files" Style="{StaticResource StatusTextStyle}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Command="{x:Bind ViewModel.AddContextFilesCommand, Mode=OneWay}">
+            <TextBlock Text="Context files" Style="{StaticResource StatusTextStyle}" />
+            <!-- Wraps rather than one fixed row: in Explorer's 280 px Assistant panel a row cut off
+                 "Remove selected" and "Suggest relevant files" entirely. -->
+            <toolkit:WrapPanel HorizontalSpacing="8" VerticalSpacing="8">
+                <Button AutomationProperties.Name="Add files..." Command="{x:Bind ViewModel.AddContextFilesCommand, Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Attach" />
                         <TextBlock Text="Add files..." />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="2" Margin="8,0,0,0" Command="{x:Bind ViewModel.AddContextFolderCommand, Mode=OneWay}">
+                <Button AutomationProperties.Name="Add folder..." Command="{x:Bind ViewModel.AddContextFolderCommand, Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Folder" />
                         <TextBlock Text="Add folder..." />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="3" Margin="8,0,0,0" Command="{x:Bind ViewModel.RemoveAttachedPathCommand, Mode=OneWay}">
+                <Button AutomationProperties.Name="Remove selected" Command="{x:Bind ViewModel.RemoveAttachedPathCommand, Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Delete" />
                         <TextBlock Text="Remove selected" />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="4" Margin="8,0,0,0" Command="{x:Bind ViewModel.SuggestRelevantFilesCommand, Mode=OneWay}">
+                <Button AutomationProperties.Name="Suggest relevant files" Command="{x:Bind ViewModel.SuggestRelevantFilesCommand, Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xEA80;" FontSize="16" />
                         <TextBlock Text="Suggest relevant files" />
                     </StackPanel>
                 </Button>
-            </Grid>
+            </toolkit:WrapPanel>
             <ListView ItemsSource="{x:Bind ViewModel.AttachedPaths, Mode=OneWay}"
                       SelectedItem="{x:Bind ViewModel.SelectedAttachedPath, Mode=TwoWay}"
                       MaxHeight="96" />
@@ -143,6 +144,7 @@
                      Grid.Row="1"
                      Text="{x:Bind ViewModel.PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      PlaceholderText="Enter the prompt you want to send to Claude Code..."
+                     MinHeight="96"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -170,20 +172,20 @@
             </Popup>
         </Grid>
 
-        <StackPanel Grid.Row="4" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8">
-            <Button Command="{x:Bind ViewModel.SavePromptCommand, Mode=OneWay}">
+        <toolkit:WrapPanel Grid.Row="4" Margin="0,8,0,0" HorizontalSpacing="8" VerticalSpacing="8">
+            <Button AutomationProperties.Name="Save prompt" Command="{x:Bind ViewModel.SavePromptCommand, Mode=OneWay}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Save" />
                     <TextBlock Text="Save prompt" />
                 </StackPanel>
             </Button>
-            <Button Command="{x:Bind ViewModel.RunPromptCommand, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}">
+            <Button AutomationProperties.Name="Send to Claude Code" Command="{x:Bind ViewModel.RunPromptCommand, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Send" />
                     <TextBlock Text="Send to Claude Code" />
                 </StackPanel>
             </Button>
-            <Button Command="{x:Bind ViewModel.CancelPromptCommand, Mode=OneWay}"
+            <Button AutomationProperties.Name="Cancel" Command="{x:Bind ViewModel.CancelPromptCommand, Mode=OneWay}"
                     Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Cancel" />
@@ -200,32 +202,51 @@
                        Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}" />
             <TextBlock Text="{x:Bind ViewModel.StreamProgressDisplay, Mode=OneWay}" VerticalAlignment="Center" Opacity="0.7"
                        Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}" />
-        </StackPanel>
+        </toolkit:WrapPanel>
 
         <!-- T-UX.2: per-run settings, grouped under a divider and de-emphasized so they don't
              compete with "Send to Claude Code". -->
         <StackPanel Grid.Row="5" Margin="0,12,0,0" Spacing="8">
             <Border Style="{StaticResource DividerStyle}" />
-            <StackPanel Orientation="Horizontal" Spacing="8" Opacity="0.85">
-                <TextBlock Text="Run options" VerticalAlignment="Center" Style="{StaticResource SidebarSectionLabelStyle}" />
-                <TextBlock Text="Preset" VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7" />
-                <ComboBox ItemsSource="{x:Bind ViewModel.AvailablePresets, Mode=OneWay}"
-                          SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
-                          Width="120" />
-                <TextBlock Text="Tutorial detail" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
-                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableDepths, Mode=OneWay}"
-                          SelectedItem="{x:Bind ViewModel.SelectedDepth, Mode=TwoWay}"
-                          Width="120" />
-                <TextBlock Text="Timeout (seconds)" VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7" />
-                <!-- NumberBox.Value is a double, so it's bound one-way and written back from
-                     ValueChanged rather than through x:Bind's two-way cast. -->
-                <NumberBox Value="{x:Bind ViewModel.TimeoutSeconds, Mode=OneWay}"
-                           Minimum="1"
-                           Maximum="86400"
-                           SmallChange="30"
-                           SpinButtonPlacementMode="Inline"
-                           Width="140"
-                           ValueChanged="OnTimeoutValueChanged" />
+            <!-- Label/control rows rather than one horizontal row, which ran past the window's
+                 edge in Explorer's 280 px Assistant panel. -->
+            <StackPanel Spacing="8" Opacity="0.85">
+                <TextBlock Text="Run options" Style="{StaticResource SidebarSectionLabelStyle}" />
+                <Grid ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Left" MaxWidth="340">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Preset" VerticalAlignment="Center" Opacity="0.7" />
+                    <ComboBox Grid.Row="0" Grid.Column="1"
+                              AutomationProperties.Name="Preset"
+                              ItemsSource="{x:Bind ViewModel.AvailablePresets, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Text="Tutorial detail" VerticalAlignment="Center" Opacity="0.7" />
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              AutomationProperties.Name="Tutorial detail"
+                              ItemsSource="{x:Bind ViewModel.AvailableDepths, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedDepth, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="2" Text="Timeout (seconds)" VerticalAlignment="Center" Opacity="0.7" />
+                    <!-- NumberBox.Value is a double, so it's bound one-way and written back from
+                         ValueChanged rather than through x:Bind's two-way cast. -->
+                    <NumberBox Grid.Row="2" Grid.Column="1"
+                               AutomationProperties.Name="Timeout (seconds)"
+                               Value="{x:Bind ViewModel.TimeoutSeconds, Mode=OneWay}"
+                               Minimum="1"
+                               Maximum="86400"
+                               SmallChange="30"
+                               SpinButtonPlacementMode="Inline"
+                               HorizontalAlignment="Stretch"
+                               ValueChanged="OnTimeoutValueChanged" />
+                </Grid>
             </StackPanel>
         </StackPanel>
 
@@ -257,4 +278,5 @@
                        Style="{StaticResource StatusTextStyle}" />
         </Grid>
     </Grid>
+    </ScrollViewer>
 </UserControl>

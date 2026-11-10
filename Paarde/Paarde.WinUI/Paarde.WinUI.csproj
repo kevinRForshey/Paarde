@@ -26,6 +26,8 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
     <!-- GridSplitter for the resizable master/detail panes (WinUI has none built in). MIT. -->
     <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.2.251219" />
+    <!-- WrapPanel, so ComposePanelControl's button rows wrap in the narrow Assistant panel. MIT. -->
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Primitives" Version="8.2.251219" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
@@ -66,8 +68,7 @@
       <Output TaskParameter="Hash" PropertyName="_MonacoActualSha512" />
     </GetFileHash>
     <Delete Files="$(MonacoCacheDir)monaco-editor.tgz" Condition="'$(_MonacoActualSha512)' != '$(MonacoSha512)'" />
-    <Error Condition="'$(_MonacoActualSha512)' != '$(MonacoSha512)'"
-           Text="monaco-editor $(MonacoVersion) failed its SHA-512 check (expected $(MonacoSha512), got $(_MonacoActualSha512))." />
+    <Error Condition="'$(_MonacoActualSha512)' != '$(MonacoSha512)'" Text="monaco-editor $(MonacoVersion) failed its SHA-512 check (expected $(MonacoSha512), got $(_MonacoActualSha512))." />
     <Exec Command="&quot;$(SystemRoot)\System32\tar.exe&quot; -xzf monaco-editor.tgz package/min/vs package/LICENSE" WorkingDirectory="$(MonacoCacheDir)" />
     <Delete Files="$(MonacoCacheDir)monaco-editor.tgz" />
     <Touch Files="$(MonacoExtractedMarker)" AlwaysCreate="true" />

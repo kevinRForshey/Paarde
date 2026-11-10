@@ -82,7 +82,7 @@ public partial class ExplorerView : UserControl
 
     // FlowWizard mode has no Compose/Review page reachable
     // from here (they're separate navigation destinations in that mode, not a docked panel), so
-    // the Assistant panel's first-run default width collapses to 0 instead of 360 - only affects
+    // the Assistant panel starts collapsed (the Assistant button still reopens it at 280) - only affects
     // users with no saved width yet, same as _paneHelper's own narrower default above.
     private async Task InitializeAssistantPanelHelperAsync()
     {
@@ -92,9 +92,7 @@ public partial class ExplorerView : UserControl
         // Narrower than the 360 this used to default to, so the
         // editor's * column visibly dominates a first-run window - only affects users with no
         // saved width yet, same as _paneHelper's own narrower default above.
-        var defaultWidth = interfaceMode == InterfaceMode.FlowWizard ? 0 : 280;
-
-        _assistantPanelHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[4], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerAssistantPanelWidth, defaultWidth: defaultWidth);
+        _assistantPanelHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[4], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerAssistantPanelWidth, defaultWidth: 280, startsCollapsed: interfaceMode == InterfaceMode.FlowWizard);
         await _assistantPanelHelper.RestoreAsync();
     }
 

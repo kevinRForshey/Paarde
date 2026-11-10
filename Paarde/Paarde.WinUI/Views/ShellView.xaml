@@ -52,6 +52,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <ComboBox Grid.Column="0"
+                      AutomationProperties.Name="Run configuration"
                       ItemsSource="{x:Bind ViewModel.RunPanelViewModel.Configurations}"
                       SelectedItem="{x:Bind ViewModel.RunPanelViewModel.SelectedConfiguration, Mode=TwoWay}"
                       PlaceholderText="No run configuration found - add one on the Settings page"
@@ -62,19 +63,19 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
-            <Button Grid.Column="1" Command="{x:Bind ViewModel.RunPanelViewModel.BuildCommand}">
+            <Button AutomationProperties.Name="Build" Grid.Column="1" Command="{x:Bind ViewModel.RunPanelViewModel.BuildCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon Glyph="&#xE943;" FontSize="16" />
                     <TextBlock Text="Build" />
                 </StackPanel>
             </Button>
-            <Button Grid.Column="2" Command="{x:Bind ViewModel.RunPanelViewModel.RunCommand}" Style="{StaticResource AccentButtonStyle}">
+            <Button AutomationProperties.Name="Run" Grid.Column="2" Command="{x:Bind ViewModel.RunPanelViewModel.RunCommand}" Style="{StaticResource AccentButtonStyle}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Play" />
                     <TextBlock Text="Run" />
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" Command="{x:Bind ViewModel.RunPanelViewModel.StopCommand}">
+            <Button AutomationProperties.Name="Stop" Grid.Column="3" Command="{x:Bind ViewModel.RunPanelViewModel.StopCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Stop" />
                     <TextBlock Text="Stop" />
@@ -264,20 +265,20 @@
                                  Text="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.CommandText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  PlaceholderText="Type a command to run in the current working directory..."
                                  FontFamily="{StaticResource MonospaceFontFamily}" />
-                        <Button Grid.Column="1" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
+                        <Button AutomationProperties.Name="Run" Grid.Column="1" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <SymbolIcon Symbol="Play" />
                                 <TextBlock Text="Run" />
                             </StackPanel>
                         </Button>
-                        <Button Grid.Column="2" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.CancelCommandCommand}"
+                        <Button AutomationProperties.Name="Cancel" Grid.Column="2" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.CancelCommandCommand}"
                                 Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.WorkbenchDockViewModel.TerminalViewModel.IsRunning), Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <SymbolIcon Symbol="Stop" />
                                 <TextBlock Text="Cancel" />
                             </StackPanel>
                         </Button>
-                        <Button Grid.Column="3" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.ClearOutputCommand}">
+                        <Button AutomationProperties.Name="Clear" Grid.Column="3" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.ClearOutputCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE894;" FontSize="16" />
                                 <TextBlock Text="Clear" />

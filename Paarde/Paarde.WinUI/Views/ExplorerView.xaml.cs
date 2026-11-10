@@ -58,7 +58,7 @@ public sealed partial class ExplorerView : Page
 
         var localSettingsService = App.GetService<ILocalSettingsService>();
 
-        _paneHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[0], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerTreeWidth, defaultWidth: 220);
+        _paneHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[0], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerTreeWidth, defaultWidth: 220, pane: FileTree);
         _paneHelper.AttachSplitter(TreeSplitter);
 
         _splitGroupHelper = new ResizablePaneHelper(SplitGroupGrid.ColumnDefinitions[2], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerSplitGroupWidth, defaultWidth: 320);
@@ -108,16 +108,14 @@ public sealed partial class ExplorerView : Page
         var interfaceMode = await localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
 
         // FlowWizard mode has Compose/Review as pages of their own, so the panel starts shut there.
-        var defaultWidth = interfaceMode == InterfaceMode.FlowWizard ? 0 : 280;
-
-        _assistantPanelHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[4], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerAssistantPanelWidth, defaultWidth: defaultWidth);
+        _assistantPanelHelper = new ResizablePaneHelper(WorkspaceGrid.ColumnDefinitions[4], localSettingsService, WorkspaceLayoutSettingsKeys.ExplorerAssistantPanelWidth, defaultWidth: 280, startsCollapsed: interfaceMode == InterfaceMode.FlowWizard, pane: AssistantPanel);
         await _assistantPanelHelper.RestoreAsync();
     }
 
     private void OnToggleAssistantPanelButtonClick(object sender, RoutedEventArgs e)
     {
         _assistantPanelHelper?.ToggleCollapse();
-        _assistantPanelHelper?.OnSplitterDragCompleted();
+        _assistantPanelHelper?.PersistWidth();
     }
 
     // Clicking a file opens (or activates) its tab. SelectedNode is cleared first so clicking the

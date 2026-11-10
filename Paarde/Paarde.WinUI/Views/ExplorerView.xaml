@@ -12,7 +12,7 @@
         <!-- One tab header, shared by both tab groups. Avalonia's split group has no "Split right"
              item; here it's hidden by CanSplitRight, which is false there anyway. -->
         <DataTemplate x:Key="FileTabTemplate" x:DataType="pvm:OpenFileTabViewModel">
-            <TabViewItem ToolTipService.ToolTip="{x:Bind FilePath}">
+            <TabViewItem AutomationProperties.Name="{x:Bind FileName}" ToolTipService.ToolTip="{x:Bind FilePath}">
                 <TabViewItem.Header>
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE718;" FontSize="12"
@@ -54,28 +54,28 @@
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <Button Command="{x:Bind ViewModel.RefreshTreeCommand}">
+                <Button AutomationProperties.Name="Refresh" Command="{x:Bind ViewModel.RefreshTreeCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Refresh" />
                         <TextBlock Text="Refresh" />
                     </StackPanel>
                 </Button>
                 <!-- Epic 25, T12 (R10). -->
-                <Button Command="{x:Bind ViewModel.OpenFolderCommand}">
+                <Button AutomationProperties.Name="Open folder..." Command="{x:Bind ViewModel.OpenFolderCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="OpenLocal" />
                         <TextBlock Text="Open folder..." />
                     </StackPanel>
                 </Button>
                 <!-- Epic 25, T12 (R2): collapses/expands the Assistant panel column. -->
-                <Button Click="OnToggleAssistantPanelButtonClick" ToolTipService.ToolTip="Show or hide the Assistant panel.">
+                <Button AutomationProperties.Name="Assistant" Click="OnToggleAssistantPanelButtonClick" ToolTipService.ToolTip="Show or hide the Assistant panel.">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Comment" />
                         <TextBlock Text="Assistant" />
                     </StackPanel>
                 </Button>
                 <!-- specs/editor-focus-layout R1: hides the tree and Assistant panel (also Ctrl+K, Z). -->
-                <Button Command="{x:Bind ViewModel.ToggleZenModeCommand}" ToolTipService.ToolTip="Toggle zen mode (Ctrl+K, Z).">
+                <Button AutomationProperties.Name="Zen mode" Command="{x:Bind ViewModel.ToggleZenModeCommand}" ToolTipService.ToolTip="Toggle zen mode (Ctrl+K, Z).">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="FullScreen" />
                         <TextBlock Text="Zen mode" />
@@ -208,7 +208,7 @@
 
             <toolkit:GridSplitter Grid.Column="3" x:Name="AssistantPanelSplitter" Width="4" ResizeDirection="Columns" />
 
-            <views:AssistantPanelControl Grid.Column="4" Margin="8,0,0,0" ViewModel="{x:Bind ViewModel.AssistantPanel}" />
+            <views:AssistantPanelControl x:Name="AssistantPanel" Grid.Column="4" Margin="8,0,0,0" ViewModel="{x:Bind ViewModel.AssistantPanel}" />
 
             <!-- specs/editor-focus-layout R5: the Ctrl+Tab most-recently-used switcher, opened and
                  advanced on Ctrl+Tab and committed when Ctrl is released. Centred from code-behind,

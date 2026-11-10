@@ -33,7 +33,7 @@
                 <CheckBox Content="Stage applied files in git"
                           IsChecked="{x:Bind ViewModel.StageAppliedFilesInGit, Mode=TwoWay}"
                           ToolTipService.ToolTip="Run `git add` on the files Apply Selected just wrote, so they already show as staged in your next git status." />
-                <Button Command="{x:Bind ViewModel.ApplySelectedCommand, Mode=OneWay}" HorizontalAlignment="Stretch"
+                <Button AutomationProperties.Name="Apply Selected" Command="{x:Bind ViewModel.ApplySelectedCommand, Mode=OneWay}" HorizontalAlignment="Stretch"
                         Style="{StaticResource AccentButtonStyle}"
                         ToolTipService.ToolTip="Write every selected change, across every file, to disk.">
                     <StackPanel Orientation="Horizontal" Spacing="6">
@@ -43,7 +43,7 @@
                 </Button>
                 <!-- Icons on the danger buttons are deliberate, not decorative: they give the
                      destructive-action signal a second channel beyond color (WCAG 1.4.1). -->
-                <Button Command="{x:Bind ViewModel.UndoLastApplyCommand, Mode=OneWay}" HorizontalAlignment="Stretch"
+                <Button AutomationProperties.Name="Undo Last Apply" Command="{x:Bind ViewModel.UndoLastApplyCommand, Mode=OneWay}" HorizontalAlignment="Stretch"
                         Style="{StaticResource DangerButtonStyle}"
                         ToolTipService.ToolTip="Restore the files from the most recent apply to their content from right before it.">
                     <StackPanel Orientation="Horizontal" Spacing="6">
@@ -51,7 +51,7 @@
                         <TextBlock Text="Undo Last Apply" />
                     </StackPanel>
                 </Button>
-                <Button Command="{x:Bind ViewModel.RevertAllAppliedCommand, Mode=OneWay}" HorizontalAlignment="Stretch"
+                <Button AutomationProperties.Name="Revert All Applied" Command="{x:Bind ViewModel.RevertAllAppliedCommand, Mode=OneWay}" HorizontalAlignment="Stretch"
                         Style="{StaticResource DangerButtonStyle}"
                         ToolTipService.ToolTip="Restore every file this session has applied a change to back to its content from before this session.">
                     <StackPanel Orientation="Horizontal" Spacing="6">
@@ -63,7 +63,7 @@
                            Visibility="{x:Bind helpers:BindingFunctions.VisibleIfNotEmpty(ViewModel.ApplyStatusMessage), Mode=OneWay}" />
 
                 <!-- T12.2.2: only appears after a configured build/test command fails on apply. -->
-                <Button Command="{x:Bind ViewModel.SendBuildTestErrorsToClaudeCommand, Mode=OneWay}"
+                <Button AutomationProperties.Name="Send errors to Claude" Command="{x:Bind ViewModel.SendBuildTestErrorsToClaudeCommand, Mode=OneWay}"
                         HorizontalAlignment="Stretch"
                         Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasPendingBuildTestFailure), Mode=OneWay}"
                         ToolTipService.ToolTip="Send the captured build/test failure back to Claude Code, continuing this tutorial's conversation, and ask it to fix the problem.">
@@ -80,14 +80,14 @@
                 <!-- T8.4.4: saves the overview + every file's numbered steps as a standalone document. -->
                 <TextBlock Margin="0,8,0,0" Text="EXPORT" Style="{StaticResource SidebarSectionLabelStyle}" />
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.ExportTutorialAsMarkdownCommand, Mode=OneWay}"
+                    <Button AutomationProperties.Name="Export as Markdown" Command="{x:Bind ViewModel.ExportTutorialAsMarkdownCommand, Mode=OneWay}"
                             ToolTipService.ToolTip="Save the tutorial's overview and steps as a Markdown file.">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <SymbolIcon Symbol="SaveLocal" />
                             <TextBlock Text="Export as Markdown" />
                         </StackPanel>
                     </Button>
-                    <Button Command="{x:Bind ViewModel.ExportTutorialAsHtmlCommand, Mode=OneWay}"
+                    <Button AutomationProperties.Name="Export as HTML" Command="{x:Bind ViewModel.ExportTutorialAsHtmlCommand, Mode=OneWay}"
                             ToolTipService.ToolTip="Save the tutorial's overview and steps as an HTML file.">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <SymbolIcon Symbol="SaveLocal" />
@@ -105,7 +105,7 @@
                 <TextBox Text="{x:Bind ViewModel.RefineInstruction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          PlaceholderText="Refine selected file..."
                          ToolTipService.ToolTip="Describe a change to make to only the selected file, continuing this tutorial's conversation." />
-                <Button Command="{x:Bind ViewModel.RefineSelectedFileCommand, Mode=OneWay}" HorizontalAlignment="Stretch">
+                <Button AutomationProperties.Name="Refine selected file" Command="{x:Bind ViewModel.RefineSelectedFileCommand, Mode=OneWay}" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Repair" />
                         <TextBlock Text="Refine selected file" />

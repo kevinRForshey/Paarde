@@ -30,6 +30,10 @@ public partial class RunPanelViewModel : ObservableObject
     // TerminalBuffer beyond feeding it the same escape sequence a real terminal would receive.
     private static readonly byte[] ClearScreenSequence = Encoding.ASCII.GetBytes("\x1b[2J\x1b[H");
 
+    // RIS: a full reset, not just a clear, before a new run - a TUI that was killed mid-run
+    // (Cancel/Stop) leaves its colours, alternate screen and input modes set otherwise.
+    private static readonly byte[] ResetTerminalSequence = Encoding.ASCII.GetBytes("\u001bc");
+
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
     private readonly IBuildTestRunner _buildTestRunner;
     private readonly IPtyProcessManager _ptyProcessManager;
@@ -185,7 +189,7 @@ public partial class RunPanelViewModel : ObservableObject
             return;
         }
 
-        RunOutputBuffer.Feed(ClearScreenSequence);
+        RunOutputBuffer.Feed(ResetTerminalSequence);
         StatusMessage = string.Format("RunPanel_Running".Resolve(), configuration.Name);
         StatusSeverity = NotificationSeverity.Informational;
 

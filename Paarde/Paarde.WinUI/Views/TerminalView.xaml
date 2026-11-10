@@ -29,20 +29,20 @@
                      Text="{x:Bind ViewModel.CommandText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      PlaceholderText="Type a command to run in the current working directory..."
                      FontFamily="{StaticResource MonospaceFontFamily}" />
-            <Button Grid.Column="1" Command="{x:Bind ViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
+            <Button AutomationProperties.Name="Run" Grid.Column="1" Command="{x:Bind ViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Play" />
                     <TextBlock Text="Run" />
                 </StackPanel>
             </Button>
-            <Button Grid.Column="2" Command="{x:Bind ViewModel.CancelCommandCommand}"
+            <Button AutomationProperties.Name="Cancel" Grid.Column="2" Command="{x:Bind ViewModel.CancelCommandCommand}"
                     Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Stop" />
                     <TextBlock Text="Cancel" />
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" Command="{x:Bind ViewModel.ClearOutputCommand}">
+            <Button AutomationProperties.Name="Clear" Grid.Column="3" Command="{x:Bind ViewModel.ClearOutputCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon Glyph="&#xE894;" FontSize="16" />
                     <TextBlock Text="Clear" />

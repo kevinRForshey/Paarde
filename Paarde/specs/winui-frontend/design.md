@@ -74,9 +74,11 @@ public static IServiceCollection AddPaardePresentation(this IServiceCollection s
 | `Microsoft.Extensions.Hosting`, `Serilog.*` | same as Avalonia | host + logging | MIT / Apache-2.0 |
 | ~~`Microsoft.Graphics.Win2D`~~ | not used | was planned for `TerminalControl` drawing | Checked at F31.4: the NuGet package is under Microsoft's Win2D EULA, not MIT (only the source repo is MIT). Dropped: `TerminalControl` draws with plain XAML elements instead (below). |
 | `CommunityToolkit.WinUI.Controls.Sizers` | 8.2.251219 (added F31.2) | `GridSplitter`; `ResizablePaneHelper.AttachSplitter` persists the width on `ManipulationCompleted` | MIT |
+| `CommunityToolkit.WinUI.Controls.Primitives` | 8.2.251219 (added F31.8) | `WrapPanel`, so `ComposePanelControl`'s button rows wrap in the narrow Assistant panel | MIT |
 | `TextMateSharp.Grammars` (in `Paarde.Presentation`) | 2.0.5 (F31.2) | `SyntaxTokenizer`, moved out of Avalonia so both front ends share it | MIT |
 | `monaco-editor` (npm, `min/vs` AMD build, not a NuGet package) | 0.57.0 (chosen F31.6) | the code editor, hosted in `WebView2` (below) | MIT (checked in the package's `LICENSE`) |
 | `Microsoft.Web.WebView2` | 1.0.3719.77, transitive via Windows App SDK (no new reference) | the `WebView2` control's SDK | BSD-3-Clause (checked in the package's `LICENSE.txt`) |
+| `FlaUI.UIA3` (test-only, `Paarde.WinUI.UiTests`) | 5.0.0 | UI smoke tests through UI Automation | MIT |
 | WebView2 Runtime (Evergreen) | system component (157.0 on the dev machine) | the browser engine `WebView2` runs on | Microsoft license; ships with Windows 11 and is installed on almost all Windows 10 machines. Not redistributed by Paarde. Accepted as a platform component, like Windows App SDK (R2.4). |
 
 Licenses are checked against each package's own license file when it's added, not assumed from

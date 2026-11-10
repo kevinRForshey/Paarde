@@ -19,7 +19,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,8" Orientation="Horizontal" Spacing="8">
-            <Button Command="{x:Bind ViewModel.RevertToProposedCommand, Mode=OneWay}"
+            <Button AutomationProperties.Name="Revert to proposed" Command="{x:Bind ViewModel.RevertToProposedCommand, Mode=OneWay}"
                     Style="{StaticResource DangerButtonStyle}"
                     ToolTipService.ToolTip="Discard your edits and go back to what Claude proposed.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -27,7 +27,7 @@
                     <TextBlock Text="Revert to proposed" />
                 </StackPanel>
             </Button>
-            <Button Command="{x:Bind ViewModel.RevertToOriginalCommand, Mode=OneWay}"
+            <Button AutomationProperties.Name="Revert to original" Command="{x:Bind ViewModel.RevertToOriginalCommand, Mode=OneWay}"
                     Style="{StaticResource DangerButtonStyle}"
                     ToolTipService.ToolTip="Discard your edits and the proposed change, going back to the file on disk.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -41,19 +41,19 @@
 
         <StackPanel Grid.Row="1" Margin="0,0,0,8" Orientation="Horizontal" Spacing="8"
                     Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasSelectableHunks), Mode=OneWay}">
-            <Button Command="{x:Bind ViewModel.SelectAllHunksCommand, Mode=OneWay}">
+            <Button AutomationProperties.Name="Select all" Command="{x:Bind ViewModel.SelectAllHunksCommand, Mode=OneWay}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="SelectAll" />
                     <TextBlock Text="Select all" />
                 </StackPanel>
             </Button>
-            <Button Command="{x:Bind ViewModel.SelectNoHunksCommand, Mode=OneWay}">
+            <Button AutomationProperties.Name="Select none" Command="{x:Bind ViewModel.SelectNoHunksCommand, Mode=OneWay}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="ClearSelection" />
                     <TextBlock Text="Select none" />
                 </StackPanel>
             </Button>
-            <Button Command="{x:Bind ViewModel.InvertHunkSelectionCommand, Mode=OneWay}">
+            <Button AutomationProperties.Name="Invert selection" Command="{x:Bind ViewModel.InvertHunkSelectionCommand, Mode=OneWay}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <SymbolIcon Symbol="Switch" />
                     <TextBlock Text="Invert selection" />
@@ -65,14 +65,14 @@
         <!-- T8.4.3: jump between steps instead of only scrolling, with a position indicator.
              Hidden entirely for a file with no resolved steps. -->
         <StackPanel x:Name="StepNavigationPanel" Grid.Row="2" Margin="0,0,0,8" Orientation="Horizontal" Spacing="8">
-            <Button x:Name="PreviousStepButton" Click="OnPreviousStepButtonClick"
+            <Button AutomationProperties.Name="Previous" x:Name="PreviousStepButton" Click="OnPreviousStepButtonClick"
                     ToolTipService.ToolTip="Jump to the previous step.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon Glyph="&#xE76B;" FontSize="14" />
                     <TextBlock Text="Previous" />
                 </StackPanel>
             </Button>
-            <Button x:Name="NextStepButton" Click="OnNextStepButtonClick"
+            <Button AutomationProperties.Name="Next" x:Name="NextStepButton" Click="OnNextStepButtonClick"
                     ToolTipService.ToolTip="Jump to the next step.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Text="Next" />

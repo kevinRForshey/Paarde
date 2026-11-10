@@ -111,6 +111,34 @@ dotnet test Paarde.Avalonia.Tests
 
 Paarde runs the same way on Windows, Linux, and macOS — there's no platform-specific build step.
 
+### Windows front end (WinUI 3)
+
+`Paarde.WinUI` is a second, Windows-only front end over the same `Paarde.Presentation` view models,
+with the same pages and features as the Avalonia app. Its code editor is
+[Monaco](https://github.com/microsoft/monaco-editor) in WebView2. It lives in its own solution,
+`Paarde.Windows.slnx`, which holds everything in `Paarde.slnx` plus the WinUI projects, so
+`Paarde.slnx` still builds on Linux and macOS.
+
+```bash
+dotnet build Paarde.Windows.slnx
+
+# Run the WinUI app
+dotnet run --project Paarde.WinUI
+
+# UI smoke tests (FlaUI): launch the built app, so they need an unlocked, interactive desktop
+dotnet test Paarde.WinUI.UiTests
+```
+
+- Needs Windows 10 version 2004 (build 19041) or later, x64 or ARM64, and the WebView2 runtime
+  (part of Windows 11).
+- Unpackaged and self-contained: no MSIX and no separate Windows App SDK runtime install.
+- The first build downloads `monaco-editor` 0.57.0 from the npm registry and checks its SHA-512.
+  Later builds use the copy in `obj/`.
+- Both apps share one settings folder, `%AppData%/Paarde/ApplicationData`. Settings in the old
+  `%AppData%/Paarde.Avalonia/ApplicationData` folder are moved there on first start.
+- Leave the desktop alone while the UI smoke tests run. They won't send keys unless Paarde is the
+  foreground window, so a test fails rather than typing somewhere else.
+
 ## Usage
 
 On the Explorer, Diffs, Tutorial, and History pages, drag the divider between a browse-list pane

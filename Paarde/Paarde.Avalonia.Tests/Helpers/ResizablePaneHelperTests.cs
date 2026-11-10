@@ -24,6 +24,19 @@ public class ResizablePaneHelperTests
     }
 
     [Fact]
+    public async Task RestoreAsync_StartsCollapsed_IsShutButReopensAtTheDefaultWidth()
+    {
+        var sut = new ResizablePaneHelper(_column, _settingsService, "Layout.Test.Width", defaultWidth: 280, startsCollapsed: true);
+
+        await sut.RestoreAsync();
+        Assert.True(sut.IsCollapsed);
+
+        sut.ToggleCollapse();
+
+        Assert.Equal(280, _column.Width.Value);
+    }
+
+    [Fact]
     public async Task RestoreAsync_WidthPreviouslyPersisted_RestoresIt()
     {
         await _settingsService.SaveSettingAsync("Layout.Test.Width", 412.5);
