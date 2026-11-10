@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:vm="using:Paarde.Presentation.ViewModels"
              x:Class="Paarde.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 

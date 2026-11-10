@@ -1,6 +1,6 @@
 namespace Paarde.Core.Contracts.Services;
 
-// Epic 21 (specs/terminal-emulation R1): same "start now, don't wait for exit" shape
+// Same "start now, don't wait for exit" shape
 // IRunProcessManager already has, but PTY-backed - a process spawned through this sees a real
 // terminal device (ConPTY/forkpty) instead of a plain redirected pipe, so full-screen TUI apps
 // (Terminal.Gui, vim, htop) render and behave correctly instead of silently emitting unparsed

@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 
 using Paarde.Avalonia.Helpers;
-using Paarde.Avalonia.Tests.Fakes;
+using Paarde.Presentation.Tests.Fakes;
 
 namespace Paarde.Avalonia.Tests.Helpers;
 
@@ -19,6 +19,19 @@ public class ResizablePaneHelperTests
         var sut = CreateSut(defaultWidth: 280);
 
         await sut.RestoreAsync();
+
+        Assert.Equal(280, _column.Width.Value);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_StartsCollapsed_IsShutButReopensAtTheDefaultWidth()
+    {
+        var sut = new ResizablePaneHelper(_column, _settingsService, "Layout.Test.Width", defaultWidth: 280, startsCollapsed: true);
+
+        await sut.RestoreAsync();
+        Assert.True(sut.IsCollapsed);
+
+        sut.ToggleCollapse();
 
         Assert.Equal(280, _column.Width.Value);
     }
@@ -144,7 +157,7 @@ public class ResizablePaneHelperTests
         Assert.False(sut.IsCollapsed);
     }
 
-    // specs/editor-focus-layout R1: zen mode collapses two independent panes as a pair - this
+    // Zen mode collapses two independent panes as a pair - this
     // just confirms two ResizablePaneHelper instances don't interfere with each other, since each
     // one owns its own ColumnDefinition/settings key.
     [Fact]

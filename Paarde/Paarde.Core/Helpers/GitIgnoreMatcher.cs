@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Paarde.Core.Helpers;
 
-// Minimal .gitignore matcher, used by ProtectedPathChecker (T4.1.2) and FileTreeBuilder (T8.1.1) -
+// Minimal .gitignore matcher, used by ProtectedPathChecker and FileTreeBuilder -
 // reads a single top-level `.gitignore` from the project's working directory and matches a
 // relative file path against it. Deliberately scoped to the common subset real-world .gitignore
 // files actually use: comments ('#'), blank lines, '!' negation (later lines override earlier

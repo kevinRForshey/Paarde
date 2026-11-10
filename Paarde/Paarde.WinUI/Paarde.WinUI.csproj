@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- specs/winui-frontend: Windows-only WinUI 3 front end over Paarde.Presentation + Paarde.Core.
+       Unpackaged and self-contained (R2.2): runs from `dotnet run`/F5 with no separate Windows App
+       SDK runtime install, and uses the real %AppData% path (MSIX would virtualize it), so it shares
+       its settings folder with Paarde.Avalonia. Built from Paarde.Windows.slnx only, so Paarde.slnx
+       stays buildable on Linux/macOS (R2.3). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>Paarde.WinUI</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Still needed unpackaged: generates the resources.pri WinUI loads its XAML resources from. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft Software License Terms (Windows App SDK), not MIT - see specs/winui-frontend/design.md "Packages". -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+    <!-- GridSplitter for the resizable master/detail panes (WinUI has none built in). MIT. -->
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.2.251219" />
+    <!-- WrapPanel, so ComposePanelControl's button rows wrap in the narrow Assistant panel. MIT. -->
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Primitives" Version="8.2.251219" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Paarde.Presentation\Paarde.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Editor\index.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- specs/winui-frontend F31.6/F31.7: the code editor is Monaco (MIT) in WebView2. Its prebuilt
+       `min/vs` folder (~25 MB) isn't committed: the pinned npm tarball is downloaded once into obj/,
+       checked against npm's published SHA-512, and extracted with Windows' own tar.exe, so the build
+       needs no Node. Copied as None items, not Content - the resource indexer reads Monaco's hashed
+       file names (e.g. monaco.contribution-BuX2NvO2.js) as resource qualifiers and warns per file. -->
+  <PropertyGroup>
+    <MonacoVersion>0.57.0</MonacoVersion>
+    <MonacoTarballUrl>https://registry.npmjs.org/monaco-editor/-/monaco-editor-$(MonacoVersion).tgz</MonacoTarballUrl>
+    <MonacoSha512>5BkI9KGoqrNvBGUe15/QlZq3OooZ8WLg1AxTpaqHRCP3HNpzPPZKE2EDz8M7c+VRmCeUw1Brp4cx/PWm3kI/5A==</MonacoSha512>
+    <MonacoCacheDir>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)monaco\$(MonacoVersion)\</MonacoCacheDir>
+    <MonacoExtractedMarker>$(MonacoCacheDir)extracted.marker</MonacoExtractedMarker>
+  </PropertyGroup>
+
+  <Target Name="DownloadMonaco" Condition="!Exists('$(MonacoExtractedMarker)')">
+    <DownloadFile SourceUrl="$(MonacoTarballUrl)" DestinationFolder="$(MonacoCacheDir)" DestinationFileName="monaco-editor.tgz" Retries="2" />
+    <GetFileHash Files="$(MonacoCacheDir)monaco-editor.tgz" Algorithm="SHA512" HashEncoding="base64">
+      <Output TaskParameter="Hash" PropertyName="_MonacoActualSha512" />
+    </GetFileHash>
+    <Delete Files="$(MonacoCacheDir)monaco-editor.tgz" Condition="'$(_MonacoActualSha512)' != '$(MonacoSha512)'" />
+    <Error Condition="'$(_MonacoActualSha512)' != '$(MonacoSha512)'" Text="monaco-editor $(MonacoVersion) failed its SHA-512 check (expected $(MonacoSha512), got $(_MonacoActualSha512))." />
+    <Exec Command="&quot;$(SystemRoot)\System32\tar.exe&quot; -xzf monaco-editor.tgz package/min/vs package/LICENSE" WorkingDirectory="$(MonacoCacheDir)" />
+    <Delete Files="$(MonacoCacheDir)monaco-editor.tgz" />
+    <Touch Files="$(MonacoExtractedMarker)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="IncludeMonaco" DependsOnTargets="DownloadMonaco" BeforeTargets="AssignTargetPaths">
+    <!-- Own item type first: inside a target, unqualified %(RecursiveDir) on None would batch over
+         every None item in the project. -->
+    <ItemGroup>
+      <_MonacoFile Include="$(MonacoCacheDir)package\min\vs\**\*" />
+      <None Include="@(_MonacoFile)" Link="Editor\vs\%(_MonacoFile.RecursiveDir)%(_MonacoFile.Filename)%(_MonacoFile.Extension)" CopyToOutputDirectory="PreserveNewest" />
+      <None Include="$(MonacoCacheDir)package\LICENSE" Link="Editor\vs\LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

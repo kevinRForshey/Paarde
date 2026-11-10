@@ -1,12 +1,14 @@
+using System.Text;
+
 using XTerm;
 using XTerm.Buffer;
 using XTerm.Options;
 
 namespace Paarde.Core.Services;
 
-// specs/terminal-emulation T2: a single cell's resolved, renderer-ready state. Colors are
+// A single cell's resolved, renderer-ready state. Colors are
 // resolved to packed 0xRRGGBB here (see TerminalBuffer.ResolveColor) rather than left as raw
-// XTerm.NET mode/index pairs, so Paarde.Avalonia's rendering control (T3) never needs to
+// XTerm.NET mode/index pairs, so Paarde.Avalonia's rendering control never needs to
 // reference XTerm.NET types.
 public readonly record struct TerminalCell(
     string Content,
@@ -35,7 +37,7 @@ public sealed class TerminalRow
     public TerminalCell[] Cells { get; }
 }
 
-// specs/terminal-emulation T2: wraps an XTerm.NET Terminal. No VT100/ANSI parsing logic of its
+// Wraps an XTerm.NET Terminal. No VT100/ANSI parsing logic of its
 // own - Feed hands raw bytes straight to the library and GetRow/CursorPosition read back the
 // state it already computed. The one piece of real logic here is ResolveColor, because
 // XTerm.NET's own cell attributes carry a raw mode/index pair rather than a renderer-ready color
@@ -47,7 +49,13 @@ public sealed class TerminalBuffer : IDisposable
     public TerminalBuffer(int cols, int rows)
     {
         _terminal = new Terminal(new TerminalOptions { Cols = cols, Rows = rows });
+        _terminal.DataReceived += (_, e) => ResponseReady?.Invoke(Encoding.UTF8.GetBytes(e.Data));
     }
+
+    // The terminal's replies to queries the program wrote (device attributes, cursor position,
+    // colours, ...). The owner writes them to the program's input; a TUI that waits for one (e.g.
+    // Microsoft `edit`) hangs otherwise.
+    public event Action<byte[]>? ResponseReady;
 
     // XTerm.NET's own BufferChanged event only fires on alternate/normal screen switches, not on
     // every write (confirmed against its source - Terminal.cs raises it exclusively from

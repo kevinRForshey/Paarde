@@ -1,10 +1,10 @@
 using Avalonia.Controls;
 
-using Paarde.Avalonia.Contracts.Services;
+using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Helpers;
 
-// T8.2.3: restores and persists one Grid column's width (a master/browse-list pane) so every
+// Restores and persists one Grid column's width (a master/browse-list pane) so every
 // master-detail page (Explorer, Diffs, Tutorial, History) shares the same GridSplitter +
 // ILocalSettingsService plumbing instead of duplicating it per view. Dragging a pane all the way
 // shut (width 0) and reopening it is this app's "collapsible" - there's no separate collapsed flag
@@ -15,19 +15,21 @@ public sealed class ResizablePaneHelper
     private readonly ILocalSettingsService _settingsService;
     private readonly string _widthSettingKey;
     private readonly double _defaultWidth;
+    private readonly bool _startsCollapsed;
     private double? _widthBeforeCollapse;
 
-    public ResizablePaneHelper(ColumnDefinition column, ILocalSettingsService settingsService, string widthSettingKey, double defaultWidth)
+    public ResizablePaneHelper(ColumnDefinition column, ILocalSettingsService settingsService, string widthSettingKey, double defaultWidth, bool startsCollapsed = false)
     {
         _column = column;
         _settingsService = settingsService;
         _widthSettingKey = widthSettingKey;
         _defaultWidth = defaultWidth;
+        _startsCollapsed = startsCollapsed;
     }
 
     public async Task RestoreAsync()
     {
-        var width = await _settingsService.ReadSettingAsync<double?>(_widthSettingKey) ?? _defaultWidth;
+        var width = await _settingsService.ReadSettingAsync<double?>(_widthSettingKey) ?? (_startsCollapsed ? 0 : _defaultWidth);
         _column.Width = new GridLength(Math.Max(width, 0));
     }
 
@@ -35,7 +37,7 @@ public sealed class ResizablePaneHelper
 
     public bool IsCollapsed => _column.Width.Value <= 0;
 
-    // specs/editor-focus-layout R1: a reusable collapse/remember-width/restore toggle, replacing
+    // A reusable collapse/remember-width/restore toggle, replacing
     // the "remembered width" field each caller (e.g. ExplorerView.axaml.cs's Assistant panel
     // button) used to keep ad-hoc - zen mode needs the same mechanism applied to two panes at
     // once, so it's a method on this class rather than duplicated per call site.
@@ -52,7 +54,9 @@ public sealed class ResizablePaneHelper
 
     public void Restore()
     {
-        _column.Width = new GridLength(_widthBeforeCollapse ?? _defaultWidth);
+        // defaultWidth, not 0, when the pane started collapsed or was saved shut - otherwise it
+        // could never be reopened.
+        _column.Width = new GridLength(_widthBeforeCollapse is > 0 ? _widthBeforeCollapse.Value : _defaultWidth);
         _widthBeforeCollapse = null;
     }
 

@@ -122,7 +122,7 @@ public class FileChangeApplyServiceTests : IDisposable
         Assert.False(deselected.IsApplied);
     }
 
-    // T4.1.3: the file this write overwrites already uses CRLF, but DiffBuilder.ComposeContent joins
+    // The file this write overwrites already uses CRLF, but DiffBuilder.ComposeContent joins
     // hunk-based content with bare '\n' (see DiffBuilder.cs) - without normalizing back to the
     // original's convention, a deselected-hunk write like this would silently flip the whole file
     // to LF even though only one line's content actually changed.
@@ -251,7 +251,7 @@ public class FileChangeApplyServiceTests : IDisposable
         Assert.ThrowsAny<UnauthorizedAccessException>(() => _service.Apply(file, _workingDirectory));
     }
 
-    // WriteRaw (T4.2.2) is Apply's underlying write path with no ProposedFileChangeViewModel
+    // WriteRaw is Apply's underlying write path with no ProposedFileChangeViewModel
     // involved - these exercise it directly as its own public contract, covering the same
     // path-containment and encoding-preservation behavior the Apply_* tests above already cover
     // transitively through it.

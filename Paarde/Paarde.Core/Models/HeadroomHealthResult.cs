@@ -11,4 +11,6 @@ public record HeadroomHealthResult(int? ExitCode, IReadOnlyList<HeadroomCheckIte
     public bool IsDown => ExitCode is null || ExitCode >= 2;
 }
 
-public record HeadroomCheckItem(string Name, string Status, string Summary);
+// Hint is null when the CLI has no actionable suggestion for this check (e.g. a passing check),
+// a string when it does (e.g. "wrap it: headroom wrap codex").
+public record HeadroomCheckItem(string Name, string Status, string Summary, string? Hint = null);

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace Paarde.Core.Helpers;
 
 // Checks whether an executable would resolve on PATH, the same way the OS shell would find it,
-// without actually starting a process (T6.1.3) - used as a cheap preflight before shelling out to
+// without actually starting a process - used as a cheap preflight before shelling out to
 // `claude`, so a missing CLI can be reported with an actionable message instead of surfacing
 // whatever exception Process.Start happens to throw.
 public static class ExecutablePathResolver

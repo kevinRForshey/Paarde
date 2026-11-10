@@ -1,16 +1,17 @@
 using System.Text.Json;
 
 using Paarde.Core.Contracts.Services;
+using Paarde.Core.Helpers;
 using Paarde.Core.Models;
 
 namespace Paarde.Core.Services;
 
-// specs/build-and-run/design.md: language-specific detection knowledge as data (file
+// Language-specific detection knowledge as data (file
 // classification rules, default command templates) rather than branching code elsewhere, so a
-// new language is a new private helper here, not a change to every caller. C# detection (R2.1) is
+// new language is a new private helper here, not a change to every caller. C# detection is
 // solid (.csproj inspection, no full MSBuild evaluation needed for just these checks);
-// Python/TypeScript (R2.4/R2.5) are acknowledged first-pass heuristics, always correctable by
-// hand-editing or adding a configuration (R2.6).
+// Python/TypeScript are acknowledged first-pass heuristics, always correctable by
+// hand-editing or adding a configuration.
 public class RunConfigurationDetector : IRunConfigurationDetector
 {
     private static readonly string[] PythonEntryPointFileNames = ["main.py", "app.py", "manage.py"];
@@ -37,7 +38,7 @@ public class RunConfigurationDetector : IRunConfigurationDetector
         return configurations;
     }
 
-    // R2.1/R2.2: every .csproj under the root is a candidate, pruning bin/obj/.git (same
+    // Every .csproj under the root is a candidate, pruning bin/obj/.git (same
     // "artifacts and VCS metadata don't count" convention FileTreeBuilder already applies
     // elsewhere), excluded if it looks like a test project and otherwise included if it declares
     // an Exe/WinExe OutputType or the web SDK.
@@ -72,8 +73,8 @@ public class RunConfigurationDetector : IRunConfigurationDetector
                 LanguageId: "csharp",
                 WorkingDirectoryPath: projectDirectory,
                 ProjectRelativePath: Path.GetRelativePath(csharpRoot, projectFilePath),
-                BuildCommand: $"dotnet build \"{projectFilePath}\"",
-                RunCommand: $"dotnet run --project \"{projectFilePath}\"",
+                BuildCommand: $"dotnet build {ShellArgumentQuoting.Quote(projectFilePath)}",
+                RunCommand: $"dotnet run --project {ShellArgumentQuoting.Quote(projectFilePath)}",
                 IsAutoDetected: true);
         }
     }
@@ -121,7 +122,7 @@ public class RunConfigurationDetector : IRunConfigurationDetector
         return segments.Any(segment => IgnoredDirectoryNames.Contains(segment, StringComparer.OrdinalIgnoreCase));
     }
 
-    // R2.4: best-effort, not recursive - zero candidates (requiring the user to add one by hand)
+    // Best-effort, not recursive - zero candidates (requiring the user to add one by hand)
     // is an acceptable outcome, not a bug.
     private static IEnumerable<RunConfiguration> DetectPythonConfigurations(string pythonRoot)
     {
@@ -145,7 +146,7 @@ public class RunConfigurationDetector : IRunConfigurationDetector
         }
     }
 
-    // R2.5: one candidate per root (not per script) - a dev/start entry (preferring dev) becomes
+    // One candidate per root (not per script) - a dev/start entry (preferring dev) becomes
     // the run command, a build entry becomes the build command. No candidate at all if neither dev
     // nor start exists, since a build command with nothing to run isn't useful on its own.
     private static IEnumerable<RunConfiguration> DetectTypeScriptConfigurations(string typeScriptRoot)

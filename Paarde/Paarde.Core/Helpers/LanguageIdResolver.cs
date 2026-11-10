@@ -1,6 +1,6 @@
 namespace Paarde.Core.Helpers;
 
-// Epic 18 (specs/multi-language-support): maps a file's extension to the LSP languageId used both
+// Maps a file's extension to the LSP languageId used both
 // to pick which language server a file's notifications/requests route to
 // (LanguageServerSessionManager) and to populate textDocument/didOpen's own "languageId" field
 // (StdioLanguageServerClient), replacing the latter's old hardcoded "csharp" literal. Shared by
@@ -21,7 +21,7 @@ public static class LanguageIdResolver
     };
 
     // Returns null for an unmapped extension - callers treat that as "no language server involved
-    // for this file," not an error (specs/multi-language-support/requirements.md R2.3).
+    // for this file," not an error.
     public static string? Resolve(string filePath)
     {
         var extension = Path.GetExtension(filePath);

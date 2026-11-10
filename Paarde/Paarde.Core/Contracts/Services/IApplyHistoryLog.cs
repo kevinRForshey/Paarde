@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Contracts.Services;
 
-// Session-scoped, append-only log of apply/undo/revert actions (T4.2.3), for display on the
+// Session-scoped, append-only log of apply/undo/revert actions, for display on the
 // Tutorial page - distinct from IApplyHistoryStore's undo stack, which holds full file content and
 // shrinks as it's undone, and from IApplyBackupStore, which has no concept of individual actions
 // or timestamps at all. Registered as a singleton so it survives page navigation for the lifetime

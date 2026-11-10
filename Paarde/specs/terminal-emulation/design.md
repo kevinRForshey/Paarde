@@ -100,7 +100,7 @@ Wraps `Porta.Pty.PtyProvider.SpawnAsync` with a `PtyOptions` built from `command
 already does, so PATH/shell builtins/`&&`-chains resolve the same way). A background read loop on
 `IPtyConnection.ReaderStream` raises `OutputReceived` with whatever chunk `Stream.ReadAsync` hands
 back (no line buffering — R1 is explicit that this is raw bytes). `IPtyConnection.ProcessExited`
-raises `Exited`. `Stop()` calls `IPtyConnection.Kill()`. `WriteInput` writes to `WriterStream`.
+raises `Exited`. `Stop()` kills the shell's whole process tree (`IPtyConnection.Kill()` ends only the shell). `WriteInput` writes to `WriterStream`.
 Same "stopped by us" flag pattern `RunProcessManager` already uses, for the same reason (`Exited`
 firing asynchronously during a racing second `Start`).
 

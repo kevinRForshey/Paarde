@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Paarde.WinUI.Views.ComposePanelControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:Paarde.WinUI.Helpers"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls">
+
+    <!-- Port of Paarde.Avalonia's ComposePanelControl (Epic 25, T9). DataContext is a
+         PromptViewModel supplied by the host (PromptView now, the Assistant panel in F31.7);
+         code-behind mirrors it into ViewModel for x:Bind. Avalonia's PromptView duplicates this
+         body - here PromptView just hosts this control instead. -->
+    <!-- Scrolls when the panel is too short for everything (Explorer's Assistant panel); otherwise
+         the prompt box's * row was squeezed to nothing. Code-behind keeps RootGrid at least the
+         viewport's height, so on a tall page the prompt box still fills the spare space. -->
+    <ScrollViewer x:Name="RootScrollViewer" VerticalScrollBarVisibility="Auto" SizeChanged="OnRootScrollViewerSizeChanged">
+    <Grid x:Name="RootGrid" Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Prompt" Style="{StaticResource SubtitleTextBlockStyle}" />
+
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="Project location" Style="{StaticResource StatusTextStyle}" />
+                <TextBox Text="{x:Bind ViewModel.WorkingDirectoryPath, Mode=OneWay}"
+                         PlaceholderText="No folder selected"
+                         IsReadOnly="True" />
+            </StackPanel>
+            <!-- T8.2.4: fast project switching without leaving the Prompt page - see
+                 PromptViewModel.RecentWorkingDirectories/OnSelectedRecentWorkingDirectoryChanged.
+                 Not bound two-way: WinUI's ComboBox ignores the view model clearing the selection
+                 from inside its own SelectionChanged, so code-behind does the reset. -->
+            <ComboBox x:Name="RecentWorkingDirectoryComboBox"
+                      AutomationProperties.Name="Recent working directories"
+                      Grid.Column="1"
+                      Margin="8,20,0,0"
+                      VerticalAlignment="Top"
+                      MinWidth="160"
+                      MaxWidth="240"
+                      PlaceholderText="Recent..."
+                      ItemsSource="{x:Bind ViewModel.RecentWorkingDirectories, Mode=OneWay}"
+                      SelectionChanged="OnRecentWorkingDirectorySelectionChanged"
+                      Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasRecentWorkingDirectories), Mode=OneWay}" />
+            <Button AutomationProperties.Name="Browse..." Grid.Column="2"
+                    Margin="8,20,0,0"
+                    VerticalAlignment="Top"
+                    Command="{x:Bind ViewModel.BrowseWorkingDirectoryCommand, Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE838;" FontSize="14" />
+                    <TextBlock Text="Browse..." />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,8,0,0" Spacing="4">
+            <TextBlock Text="Context files" Style="{StaticResource StatusTextStyle}" />
+            <!-- Wraps rather than one fixed row: in Explorer's 280 px Assistant panel a row cut off
+                 "Remove selected" and "Suggest relevant files" entirely. -->
+            <toolkit:WrapPanel HorizontalSpacing="8" VerticalSpacing="8">
+                <Button AutomationProperties.Name="Add files..." Command="{x:Bind ViewModel.AddContextFilesCommand, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Attach" />
+                        <TextBlock Text="Add files..." />
+                    </StackPanel>
+                </Button>
+                <Button AutomationProperties.Name="Add folder..." Command="{x:Bind ViewModel.AddContextFolderCommand, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Folder" />
+                        <TextBlock Text="Add folder..." />
+                    </StackPanel>
+                </Button>
+                <Button AutomationProperties.Name="Remove selected" Command="{x:Bind ViewModel.RemoveAttachedPathCommand, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Delete" />
+                        <TextBlock Text="Remove selected" />
+                    </StackPanel>
+                </Button>
+                <Button AutomationProperties.Name="Suggest relevant files" Command="{x:Bind ViewModel.SuggestRelevantFilesCommand, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xEA80;" FontSize="16" />
+                        <TextBlock Text="Suggest relevant files" />
+                    </StackPanel>
+                </Button>
+            </toolkit:WrapPanel>
+            <ListView ItemsSource="{x:Bind ViewModel.AttachedPaths, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedAttachedPath, Mode=TwoWay}"
+                      MaxHeight="96" />
+
+            <!-- T14.2.3: suggestions are never auto-attached - double-tap accepts one (removing it
+                 from this list), "Dismiss" clears the rest without attaching anything. -->
+            <Border Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasSuggestedRelevantFiles), Mode=OneWay}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource ControlCornerRadius}"
+                    Padding="8">
+                <StackPanel Spacing="4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Suggested relevant files (double-click to attach)" Style="{StaticResource StatusTextStyle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="Dismiss" Command="{x:Bind ViewModel.DismissSuggestedRelevantFilesCommand, Mode=OneWay}" />
+                    </Grid>
+                    <ListView x:Name="SuggestedRelevantFilesList"
+                              ItemsSource="{x:Bind ViewModel.SuggestedRelevantFiles, Mode=OneWay}"
+                              MaxHeight="96"
+                              DoubleTapped="OnSuggestedRelevantFileDoubleTapped" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <Grid Grid.Row="3" Margin="0,8,0,0" RowSpacing="4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Prompt text" Style="{StaticResource StatusTextStyle}" />
+                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.EstimatedTokenCountDisplay, Mode=OneWay}" Style="{StaticResource StatusTextStyle}" />
+            </Grid>
+            <!-- PreviewKeyDown rather than KeyDown: an AcceptsReturn TextBox handles Enter (and
+                 Up/Down caret moves) itself before KeyDown would bubble. -->
+            <TextBox x:Name="PromptTextBox"
+                     Grid.Row="1"
+                     Text="{x:Bind ViewModel.PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PlaceholderText="Enter the prompt you want to send to Claude Code..."
+                     MinHeight="96"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     TextChanged="OnPromptTextBoxTextChanged"
+                     PreviewKeyDown="OnPromptTextBoxPreviewKeyDown" />
+
+            <!-- T14.1.1: anchored below the TextBox itself, like Avalonia's, not at the caret. Not
+                 light-dismiss, so the TextBox keeps keyboard input while it's open; Escape or any
+                 keystroke outside a mention closes it (IsOpen follows HasMentionSuggestions). -->
+            <Popup x:Name="MentionPopup"
+                   Grid.Row="1"
+                   PlacementTarget="{x:Bind PromptTextBox}"
+                   DesiredPlacement="BottomEdgeAlignedLeft"
+                   IsOpen="{x:Bind ViewModel.HasMentionSuggestions, Mode=OneWay}">
+                <Border Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource OverlayCornerRadius}"
+                        MaxHeight="160"
+                        MinWidth="240">
+                    <ListView x:Name="MentionList"
+                              ItemsSource="{x:Bind ViewModel.MentionSuggestions, Mode=OneWay}"
+                              DoubleTapped="OnMentionSuggestionDoubleTapped" />
+                </Border>
+            </Popup>
+        </Grid>
+
+        <toolkit:WrapPanel Grid.Row="4" Margin="0,8,0,0" HorizontalSpacing="8" VerticalSpacing="8">
+            <Button AutomationProperties.Name="Save prompt" Command="{x:Bind ViewModel.SavePromptCommand, Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Save" />
+                    <TextBlock Text="Save prompt" />
+                </StackPanel>
+            </Button>
+            <Button AutomationProperties.Name="Send to Claude Code" Command="{x:Bind ViewModel.RunPromptCommand, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Send" />
+                    <TextBlock Text="Send to Claude Code" />
+                </StackPanel>
+            </Button>
+            <Button AutomationProperties.Name="Cancel" Command="{x:Bind ViewModel.CancelPromptCommand, Mode=OneWay}"
+                    Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Cancel" />
+                    <TextBlock Text="Cancel" />
+                </StackPanel>
+            </Button>
+            <CheckBox Content="Continue previous conversation"
+                      IsChecked="{x:Bind ViewModel.ContinuePreviousConversation, Mode=TwoWay}"
+                      IsEnabled="{x:Bind ViewModel.HasPreviousSession, Mode=OneWay}"
+                      VerticalAlignment="Center" />
+            <ProgressRing Width="20" Height="20" VerticalAlignment="Center" IsIndeterminate="True"
+                          IsActive="{x:Bind ViewModel.IsRunning, Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.ElapsedTimeDisplay, Mode=OneWay}" VerticalAlignment="Center" Opacity="0.7"
+                       Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.StreamProgressDisplay, Mode=OneWay}" VerticalAlignment="Center" Opacity="0.7"
+                       Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.IsRunning), Mode=OneWay}" />
+        </toolkit:WrapPanel>
+
+        <!-- T-UX.2: per-run settings, grouped under a divider and de-emphasized so they don't
+             compete with "Send to Claude Code". -->
+        <StackPanel Grid.Row="5" Margin="0,12,0,0" Spacing="8">
+            <Border Style="{StaticResource DividerStyle}" />
+            <!-- Label/control rows rather than one horizontal row, which ran past the window's
+                 edge in Explorer's 280 px Assistant panel. -->
+            <StackPanel Spacing="8" Opacity="0.85">
+                <TextBlock Text="Run options" Style="{StaticResource SidebarSectionLabelStyle}" />
+                <Grid ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Left" MaxWidth="340">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Preset" VerticalAlignment="Center" Opacity="0.7" />
+                    <ComboBox Grid.Row="0" Grid.Column="1"
+                              AutomationProperties.Name="Preset"
+                              ItemsSource="{x:Bind ViewModel.AvailablePresets, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Text="Tutorial detail" VerticalAlignment="Center" Opacity="0.7" />
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              AutomationProperties.Name="Tutorial detail"
+                              ItemsSource="{x:Bind ViewModel.AvailableDepths, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedDepth, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="2" Text="Timeout (seconds)" VerticalAlignment="Center" Opacity="0.7" />
+                    <!-- NumberBox.Value is a double, so it's bound one-way and written back from
+                         ValueChanged rather than through x:Bind's two-way cast. -->
+                    <NumberBox Grid.Row="2" Grid.Column="1"
+                               AutomationProperties.Name="Timeout (seconds)"
+                               Value="{x:Bind ViewModel.TimeoutSeconds, Mode=OneWay}"
+                               Minimum="1"
+                               Maximum="86400"
+                               SmallChange="30"
+                               SpinButtonPlacementMode="Inline"
+                               HorizontalAlignment="Stretch"
+                               ValueChanged="OnTimeoutValueChanged" />
+                </Grid>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Epic 11 (F11.2.2): only takes up space once a run has actually used a tool. -->
+        <Expander Grid.Row="6"
+                  Margin="0,8,0,0"
+                  Header="Tool activity"
+                  IsExpanded="True"
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Stretch"
+                  Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasToolActivity), Mode=OneWay}">
+            <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{x:Bind ViewModel.ToolActivityLog, Mode=OneWay}" />
+            </ScrollViewer>
+        </Expander>
+
+        <Grid Grid.Row="7" Margin="0,4,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <InfoBar Grid.Row="0"
+                     Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                     Severity="{x:Bind helpers:BindingFunctions.ToInfoBarSeverity(ViewModel.StatusSeverity), Mode=OneWay}"
+                     IsClosable="False"
+                     IsOpen="{x:Bind helpers:BindingFunctions.IsNotEmpty(ViewModel.StatusMessage), Mode=OneWay}" />
+            <TextBlock Grid.Row="1" Margin="0,4,0,0" HorizontalAlignment="Right"
+                       Text="{x:Bind ViewModel.UsageSummary, Mode=OneWay}"
+                       Style="{StaticResource StatusTextStyle}" />
+        </Grid>
+    </Grid>
+    </ScrollViewer>
+</UserControl>

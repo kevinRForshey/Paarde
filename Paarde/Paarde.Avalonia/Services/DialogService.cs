@@ -1,6 +1,6 @@
-using Paarde.Avalonia.Contracts.Services;
 
 using FluentAvalonia.UI.Controls;
+using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Services;
 

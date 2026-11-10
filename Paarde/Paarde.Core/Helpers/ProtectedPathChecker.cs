@@ -1,8 +1,8 @@
 namespace Paarde.Core.Helpers;
 
 // Decides whether a proposed write's target is somewhere an apply should refuse to touch without
-// explicit confirmation (T4.1.2): inside `.git/`, `bin/`, or `obj/`, or matched by the project's
-// `.gitignore`. Deliberately separate from FilePathContainment (T4.1.1) - that check is about
+// explicit confirmation: inside `.git/`, `bin/`, or `obj/`, or matched by the project's
+// `.gitignore`. Deliberately separate from FilePathContainment - that check is about
 // writes escaping the working directory entirely (a security boundary that's never bypassable);
 // this one is about writes landing somewhere that's merely unwise by default (build output,
 // VCS internals, explicitly-ignored files), which the user can choose to override per apply.

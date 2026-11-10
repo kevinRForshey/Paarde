@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 using Porta.Pty;
@@ -6,7 +8,7 @@ using Paarde.Core.Contracts.Services;
 
 namespace Paarde.Core.Services;
 
-// specs/terminal-emulation/design.md: same cmd.exe/sh -c shelling pattern RunProcessManager
+// Same cmd.exe/sh -c shelling pattern RunProcessManager
 // already uses (so PATH/shell builtins/&&-chains resolve the same way), but spawned through
 // Porta.Pty so the child process gets a real PTY (ConPTY on Windows, forkpty/posix_openpt on
 // Linux/macOS) instead of a plain redirected pipe - the fix for TUI apps rendering as unparsed
@@ -40,6 +42,15 @@ public class PtyProcessManager : IPtyProcessManager
         Stop();
 
         var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+        if (isWindows)
+        {
+            // A process started in a new process group ignores Ctrl+C, and every process it starts
+            // inherits that - so if this app was launched that way, Ctrl+C typed into the terminal
+            // would reach cmd but not the program it runs. Clearing it here lets the children inherit
+            // normal Ctrl+C handling.
+            SetConsoleCtrlHandler(IntPtr.Zero, false);
+        }
         var options = new PtyOptions
         {
             Cols = cols,
@@ -124,6 +135,21 @@ public class PtyProcessManager : IPtyProcessManager
         }
 
         current.StoppedByUs = true;
-        current.Connection.Kill();
+
+        // The connection's own Kill() ends only the shell, leaving whatever it started (a TUI under
+        // cmd, the program under `dotnet run`) running.
+        try
+        {
+            using var process = Process.GetProcessById(current.Connection.Pid);
+            process.Kill(entireProcessTree: true);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+            // Already exited.
+        }
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetConsoleCtrlHandler(IntPtr handlerRoutine, [MarshalAs(UnmanagedType.Bool)] bool add);
 }

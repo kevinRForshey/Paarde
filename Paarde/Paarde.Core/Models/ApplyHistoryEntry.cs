@@ -12,7 +12,7 @@ public enum ApplyHistoryEntryKind
     RevertAllApplied,
 }
 
-// One row in the apply-history log shown on the Tutorial page (T4.2.3) - a lightweight,
+// One row in the apply-history log shown on the Tutorial page - a lightweight,
 // append-only record of what happened and when, independent of IApplyHistoryStore's undo stack
 // (which holds full pre-apply file content and gets popped away as it's undone) and
 // IApplyBackupStore's session baseline (which holds no timestamps or per-action grouping at all).

@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Contracts.ViewModels;
+using Paarde.Presentation.Contracts.ViewModels;
 using Paarde.Avalonia.Helpers;
 
 using FluentAvalonia.UI.Controls;
@@ -9,10 +9,11 @@ using FluentAvalonia.UI.Navigation;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Paarde.Presentation.Contracts.Services;
 
 namespace Paarde.Avalonia.Services;
 
-public class NavigationService : INavigationService
+public class NavigationService : IFrameNavigationService
 {
     private readonly IPageService _pageService;
     private readonly IDialogService _dialogService;
@@ -133,7 +134,7 @@ public class NavigationService : INavigationService
         ConfirmThenRetryNavigation(e.NavigationMode, e.SourcePageType, e.Parameter);
     }
 
-    // T9.2.3: async void because it's raised from OnNavigating's event handler (itself required to
+    // Async void because it's raised from OnNavigating's event handler (itself required to
     // be synchronous by Frame.Navigating's delegate signature), so there's no caller able to await
     // it - wrapped in its own try/catch (rather than just the inner try/finally below) so an
     // exception from the dialog await itself doesn't unwind unobserved past this method too.

@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:styling="using:Avalonia.Styling"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:pmodels="using:Paarde.Presentation.Models"
+             xmlns:vm="using:Paarde.Presentation.ViewModels"
              xmlns:models="using:Paarde.Core.Models"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
@@ -18,18 +18,18 @@
                 <RadioButton Content="Light"
                              GroupName="AppTheme"
                              Command="{Binding SwitchThemeCommand}"
-                             CommandParameter="{x:Static styling:ThemeVariant.Light}"
-                             IsChecked="{Binding ThemeVariant, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Light, Mode=OneWay}" />
+                             CommandParameter="{x:Static pmodels:AppTheme.Light}"
+                             IsChecked="{Binding Theme, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Light, Mode=OneWay}" />
                 <RadioButton Content="Dark"
                              GroupName="AppTheme"
                              Command="{Binding SwitchThemeCommand}"
-                             CommandParameter="{x:Static styling:ThemeVariant.Dark}"
-                             IsChecked="{Binding ThemeVariant, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Dark, Mode=OneWay}" />
+                             CommandParameter="{x:Static pmodels:AppTheme.Dark}"
+                             IsChecked="{Binding Theme, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Dark, Mode=OneWay}" />
                 <RadioButton Content="Default"
                              GroupName="AppTheme"
                              Command="{Binding SwitchThemeCommand}"
-                             CommandParameter="{x:Static styling:ThemeVariant.Default}"
-                             IsChecked="{Binding ThemeVariant, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Default, Mode=OneWay}" />
+                             CommandParameter="{x:Static pmodels:AppTheme.Default}"
+                             IsChecked="{Binding Theme, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Default, Mode=OneWay}" />
             </StackPanel>
         </StackPanel>
 
@@ -46,7 +46,7 @@
             <Button Content="Check Headroom status now" Command="{Binding CheckHeadroomNowCommand}" HorizontalAlignment="Left" />
             <ui:InfoBar Margin="0,4,0,0"
                         Message="{Binding HeadroomStatusMessage}"
-                        Severity="{Binding HeadroomStatusSeverity}"
+                        Severity="{Binding HeadroomStatusSeverity, Converter={StaticResource NotificationSeverityToInfoBarSeverityConverter}}"
                         IsClosable="False"
                         IsOpen="{Binding HeadroomStatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>

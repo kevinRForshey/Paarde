@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Paarde.WinUI.Views.BreadcrumbBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Paarde.Core.Models">
+
+    <!-- specs/editor-intelligence R5: Segments is computed in code-behind from DocumentSymbols +
+         CaretPosition via BreadcrumbPathBuilder.Build, same as Paarde.Avalonia's. -->
+    <ItemsControl x:Name="SegmentsItemsControl">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="4" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:LspDocumentSymbol">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Content="{x:Bind Name}" Tag="{x:Bind}" Click="OnSegmentButtonClick" Padding="4,0" />
+                    <TextBlock Text="›" Opacity="0.5" VerticalAlignment="Center" />
+                </StackPanel>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

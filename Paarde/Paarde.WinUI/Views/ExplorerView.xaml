@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Paarde.WinUI.Views.ExplorerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
+    xmlns:helpers="using:Paarde.WinUI.Helpers"
+    xmlns:pvm="using:Paarde.Presentation.ViewModels"
+    xmlns:views="using:Paarde.WinUI.Views">
+
+    <Page.Resources>
+        <!-- One tab header, shared by both tab groups. Avalonia's split group has no "Split right"
+             item; here it's hidden by CanSplitRight, which is false there anyway. -->
+        <DataTemplate x:Key="FileTabTemplate" x:DataType="pvm:OpenFileTabViewModel">
+            <TabViewItem AutomationProperties.Name="{x:Bind FileName}" ToolTipService.ToolTip="{x:Bind FilePath}">
+                <TabViewItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE718;" FontSize="12"
+                                  Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(IsPinned), Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind FileName}" MaxWidth="200" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="*" FontWeight="Bold"
+                                   ToolTipService.ToolTip="This file has unsaved edits."
+                                   Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(IsDirty), Mode=OneWay}" />
+                    </StackPanel>
+                </TabViewItem.Header>
+                <TabViewItem.ContextFlyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Text="{x:Bind PinMenuItemLabel, Mode=OneWay}" Command="{x:Bind TogglePinCommand}" />
+                        <MenuFlyoutItem Text="Split right" Command="{x:Bind RequestSplitRightCommand}"
+                                        Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(CanSplitRight), Mode=OneWay}" />
+                    </MenuFlyout>
+                </TabViewItem.ContextFlyout>
+            </TabViewItem>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- The path trims at MaxWidth so a deep working directory can't push the buttons away. -->
+        <Grid Grid.Row="0" Margin="8" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{x:Bind ViewModel.WorkingDirectoryPath, Mode=OneWay}"
+                       ToolTipService.ToolTip="{x:Bind ViewModel.WorkingDirectoryPath, Mode=OneWay}"
+                       MaxWidth="600"
+                       FontWeight="Bold"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button AutomationProperties.Name="Refresh" Command="{x:Bind ViewModel.RefreshTreeCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Refresh" />
+                        <TextBlock Text="Refresh" />
+                    </StackPanel>
+                </Button>
+                <!-- Epic 25, T12 (R10). -->
+                <Button AutomationProperties.Name="Open folder..." Command="{x:Bind ViewModel.OpenFolderCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="OpenLocal" />
+                        <TextBlock Text="Open folder..." />
+                    </StackPanel>
+                </Button>
+                <!-- Epic 25, T12 (R2): collapses/expands the Assistant panel column. -->
+                <Button AutomationProperties.Name="Assistant" Click="OnToggleAssistantPanelButtonClick" ToolTipService.ToolTip="Show or hide the Assistant panel.">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Comment" />
+                        <TextBlock Text="Assistant" />
+                    </StackPanel>
+                </Button>
+                <!-- specs/editor-focus-layout R1: hides the tree and Assistant panel (also Ctrl+K, Z). -->
+                <Button AutomationProperties.Name="Zen mode" Command="{x:Bind ViewModel.ToggleZenModeCommand}" ToolTipService.ToolTip="Toggle zen mode (Ctrl+K, Z).">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="FullScreen" />
+                        <TextBlock Text="Zen mode" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <InfoBar Grid.Row="1"
+                 Margin="8,0,8,8"
+                 Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                 Severity="{x:Bind helpers:BindingFunctions.ToInfoBarSeverity(ViewModel.StatusSeverity), Mode=OneWay}"
+                 IsClosable="False"
+                 IsOpen="{x:Bind helpers:BindingFunctions.IsNotEmpty(ViewModel.StatusMessage), Mode=OneWay}" />
+
+        <!-- T8.1.3 / T8.2.3 / Epic 25 T12: tree | tabs | Assistant panel, each splitter persisted
+             through ResizablePaneHelper; dragging a side pane shut collapses it. -->
+        <Grid x:Name="WorkspaceGrid" Grid.Row="2" Margin="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="280" />
+            </Grid.ColumnDefinitions>
+
+            <TreeView x:Name="FileTree"
+                      Grid.Column="0"
+                      SelectionMode="Single"
+                      ItemsSource="{x:Bind ViewModel.Root.Children, Mode=OneWay}"
+                      ItemInvoked="OnFileTreeItemInvoked">
+                <TreeView.ItemTemplate>
+                    <DataTemplate x:DataType="pvm:FileTreeNodeViewModel">
+                        <TreeViewItem ItemsSource="{x:Bind Children}" AutomationProperties.Name="{x:Bind Name}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{x:Bind Name}" />
+                                <TextBlock Text="●"
+                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                           ToolTipService.ToolTip="Touched by the current proposal"
+                                           Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(IsTouched)}" />
+                            </StackPanel>
+                        </TreeViewItem>
+                    </DataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+
+            <toolkit:GridSplitter Grid.Column="1" x:Name="TreeSplitter" Width="4" ResizeDirection="Columns" />
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0"
+                           Margin="8"
+                           Text="Select a file on the left to preview it here."
+                           Opacity="0.7"
+                           Visibility="{x:Bind helpers:BindingFunctions.CollapsedIf(ViewModel.HasOpenTabs), Mode=OneWay}" />
+
+                <!-- Epic 23 / specs/editor-focus-layout R2-R4: two tab groups (the second appears on
+                     "Split right" and collapses with its last tab). The TabViews are tab strips only;
+                     each group's ExplorerFileTabControl below shows that group's selected tab. -->
+                <Grid Grid.Row="1" Margin="8,0,0,0" Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasOpenTabs), Mode=OneWay}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Button Grid.Row="0"
+                            Content="Close Tab"
+                            HorizontalAlignment="Right"
+                            Margin="8,0,0,4"
+                            Command="{x:Bind ViewModel.CloseSelectedTabCommand}"
+                            ToolTipService.ToolTip="Close the active tab." />
+
+                    <Grid x:Name="SplitGroupGrid" Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="320" />
+                        </Grid.ColumnDefinitions>
+
+                        <Grid Grid.Column="0" RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TabView x:Name="PrimaryTabView"
+                                     TabItemsSource="{x:Bind ViewModel.PrimaryGroupTabs}"
+                                     TabItemTemplate="{StaticResource FileTabTemplate}"
+                                     TabWidthMode="SizeToContent"
+                                     CanReorderTabs="True"
+                                     CanDragTabs="False"
+                                     IsAddTabButtonVisible="False"
+                                     SelectionChanged="OnTabViewSelectionChanged"
+                                     TabCloseRequested="OnTabViewTabCloseRequested" />
+                            <views:ExplorerFileTabControl x:Name="PrimaryFileTab" Grid.Row="1" />
+                        </Grid>
+
+                        <toolkit:GridSplitter Grid.Column="1"
+                                              x:Name="SplitGroupSplitter"
+                                              Width="4"
+                                              ResizeDirection="Columns"
+                                              Visibility="{x:Bind helpers:BindingFunctions.VisibleIf(ViewModel.HasSecondaryGroupTabs), Mode=OneWay}" />
+
+                        <!-- x:Load, not Visibility: the second group's editor is another WebView2, so
+                             it only exists while the group has tabs. -->
+                        <Grid x:Name="SecondaryGroup"
+                              Grid.Column="2"
+                              RowSpacing="8"
+                              x:Load="{x:Bind ViewModel.HasSecondaryGroupTabs, Mode=OneWay}"
+                              Loaded="OnSecondaryGroupLoaded">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TabView x:Name="SecondaryTabView"
+                                     TabItemsSource="{x:Bind ViewModel.SecondaryGroupTabs}"
+                                     TabItemTemplate="{StaticResource FileTabTemplate}"
+                                     TabWidthMode="SizeToContent"
+                                     CanReorderTabs="True"
+                                     CanDragTabs="False"
+                                     IsAddTabButtonVisible="False"
+                                     SelectionChanged="OnTabViewSelectionChanged"
+                                     TabCloseRequested="OnTabViewTabCloseRequested" />
+                            <views:ExplorerFileTabControl x:Name="SecondaryFileTab" Grid.Row="1" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <toolkit:GridSplitter Grid.Column="3" x:Name="AssistantPanelSplitter" Width="4" ResizeDirection="Columns" />
+
+            <views:AssistantPanelControl x:Name="AssistantPanel" Grid.Column="4" Margin="8,0,0,0" ViewModel="{x:Bind ViewModel.AssistantPanel}" />
+
+            <!-- specs/editor-focus-layout R5: the Ctrl+Tab most-recently-used switcher, opened and
+                 advanced on Ctrl+Tab and committed when Ctrl is released. Centred from code-behind,
+                 since WinUI's Popup has no Center placement. -->
+            <Popup x:Name="MruSwitcherPopup"
+                   Grid.ColumnSpan="5"
+                   IsOpen="{x:Bind ViewModel.IsMruSwitcherOpen, Mode=OneWay}">
+                <Border Width="360"
+                        Padding="4"
+                        Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource OverlayCornerRadius}">
+                    <ListView ItemsSource="{x:Bind ViewModel.MruSwitcherItems}"
+                              SelectedItem="{x:Bind ViewModel.MruSwitcherHighlighted, Mode=OneWay}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="pvm:OpenFileTabViewModel">
+                                <TextBlock Text="{x:Bind FileName}" ToolTipService.ToolTip="{x:Bind FilePath}" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
+            </Popup>
+        </Grid>
+    </Grid>
+</Page>

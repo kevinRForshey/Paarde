@@ -1,8 +1,9 @@
 using System.ComponentModel;
 
 using Avalonia.Controls;
+using Avalonia.Input;
 
-using Paarde.Avalonia.ViewModels;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia.Views;
 
@@ -19,7 +20,7 @@ public partial class TerminalView : UserControl
         DataContext = ViewModel;
         InitializeComponent();
 
-        // specs/terminal-emulation T7: OutputTerminal stays ignorant of IPtyProcessManager, same
+        // OutputTerminal stays ignorant of IPtyProcessManager, same
         // shape ShellView.axaml.cs already uses for RunPanelViewModel's TerminalControl.
         OutputTerminal.InputReceived += ViewModel.WriteInput;
         OutputTerminal.Resized += ViewModel.Resize;
@@ -36,6 +37,16 @@ public partial class TerminalView : UserControl
         if (e.PropertyName == nameof(TerminalViewModel.IsRunning) && ViewModel.IsRunning)
         {
             OutputTerminal.Focus();
+        }
+    }
+
+    // Enter in the command box runs the command, like pressing Run.
+    private void OnCommandTextBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && ViewModel.RunCommandCommand.CanExecute(null))
+        {
+            ViewModel.RunCommandCommand.Execute(null);
+            e.Handled = true;
         }
     }
 }

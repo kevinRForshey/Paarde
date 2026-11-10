@@ -14,11 +14,11 @@ public interface IPromptTemplateProvider
 
     string GetTutorialInstructionPrompt();
 
-    // T5.3.3: extra guidance appended after the preamble (default or user-overridden) and before
+    // Extra guidance appended after the preamble (default or user-overridden) and before
     // the depth instruction/user prompt. PromptPreset.General returns "" - it adds no extra text.
     string GetPresetInstruction(PromptPreset preset);
 
-    // T5.3.3: extra guidance controlling how much explanation text each step should contain.
+    // Extra guidance controlling how much explanation text each step should contain.
     // TutorialDepth.Standard returns "" - it relies on the base preamble's own wording.
     string GetDepthInstruction(TutorialDepth depth);
 }

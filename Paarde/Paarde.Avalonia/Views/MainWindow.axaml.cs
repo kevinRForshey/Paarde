@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 
-using Paarde.Avalonia.Strings;
+using Paarde.Presentation.Strings;
 
 namespace Paarde.Avalonia.Views;
 
@@ -14,7 +14,7 @@ public partial class MainWindow : Window
         Title = "AppDisplayName".Resolve();
     }
 
-    // specs/fluent-design-pass R1: off by default (see AppearanceSettingsKeys) - called once at
+    // Off by default (see AppearanceSettingsKeys) - called once at
     // startup with whatever was saved, and again live from SettingsViewModel when toggled.
     // Background only needs to go transparent when the backdrop hint is actually in play; without
     // it, a transparent Background would just show the desktop through an unfilled window, so

@@ -136,6 +136,39 @@ public class PtyProcessManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task Stop_WhileRunning_AlsoKillsTheCommandsChildProcesses()
+    {
+        // The nested shell outlives its parent unless Stop kills the whole tree; if it survives,
+        // it writes the marker after about two seconds.
+        var marker = Path.Combine(_workingDirectory, "survived.txt");
+        var command = OperatingSystem.IsWindows()
+            ? "cmd /c \"ping -n 3 127.0.0.1 > nul & echo x> survived.txt\""
+            : "sh -c 'sleep 2; touch survived.txt'; true";
+        var exited = ExitedTask();
+        await _manager.StartAsync(command, _workingDirectory, 80, 24);
+        await Task.Delay(500);
+
+        _manager.Stop();
+
+        await exited;
+        await Task.Delay(TimeSpan.FromSeconds(4));
+        Assert.False(File.Exists(marker));
+    }
+
+    [Fact]
+    public async Task WriteInput_CtrlC_InterruptsTheRunningCommand()
+    {
+        var exited = ExitedTask();
+        await _manager.StartAsync(LongRunningCommand, _workingDirectory, 80, 24);
+        await Task.Delay(1000);
+
+        _manager.WriteInput([0x03]);
+
+        // Well inside the 30 seconds the command would otherwise run; ExitedTask times out at 15.
+        await exited;
+    }
+
+    [Fact]
     public async Task StartAsync_WhileAnotherRunIsActive_StopsThePreviousRunFirst()
     {
         var firstExited = ExitedTask();

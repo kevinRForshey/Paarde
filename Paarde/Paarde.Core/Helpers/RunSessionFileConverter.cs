@@ -6,7 +6,7 @@ namespace Paarde.Core.Helpers;
 // Converts between RunSessionFile/RunSessionHunk (the persisted shape, T7.1.1) and
 // ProposedFileChangeViewModel/ProposedHunk (the live, observable shape) in both directions.
 // Shared by RunSessionStore (saving on RecordRun/Resave, restoring on RestoreLastSession, T7.1.2)
-// and the History page's read-only reopen view (T7.2.2), which otherwise would have needed its own
+// and the History page's read-only reopen view, which otherwise would have needed its own
 // copy of the restore direction.
 public static class RunSessionFileConverter
 {

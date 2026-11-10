@@ -2,7 +2,7 @@ using Paarde.Core.Contracts.Services;
 
 namespace Paarde.Core.Services;
 
-// specs/multi-language-support/design.md: scans the working directory itself plus its immediate
+// Scans the working directory itself plus its immediate
 // subdirectories (depth 0 and depth 1) for each language's conventional marker file(s) - covers
 // the common "backend/ + frontend/" polyglot-repo split without a full recursive walk, which isn't
 // needed since these markers conventionally live at a project's own root.

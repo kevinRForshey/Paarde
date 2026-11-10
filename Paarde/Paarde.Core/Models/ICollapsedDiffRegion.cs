@@ -1,6 +1,6 @@
 namespace Paarde.Core.Models;
 
-// Shared shape of a collapsed-region placeholder row (T8.3.2), implemented by both
+// Shared shape of a collapsed-region placeholder row, implemented by both
 // CollapsibleDiffRow (inline view) and CollapsibleSideBySideDiffRow (side-by-side view) so
 // DiffsDetailControl's single "expand this region" click handler works against either without
 // caring which view mode produced the row that was clicked.

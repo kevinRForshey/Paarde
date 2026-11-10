@@ -38,6 +38,27 @@ public class HeadroomServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CheckHealthAsync_ParsesHint_WhenPresent()
+    {
+        const string json = """{"exit_code": 1, "checks": [{"name": "codex", "status": "warn", "summary": "not routed", "hint": "wrap it: headroom wrap codex"}]}""";
+        _buildTestRunner.ResultsToReturn.Enqueue(new CommandResult(1, json, string.Empty, TimeSpan.Zero));
+
+        var result = await _sut.CheckHealthAsync();
+
+        Assert.Equal("wrap it: headroom wrap codex", result.Checks[0].Hint);
+    }
+
+    [Fact]
+    public async Task CheckHealthAsync_ParsesHint_AsNull_WhenAbsentOrNull()
+    {
+        _buildTestRunner.ResultsToReturn.Enqueue(new CommandResult(0, HealthyJson, string.Empty, TimeSpan.Zero));
+
+        var result = await _sut.CheckHealthAsync();
+
+        Assert.Null(result.Checks[0].Hint);
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_ParsesWarnJson_NotDown()
     {
         _buildTestRunner.ResultsToReturn.Enqueue(new CommandResult(1, WarnJson, string.Empty, TimeSpan.Zero));
@@ -119,6 +140,19 @@ public class HeadroomServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task IsProjectWiredAsync_LocalSettingsHasWrapSelfhealMarker_ReturnsTrue()
+    {
+        // `headroom wrap claude` installs this lighter, SessionStart-only self-heal hook instead
+        // of the full `init claude` wiring - still counts as "wired".
+        var path = Path.Combine(_projectPath, ".claude", "settings.local.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var json = """{"hooks": {"SessionStart": [{"matcher": "startup|resume", "hooks": [{"type": "command", "command": "/home/user/.local/bin/headroom wrap selfheal --marker headroom-wrap-selfheal", "timeout": 10}]}]}}""";
+        await File.WriteAllTextAsync(path, json);
+
+        Assert.True(await _sut.IsProjectWiredAsync(_projectPath));
+    }
+
+    [Fact]
     public async Task IsProjectWiredAsync_SettingsFileWithoutMarker_ReturnsFalse()
     {
         WriteSettings(Path.Combine(_projectPath, ".claude", "settings.local.json"), wired: false);
@@ -169,7 +203,7 @@ public class HeadroomServiceTests : IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        var command = wired ? "/x/headroom wrap selfheal --marker m" : "/x/some-other-hook";
+        var command = wired ? "/x/headroom init hook ensure --profile init-proj-abc123 --marker headroom-init-claude" : "/x/some-other-hook";
         var json = """{"hooks": {"SessionStart": [{"matcher": "startup|resume", "hooks": [{"type": "command", "command": "COMMAND_PLACEHOLDER", "timeout": 10}]}]}}"""
             .Replace("COMMAND_PLACEHOLDER", command);
 

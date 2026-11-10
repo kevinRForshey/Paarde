@@ -51,17 +51,26 @@ a modern desktop app on any of the three.
 | Domain/shared logic | `Paarde.Core` — parsing, diffing, apply orchestration, session persistence; UI-framework-agnostic so it's unit-testable without Avalonia |
 | LLM integration | Shells out to the `claude` CLI (`Paarde.Core/Services/ClaudeCliRunner.cs`), streaming NDJSON (`stream-json`) for live progress |
 | Code intelligence | Shells out to a Language Server Protocol server over stdio (`Paarde.Core/Services/StdioLanguageServerClient.cs`, `csharp-ls` by default) for Explorer's diagnostics/go-to-definition/find-references |
-| Tests | xUnit (`Paarde.Core.Tests`, `Paarde.Avalonia.Tests`) |
+| Presentation logic | `Paarde.Presentation` — view models, settings/navigation contracts and non-UI app services; references no UI framework, so any front end (Avalonia today, WinUI 3 planned) can host it |
+| Tests | xUnit (`Paarde.Core.Tests`, `Paarde.Presentation.Tests`, `Paarde.Avalonia.Tests`) |
 
 ### Project layout
 
 ```
 Paarde.slnx
-├─ Paarde.Core/            Domain models, services, view models shared by the UI (no Avalonia dependency)
-├─ Paarde.Core.Tests/      Unit tests for Paarde.Core
-├─ Paarde.Avalonia/        The desktop app: views, view models, DI setup, Program.cs entry point
-└─ Paarde.Avalonia.Tests/  Unit tests for Paarde.Avalonia view models
+├─ Paarde.Core/                Domain models, services, shared diff/apply view models (no UI dependency)
+├─ Paarde.Core.Tests/          Unit tests for Paarde.Core
+├─ Paarde.Presentation/        View models, contracts, settings/app services (no UI dependency)
+├─ Paarde.Presentation.Tests/  Unit tests for Paarde.Presentation, plus shared test fakes
+├─ Paarde.Avalonia/            The Avalonia desktop app: views, controls, converters, Avalonia-backed
+│                              service implementations, ShellViewModel, DI setup, Program.cs
+└─ Paarde.Avalonia.Tests/      Unit tests for Avalonia controls/converters
 ```
+
+Dependencies run one way: `Paarde.Avalonia → Paarde.Presentation → Paarde.Core`. A front end
+supplies views plus implementations of the UI-bound contracts in
+`Paarde.Presentation/Contracts/Services` (`IUiDispatcher`, `INavigationService`,
+`IThemeSelectorService`, `IWindowAppearanceService`, `IDialogService`, the file/folder pickers).
 
 ## Prerequisites
 
@@ -80,6 +89,10 @@ Paarde.slnx
   ```
   Not required to run Paarde — if it's missing, those three features are simply inactive and
   everything else works as normal.
+- *(Optional)* [Headroom](https://github.com/chopratejas/headroom) and [`uv`](https://github.com/astral-sh/uv)
+  for the Headroom integration (Settings page). Not required to run Paarde — the integration is off
+  by default, and if `headroom`/`uv` are missing Paarde offers to install Headroom via `uv` rather
+  than requiring it up front.
 
 ## Building and running
 
@@ -92,10 +105,39 @@ dotnet run --project Paarde.Avalonia
 
 # Run the test suites
 dotnet test Paarde.Core.Tests
+dotnet test Paarde.Presentation.Tests
 dotnet test Paarde.Avalonia.Tests
 ```
 
 Paarde runs the same way on Windows, Linux, and macOS — there's no platform-specific build step.
+
+### Windows front end (WinUI 3)
+
+`Paarde.WinUI` is a second, Windows-only front end over the same `Paarde.Presentation` view models,
+with the same pages and features as the Avalonia app. Its code editor is
+[Monaco](https://github.com/microsoft/monaco-editor) in WebView2. It lives in its own solution,
+`Paarde.Windows.slnx`, which holds everything in `Paarde.slnx` plus the WinUI projects, so
+`Paarde.slnx` still builds on Linux and macOS.
+
+```bash
+dotnet build Paarde.Windows.slnx
+
+# Run the WinUI app
+dotnet run --project Paarde.WinUI
+
+# UI smoke tests (FlaUI): launch the built app, so they need an unlocked, interactive desktop
+dotnet test Paarde.WinUI.UiTests
+```
+
+- Needs Windows 10 version 2004 (build 19041) or later, x64 or ARM64, and the WebView2 runtime
+  (part of Windows 11).
+- Unpackaged and self-contained: no MSIX and no separate Windows App SDK runtime install.
+- The first build downloads `monaco-editor` 0.57.0 from the npm registry and checks its SHA-512.
+  Later builds use the copy in `obj/`.
+- Both apps share one settings folder, `%AppData%/Paarde/ApplicationData`. Settings in the old
+  `%AppData%/Paarde.Avalonia/ApplicationData` folder are moved there on first start.
+- Leave the desktop alone while the UI smoke tests run. They won't send keys unless Paarde is the
+  foreground window, so a test fails rather than typing somewhere else.
 
 ## Usage
 
@@ -241,8 +283,20 @@ Every run is persisted automatically. Select a past session from the list to see
   **Reset to default** restores the built-in template.
 - **Code intelligence** — override the language server's executable path and arguments if
   `csharp-ls` isn't on your `PATH`, or swap in a different LSP-speaking server entirely.
+- **Headroom integration** — optional integration with [Headroom](https://github.com/chopratejas/headroom),
+  a token-savings proxy for Claude Code. When enabled, Paarde checks on startup, and on demand via
+  **Check Headroom status now**, whether the `headroom` CLI is installed, healthy, and the current
+  project is durably wired for it — offering (never forcing) to install it via [`uv`](https://github.com/astral-sh/uv)
+  or wire the project when something's missing. Off by default, since it can prompt to install
+  software and spawn external processes. Declining a prompt during an automatic startup check snoozes
+  it for 24 hours instead of re-asking on every launch; the manual **Check Headroom status now**
+  button always re-prompts regardless of that snooze.
 
 ## Project status
 
 Paarde is under active development. See [ROADMAP.md](ROADMAP.md) for a detailed, honest breakdown
 of what's implemented, what's partial, and what's planned next.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

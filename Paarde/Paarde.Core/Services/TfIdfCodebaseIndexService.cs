@@ -8,7 +8,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Services;
 
-// T14.2.1/T14.2.2: "suggest relevant files" without a cloud embeddings provider (none of
+// "suggest relevant files" without a cloud embeddings provider (none of
 // Anthropic's APIs expose one) and without a vector DB - scores whole files via classic TF-IDF
 // against the prompt's own text, keyed by working directory and invalidated per file on
 // LastWriteTimeUtc rather than a full re-tokenize on every call. This is lexical, not semantic -

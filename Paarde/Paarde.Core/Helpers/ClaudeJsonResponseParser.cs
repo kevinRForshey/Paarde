@@ -9,12 +9,12 @@ namespace Paarde.Core.Helpers;
 // F5.1) - a single JSON object, either wrapped in commentary/fences or raw, matching ClaudeJsonResponse.
 // TryParse never throws: any extraction/deserialization/validation failure comes back as a false
 // return plus a human-readable `error`, which PromptViewModel feeds back to the model on a one-shot
-// retry (T5.1.2) before giving up and handing the raw text to the legacy markdown parser (T5.1.3).
+// retry before giving up and handing the raw text to the legacy markdown parser.
 //
-// F5.2: a file's "edits" (search/replace blocks) are applied against the real file at
+// A file's "edits" (search/replace blocks) are applied against the real file at
 // workingDirectoryPath/path as part of validation, not mapping - an edit whose "search" text can't be
 // matched is indistinguishable from a truncated/stale response, so it's treated as a schema failure
-// (T5.2.3) and fed back on the same retry path as any other validation error, rather than silently
+// and fed back on the same retry path as any other validation error, rather than silently
 // producing a half-applied file.
 public static class ClaudeJsonResponseParser
 {
@@ -193,7 +193,7 @@ public static class ClaudeJsonResponseParser
         };
     }
 
-    // F5.2: edit-mode already read the file's real current content while resolving its edits during
+    // Edit-mode already read the file's real current content while resolving its edits during
     // validation, so OriginalContent is set here immediately instead of waiting for the UI to lazily
     // read it later (ProposedFileChangeViewModel.RefreshOriginalContent) - the diff is correct the
     // moment the response is parsed.

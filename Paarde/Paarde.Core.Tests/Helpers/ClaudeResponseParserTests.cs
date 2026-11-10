@@ -216,7 +216,7 @@ public class ClaudeResponseParserTests
         // Known fragility (see roadmap "Protocol fragility"): the non-greedy content match stops at the
         // first standalone ``` line, so a file whose own content documents a fenced code block gets cut
         // short instead of capturing the full intended content. This test pins today's actual behavior
-        // so a future structured-output rework (Epic 5) has a baseline to compare against.
+        // so a future structured-output rework has a baseline to compare against.
         const string cliOutput = """
             ## Tutorial
             Overview.

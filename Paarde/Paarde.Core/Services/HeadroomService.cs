@@ -14,7 +14,17 @@ namespace Paarde.Core.Services;
 // feature instead of a script someone has to know to run.
 public class HeadroomService : IHeadroomService
 {
-    private const string WrapMarkerCommand = "headroom wrap selfheal";
+    // Two distinct commands durably wire a project for Headroom routing (confirmed against the
+    // real CLI, v0.37.0): `headroom init claude` writes a SessionStart+PreToolUse hook
+    // "... init hook ensure --profile <random-per-project> --marker headroom-init-claude", while
+    // `headroom wrap claude` additionally installs a lighter SessionStart-only self-heal hook
+    // "... wrap selfheal --marker headroom-wrap-selfheal" (per `headroom wrap selfheal --help`:
+    // "Installed SessionStart-only hook by `wrap claude`") that just recovers a stale
+    // ANTHROPIC_BASE_URL if the proxy died. Either marker means the project already has some
+    // form of Headroom session wiring - a project (like this one) wired only via `wrap claude`
+    // must not be reported as unwired just because it lacks the `init claude` marker.
+    private const string InitClaudeMarker = "--marker headroom-init-claude";
+    private const string WrapSelfhealMarker = "--marker headroom-wrap-selfheal";
     private const string HeadroomPackageSpec = "headroom-ai[all]";
 
     // pip --user and `uv tool install` both default to putting shims here on every platform
@@ -99,7 +109,13 @@ public class HeadroomService : IHeadroomService
 
             return sessionStartBlocks
                 .SelectMany(block => block["hooks"] as JArray ?? [])
-                .Any(hook => hook["command"]?.Value<string>()?.Contains(WrapMarkerCommand, StringComparison.Ordinal) == true);
+                .Any(hook =>
+                {
+                    var command = hook["command"]?.Value<string>();
+                    return command is not null &&
+                        (command.Contains(InitClaudeMarker, StringComparison.Ordinal) ||
+                         command.Contains(WrapSelfhealMarker, StringComparison.Ordinal));
+                });
         }
         catch (Exception ex) when (ex is Newtonsoft.Json.JsonException or IOException)
         {
@@ -127,7 +143,8 @@ public class HeadroomService : IHeadroomService
                 .Select(check => new HeadroomCheckItem(
                     check["name"]?.Value<string>() ?? string.Empty,
                     check["status"]?.Value<string>() ?? string.Empty,
-                    check["summary"]?.Value<string>() ?? string.Empty))
+                    check["summary"]?.Value<string>() ?? string.Empty,
+                    check["hint"]?.Value<string>()))
                 .ToList();
 
             result = new HeadroomHealthResult(exitCode, checks);

@@ -1,0 +1,12 @@
+<Solution>
+  <!-- specs/winui-frontend R2.3: everything in Paarde.slnx plus the Windows-only WinUI 3 front end.
+       Paarde.slnx stays the cross-platform solution. -->
+  <Project Path="Paarde.Core/Paarde.Core.csproj" />
+  <Project Path="Paarde.Presentation/Paarde.Presentation.csproj" />
+  <Project Path="Paarde.Avalonia/Paarde.Avalonia.csproj" />
+  <Project Path="Paarde.WinUI/Paarde.WinUI.csproj" />
+  <Project Path="Paarde.Core.Tests/Paarde.Core.Tests.csproj" />
+  <Project Path="Paarde.Presentation.Tests/Paarde.Presentation.Tests.csproj" />
+  <Project Path="Paarde.Avalonia.Tests/Paarde.Avalonia.Tests.csproj" />
+  <Project Path="Paarde.WinUI.UiTests/Paarde.WinUI.UiTests.csproj" />
+</Solution>

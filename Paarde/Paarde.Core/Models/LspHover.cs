@@ -1,6 +1,6 @@
 namespace Paarde.Core.Models;
 
-// specs/editor-intelligence R2: Contents is pre-flattened to a single string at the client
+// Contents is pre-flattened to a single string at the client
 // boundary (joining LSP's MarkupContent/MarkedString[] variants) - CodeEditor renders it as
 // plain/wrapped text in a tooltip, not rendered Markdown, so there's no reason to carry the raw
 // union type past StdioLanguageServerClient.

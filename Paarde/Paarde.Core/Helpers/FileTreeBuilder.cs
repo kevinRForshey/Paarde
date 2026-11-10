@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Helpers;
 
-// Builds a FileTreeEntry tree of a working directory for the Explorer page (T8.1.1), honoring the
+// Builds a FileTreeEntry tree of a working directory for the Explorer page, honoring the
 // project's root `.gitignore` via GitIgnoreMatcher (the same matcher ProtectedPathChecker uses, so
 // "ignored" means the same thing everywhere in the app) - ".git" itself is always excluded too,
 // since it's noise in a file browser regardless of whether it's been gitignored. Directories are

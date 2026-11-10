@@ -28,24 +28,21 @@
          highlighting on top of the base editor control. -->
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.0" />
     <PackageReference Include="AvaloniaEdit.TextMate" Version="11.4.0" />
-    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.5" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-    <!-- T6.3.2: DPAPI (Windows-only secret protection, used by SecureStorageService) - official,
-         minimal Microsoft package; non-Windows platforms use built-in System.Security.Cryptography
-         instead, so this is never loaded there. -->
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     <!-- T9.2.1: structured, rolling file logging. UseSerilog() (Serilog.Extensions.Hosting) replaces
          the host's default ILoggerFactory wiring, bridging Microsoft.Extensions.Logging.ILogger<T> -
          already injected throughout Core/Avalonia services - onto Serilog's Console/Debug/File sinks. -->
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Paarde.Core\Paarde.Core.csproj" />
+    <ProjectReference Include="..\Paarde.Presentation\Paarde.Presentation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

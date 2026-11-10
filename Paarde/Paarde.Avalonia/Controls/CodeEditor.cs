@@ -16,10 +16,11 @@ using Paarde.Avalonia.Helpers;
 using Paarde.Core.Models;
 
 using TextMateSharp.Grammars;
+using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Controls;
 
-// Epic 15, T15.1.1: raised by CodeEditor after its debounce window elapses while the caret sits in
+// Raised by CodeEditor after its debounce window elapses while the caret sits in
 // typed text, carrying just enough context (text immediately before/after the caret) for a host
 // ViewModel to request a short completion - same shape as DiffHunkAcceptRejectEventArgs, a plain
 // data-carrying EventArgs rather than a callback, so CodeEditor stays ignorant of ILlmRunner.
@@ -30,7 +31,7 @@ public sealed class GhostTextRequestedEventArgs(string textBeforeCaret, string t
     public string TextAfterCaret { get; } = textAfterCaret;
 }
 
-// Epic 17, T17.1.3: raised by CodeEditor on F12/Shift+F12, carrying just the caret's LSP position -
+// Raised by CodeEditor on F12/Shift+F12, carrying just the caret's LSP position -
 // shared by both GoToDefinitionRequested and FindReferencesRequested since neither needs anything
 // beyond where the caret was when the key was pressed.
 public sealed class CodeNavigationRequestedEventArgs(LspPosition position) : EventArgs
@@ -38,7 +39,7 @@ public sealed class CodeNavigationRequestedEventArgs(LspPosition position) : Eve
     public LspPosition Position { get; } = position;
 }
 
-// specs/editor-autocomplete, T4: raised by CodeEditor when a trigger character is typed or the
+// Raised by CodeEditor when a trigger character is typed or the
 // manual-invoke shortcut is pressed - same "just the caret's LSP position" shape as
 // CodeNavigationRequestedEventArgs, kept as its own type since it's a conceptually distinct event
 // (completion vs. navigation) even though the payload happens to be identical today.
@@ -47,7 +48,7 @@ public sealed class CompletionRequestedEventArgs(LspPosition position) : EventAr
     public LspPosition Position { get; } = position;
 }
 
-// specs/editor-intelligence R6: raised after the pointer settles over a position with no
+// Raised after the pointer settles over a position with no
 // diagnostic (diagnostics win ties - see OnPointerMovedForHover), carrying just where to ask
 // GetHoverAsync about.
 public sealed class HoverRequestedEventArgs(LspPosition position) : EventArgs
@@ -66,7 +67,7 @@ public class CodeEditor : TextEditor
     public static readonly StyledProperty<string?> FilePathProperty =
         AvaloniaProperty.Register<CodeEditor, string?>(nameof(FilePath));
 
-    // T13.1.2: null (not set) for every CodeEditor host except TutorialDetailControl's editable
+    // Null (not set) for every CodeEditor host except TutorialDetailControl's editable
     // proposal view - Explorer's read-only preview never binds these, so the renderer/margin stay
     // empty and invisible there.
     public static readonly StyledProperty<IReadOnlyList<DiffLine>?> DiffLinesProperty =
@@ -75,38 +76,38 @@ public class CodeEditor : TextEditor
     public static readonly StyledProperty<IReadOnlyList<DiffHunk>?> DiffHunksProperty =
         AvaloniaProperty.Register<CodeEditor, IReadOnlyList<DiffHunk>?>(nameof(DiffHunks));
 
-    // Epic 15, T15.1.1: set by the host ViewModel once a completion for the most recent
+    // Set by the host ViewModel once a completion for the most recent
     // GhostTextRequested arrives (or left alone - CodeEditor ignores it as stale - if the caret has
     // since moved away from the offset the request was made at).
     public static readonly StyledProperty<string?> GhostTextSuggestionProperty =
         AvaloniaProperty.Register<CodeEditor, string?>(nameof(GhostTextSuggestion));
 
-    // Epic 17, T17.1.2: null (not set) for every CodeEditor host except Explorer's - same
+    // Null (not set) for every CodeEditor host except Explorer's - same
     // opt-in-by-binding convention DiffLines/DiffHunks above already use for their own
     // Explorer/Tutorial split.
     public static readonly StyledProperty<IReadOnlyList<LspDiagnostic>?> DiagnosticsProperty =
         AvaloniaProperty.Register<CodeEditor, IReadOnlyList<LspDiagnostic>?>(nameof(Diagnostics));
 
-    // specs/editor-autocomplete, T4: set by the host ViewModel once a CompletionRequested round
+    // Set by the host ViewModel once a CompletionRequested round
     // trip returns (or left alone if the caret has since moved past the request's offset, same
     // staleness rule GhostTextSuggestion already uses) - null/empty means "nothing to show", not
     // an error (R1.1's "if any are returned").
     public static readonly StyledProperty<IReadOnlyList<LspCompletionItem>?> CompletionItemsProperty =
         AvaloniaProperty.Register<CodeEditor, IReadOnlyList<LspCompletionItem>?>(nameof(CompletionItems));
 
-    // specs/ide-workbench-shell, R3.5: set only from the existing TextArea.Caret.PositionChanged
+    // Set only from the existing TextArea.Caret.PositionChanged
     // subscription below - no host ever sets this itself, so the setter stays private and this is
     // purely an outward-facing readout for IActiveEditorContext/the status bar.
     public static readonly StyledProperty<LspPosition?> CaretPositionProperty =
         AvaloniaProperty.Register<CodeEditor, LspPosition?>(nameof(CaretPosition));
 
-    // specs/editor-intelligence R3: set by the host ViewModel after a DocumentSymbolsRequested
+    // Set by the host ViewModel after a DocumentSymbolsRequested
     // round trip returns; a single synthetic root (design.md #3), not a list - the outline
-    // TreeView/breadcrumb bar (T4/T5) both bind to this directly.
+    // TreeView/breadcrumb bar both bind to this directly.
     public static readonly StyledProperty<LspDocumentSymbol?> DocumentSymbolsProperty =
         AvaloniaProperty.Register<CodeEditor, LspDocumentSymbol?>(nameof(DocumentSymbols));
 
-    // specs/editor-intelligence R6: set by the host ViewModel once a HoverRequested round trip
+    // Set by the host ViewModel once a HoverRequested round trip
     // returns; null means "nothing to show" (LspHover's own doc comment), not an error. Same
     // staleness rule GhostTextSuggestion/CompletionItems already use - OnHoverSuggestionChanged
     // drops it if the pointer has since moved off the position it was requested for.
@@ -120,7 +121,7 @@ public class CodeEditor : TextEditor
     private readonly DiagnosticsRenderer _diagnosticsRenderer;
     private LspDiagnostic? _shownDiagnosticTooltip;
 
-    // specs/editor-intelligence R6: reuses GhostTextDebouncer's class/delay rather than a third
+    // Reuses GhostTextDebouncer's class/delay rather than a third
     // timer - driven by the same _ghostTextTimer tick as _documentSymbolsDebouncer above.
     // _currentHoverOffset is -1 whenever the pointer isn't currently over any text offset
     // (outside the editor, or a diagnostic is showing instead); _pendingHoverRequestOffset is
@@ -139,7 +140,7 @@ public class CodeEditor : TextEditor
     private bool _isApplyingGhostTextSuggestion;
     private int _pendingGhostTextRequestOffset = -1;
 
-    // specs/editor-autocomplete, T4/T5: null whenever no dropdown is currently open - checked by
+    // Null whenever no dropdown is currently open - checked by
     // R6's ghost-text-suppression gating (OnGhostTextTimerTick/OnCodeEditorTextChanged) and by
     // OnCompletionItemsChanged to avoid stacking a second window on top of one already showing.
     private CompletionWindow? _completionWindow;
@@ -205,38 +206,38 @@ public class CodeEditor : TextEditor
         set => SetValue(HoverSuggestionProperty, value);
     }
 
-    // T13.1.3: raised when the gutter's Accept/Reject button for a hunk is clicked; the host
+    // Raised when the gutter's Accept/Reject button for a hunk is clicked; the host
     // (TutorialDetailControl) is the one that knows which ProposedFileChangeViewModel owns that
     // hunk's selection, so this control just forwards which DiffHunk and which action.
     public event EventHandler<DiffHunkAcceptRejectEventArgs>? DiffHunkActionRequested;
 
-    // Epic 15, T15.1.2/T15.2: raised after the debounce window elapses while the caret sits in
+    // Raised after the debounce window elapses while the caret sits in
     // typed text - the host ViewModel is the one that knows which ILlmRunner to ask and how, so
     // this control just forwards the surrounding text and (via GhostTextSuggestion) receives the
     // answer back.
     public event EventHandler<GhostTextRequestedEventArgs>? GhostTextRequested;
 
-    // Epic 17, T17.1.3: the host ViewModel is the one that knows how to ask ILanguageServerClient
+    // The host ViewModel is the one that knows how to ask ILanguageServerClient
     // and what to do with the result (jump the tree selection, show a references flyout), so this
     // control just forwards where the caret was.
     public event EventHandler<CodeNavigationRequestedEventArgs>? GoToDefinitionRequested;
 
     public event EventHandler<CodeNavigationRequestedEventArgs>? FindReferencesRequested;
 
-    // specs/editor-autocomplete, T4: raised on a trigger character or the manual-invoke shortcut -
+    // Raised on a trigger character or the manual-invoke shortcut -
     // same "control forwards where the caret was, host decides what to ask and sets the result
     // back via a bindable property" split GoToDefinitionRequested/GhostTextRequested already use,
     // rather than giving CodeEditor its own ILanguageServerSessionManager dependency (Controls/ in
     // this codebase never reach into DI directly - only Views' code-behind does).
     public event EventHandler<CompletionRequestedEventArgs>? CompletionRequested;
 
-    // specs/editor-intelligence R3: raised once when FilePath is first set (a fresh tab's initial
+    // Raised once when FilePath is first set (a fresh tab's initial
     // load) and again after every settled edit (same 400ms debounce window as GhostTextRequested,
     // reusing GhostTextDebouncer rather than a second timer). No payload - the host ViewModel
     // already knows which file this editor is showing.
     public event EventHandler? DocumentSymbolsRequested;
 
-    // specs/editor-intelligence R6: the host ViewModel is the one that knows how to ask
+    // The host ViewModel is the one that knows how to ask
     // ILanguageServerSessionManager.GetHoverAsync and sets the answer back via HoverSuggestion -
     // same "control forwards where the pointer was, host decides what to ask" split every other
     // request-response event on this control already uses.
@@ -301,7 +302,7 @@ public class CodeEditor : TextEditor
         };
         KeyDown += OnCodeEditorKeyDownForNavigation;
 
-        // specs/editor-autocomplete, R1.1: TextEntered fires once per inserted character, after
+        // TextEntered fires once per inserted character, after
         // it's already in the document - CaretOffset below is already past the typed ".".
         TextArea.TextEntered += OnTextAreaTextEntered;
 
@@ -368,7 +369,7 @@ public class CodeEditor : TextEditor
             return;
         }
 
-        // specs/editor-autocomplete R6.1/T6: a completion dropdown already answers "what goes
+        // A completion dropdown already answers "what goes
         // here" with a server-verified list - don't also fire off a competing LLM guess underneath it.
         if (IsReadOnly || Document is null || GhostTextRequested is null || _completionWindow is not null)
         {
@@ -378,7 +379,7 @@ public class CodeEditor : TextEditor
         var caretOffset = CaretOffset;
         var text = Document.Text;
 
-        // T15.2.1: a short window around the caret, not the whole file - this runs on essentially
+        // A short window around the caret, not the whole file - this runs on essentially
         // every keystroke-adjacent pause, so the prompt needs to stay cheap regardless of file size.
         const int maxBeforeLength = 4000;
         const int maxAfterLength = 1000;
@@ -417,7 +418,7 @@ public class CodeEditor : TextEditor
 
     private void OnTextAreaKeyDown(object? sender, KeyEventArgs e)
     {
-        // R1.2: manual invoke works at any caret position, suggestion-showing or not - checked
+        // Manual invoke works at any caret position, suggestion-showing or not - checked
         // ahead of the ghost-text-only logic below rather than folded into it.
         if (e.Key == Key.Space && e.KeyModifiers == KeyModifiers.Control)
         {
@@ -472,7 +473,7 @@ public class CodeEditor : TextEditor
         _ghostTextDebouncer.Cancel();
     }
 
-    // R1.1: the shared trigger character across C#, Python, and TypeScript/JavaScript/JSX (design
+    // The shared trigger character across C#, Python, and TypeScript/JavaScript/JSX (design
     // decision in specs/editor-autocomplete/design.md - not per-server triggerCharacters for v1).
     private void OnTextAreaTextEntered(object? sender, TextInputEventArgs e)
     {
@@ -482,9 +483,9 @@ public class CodeEditor : TextEditor
         }
     }
 
-    // R1.4: requests completions exactly once per trigger - CompletionRequested's subscriber sets
+    // Requests completions exactly once per trigger - CompletionRequested's subscriber sets
     // CompletionItems back once the (async, host-owned) lookup resolves; narrowing as the user
-    // keeps typing is CompletionList's own built-in filtering (R3.3), not a re-request here.
+    // keeps typing is CompletionList's own built-in filtering, not a re-request here.
     private void TriggerCompletion()
     {
         if (Document is null || CompletionRequested is null)
@@ -512,7 +513,7 @@ public class CodeEditor : TextEditor
 
     private void ShowCompletionWindow(IReadOnlyList<LspCompletionItem> items)
     {
-        // R6.2: the dropdown is server-verified and takes precedence - whatever ghost-text
+        // The dropdown is server-verified and takes precedence - whatever ghost-text
         // suggestion (a guess) was showing disappears the instant this one opens.
         DismissGhostTextSuggestion();
 
@@ -527,10 +528,10 @@ public class CodeEditor : TextEditor
         window.Show();
     }
 
-    // Epic 17, T17.1.2: GetPositionFromPoint (inherited from TextEditor) already translates a
+    // GetPositionFromPoint (inherited from TextEditor) already translates a
     // point relative to this control into document coordinates, scroll offset included - no manual
     // ScrollOffset adjustment needed here.
-    // specs/editor-intelligence R6: a diagnostic at the hovered position always wins over hover
+    // A diagnostic at the hovered position always wins over hover
     // text (DiagnosticsRenderer doesn't itself hook TextView.PointerHovered - this handler is the
     // one place both tooltip sources are reconciled).
     private void OnPointerMovedForHover(object? sender, PointerEventArgs e)
@@ -648,7 +649,7 @@ public class CodeEditor : TextEditor
         ToolTip.SetIsOpen(this, false);
     }
 
-    // Epic 17, T17.1.3: F12 (go to definition) / Shift+F12 (find references) - the same keybinds
+    // F12 (go to definition) / Shift+F12 (find references) - the same keybinds
     // most LSP-backed editors (VS Code, Visual Studio) already use for these, so no settings/
     // customization is needed for day one.
     private void OnCodeEditorKeyDownForNavigation(object? sender, KeyEventArgs e)

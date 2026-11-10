@@ -1,25 +1,22 @@
-using System.Runtime.Versioning;
-
 using Newtonsoft.Json.Linq;
 
 using Paarde.Core.Models;
 using Paarde.Core.Services;
+using Paarde.Core.Tests.TestSupport;
 
 namespace Paarde.Core.Tests.Services;
 
-[SupportedOSPlatform("linux")]
-[SupportedOSPlatform("macos")]
 
 // Stands a Python script in for a real LSP server (same "fake external process" approach
 // ClaudeCliRunnerTests takes with a shell script) so the Content-Length framing, request/response
-// correlation, and diagnostics-push handling (T17.1.1/T17.1.2) can be exercised without depending
+// correlation, and diagnostics-push handling can be exercised without depending
 // on csharp-ls (or any other real language server) being installed - per the roadmap's explicit
-// instruction not to test against a real one.
+// instruction not to test against a real one. FakeExecutable makes it launchable on Windows too;
+// tests return early where Python isn't installed.
 [Collection("RealProcess")]
 public class StdioLanguageServerClientTests : IAsyncLifetime
 {
     private const string FakeLspServerScript = """
-        #!/usr/bin/env python3
         import sys, json, os
 
         log_path = sys.argv[1] if len(sys.argv) > 1 else None
@@ -178,19 +175,16 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
                 break
         """;
 
-    private readonly string _scriptPath = Path.Combine(Path.GetTempPath(), $"fake-lsp-server-{Guid.NewGuid()}.py");
+    private readonly FakeExecutable _fakeServer = new(FakeLspServerScript);
     private readonly string _receivedMessagesLogPath = Path.Combine(Path.GetTempPath(), $"fake-lsp-server-{Guid.NewGuid()}.log");
     private readonly StdioLanguageServerClient _client;
 
     public StdioLanguageServerClientTests()
     {
-        File.WriteAllText(_scriptPath, FakeLspServerScript);
-        File.SetUnixFileMode(_scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-
         // The arguments field doubles as a place to hand the fake server a path to record every
         // request/notification it receives to, so tests can assert on outgoing message shape
-        // (R2.4/R5.1) without the fake server needing its own JSON-RPC client to talk back.
-        var options = new LanguageServerOptions("csharp", _scriptPath, _receivedMessagesLogPath);
+        // without the fake server needing its own JSON-RPC client to talk back.
+        var options = new LanguageServerOptions("csharp", _fakeServer.ExecutablePath, _receivedMessagesLogPath);
         _client = new StdioLanguageServerClient(() => Task.FromResult(options));
     }
 
@@ -200,10 +194,7 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     {
         await _client.StopAsync();
 
-        if (File.Exists(_scriptPath))
-        {
-            File.Delete(_scriptPath);
-        }
+        _fakeServer.Dispose();
 
         if (File.Exists(_receivedMessagesLogPath))
         {
@@ -221,7 +212,13 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
         {
             if (File.Exists(_receivedMessagesLogPath))
             {
-                foreach (var line in await File.ReadAllLinesAsync(_receivedMessagesLogPath))
+                // Shared read: on Windows the fake server may have the log open for appending, and
+                // its last line may still be half-written (only complete lines end in "\n").
+                using var stream = new FileStream(_receivedMessagesLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                var log = await reader.ReadToEndAsync();
+
+                foreach (var line in log.Split('\n').SkipLast(1))
                 {
                     var message = JObject.Parse(line);
                     if (message["method"]?.ToString() == method)
@@ -254,6 +251,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task StartAsync_ValidServer_SetsIsRunningTrue()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         Assert.True(_client.IsRunning);
@@ -262,6 +264,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task StopAsync_RunningServer_SetsIsRunningFalse()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         await _client.StopAsync();
@@ -272,6 +279,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetDefinitionAsync_ServerRespondsWithASingleLocation_ReturnsThatLocation()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var locations = await _client.GetDefinitionAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 0));
@@ -285,6 +297,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetReferencesAsync_ServerRespondsWithAnArray_ReturnsEveryLocationInOrder()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var locations = await _client.GetReferencesAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 0));
@@ -297,6 +314,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task NotifyDocumentOpenedAsync_ServerPublishesDiagnostics_RaisesDiagnosticsPublishedForThatFile()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var filePath = Path.Combine(Path.GetTempPath(), "fake-lsp-doc.cs");
         var tcs = new TaskCompletionSource<(string FilePath, IReadOnlyList<LspDiagnostic> Diagnostics)>(TaskCreationOptions.RunContinuationsAsynchronously);
         _client.DiagnosticsPublished += (path, diagnostics) => tcs.TrySetResult((path, diagnostics));
@@ -315,6 +337,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task StartAsync_SendsInitializeRequestDeclaringDiagnosticsDefinitionAndReferencesCapabilities()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var initializeMessage = await WaitForReceivedMessageAsync("initialize");
@@ -329,6 +356,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task StartAsync_SendsInitializeRequestDeclaringCompletionCapabilityWithoutSnippetSupport()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var initializeMessage = await WaitForReceivedMessageAsync("initialize");
@@ -341,6 +373,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetCompletionAsync_ServerRespondsWithABareArray_ReturnsEveryItemInOrder()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var items = await _client.GetCompletionAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 0));
@@ -357,6 +394,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetCompletionAsync_ServerRespondsWithACompletionListObject_ReturnsItsItems()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var items = await _client.GetCompletionAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 99));
@@ -369,6 +411,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetDocumentSymbolsAsync_ServerRespondsWithHierarchicalShape_ReturnsSingleSyntheticRootWrappingIt()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var filePath = Path.Combine(Path.GetTempPath(), "hierarchical-symbols.cs");
@@ -392,6 +439,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetDocumentSymbolsAsync_ServerRespondsWithFlatShape_ReconstructsNestingFromContainerName()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var filePath = Path.Combine(Path.GetTempPath(), "flat-symbols.cs");
@@ -408,6 +460,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetHoverAsync_ServerRespondsWithMarkupContent_ReturnsItsValue()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var hover = await _client.GetHoverAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 0));
@@ -419,6 +476,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task GetHoverAsync_ServerRespondsWithMarkedStringArray_FlattensEveryEntry()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var hover = await _client.GetHoverAsync(Path.Combine(Path.GetTempPath(), "source.cs"), new LspPosition(0, 50));
@@ -431,6 +493,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task StartAsync_SendsInitializeRequestDeclaringDocumentSymbolAndHoverCapabilities()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         await _client.StartAsync(Path.GetTempPath());
 
         var initializeMessage = await WaitForReceivedMessageAsync("initialize");
@@ -450,6 +517,11 @@ public class StdioLanguageServerClientTests : IAsyncLifetime
     [Fact]
     public async Task NotifyDocumentOpenedAsync_SendsTheCallerSuppliedLanguageIdNotAHardcodedOne()
     {
+        if (!FakeExecutable.IsPythonAvailable)
+        {
+            return;
+        }
+
         var filePath = Path.Combine(Path.GetTempPath(), "fake-lsp-doc.tsx");
 
         await _client.StartAsync(Path.GetTempPath());

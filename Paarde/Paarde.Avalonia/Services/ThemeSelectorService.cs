@@ -1,15 +1,15 @@
 using Avalonia;
 using Avalonia.Styling;
 
-using Paarde.Avalonia.Contracts.Services;
+using Paarde.Presentation.Models;
+using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Services;
 
 namespace Paarde.Avalonia.Services;
 
 public class ThemeSelectorService : IThemeSelectorService
 {
-    private const string SettingsKey = "AppBackgroundRequestedTheme";
-
-    public ThemeVariant Theme { get; set; } = ThemeVariant.Default;
+    public AppTheme Theme { get; set; } = AppTheme.Default;
 
     private readonly ILocalSettingsService _localSettingsService;
 
@@ -24,7 +24,7 @@ public class ThemeSelectorService : IThemeSelectorService
         await Task.CompletedTask;
     }
 
-    public async Task SetThemeAsync(ThemeVariant theme)
+    public async Task SetThemeAsync(AppTheme theme)
     {
         Theme = theme;
 
@@ -36,27 +36,33 @@ public class ThemeSelectorService : IThemeSelectorService
     {
         if (Application.Current != null)
         {
-            Application.Current.RequestedThemeVariant = Theme;
+            Application.Current.RequestedThemeVariant = ToThemeVariant(Theme);
         }
 
         await Task.CompletedTask;
     }
 
-    private async Task<ThemeVariant> LoadThemeFromSettingsAsync()
+    private static ThemeVariant ToThemeVariant(AppTheme theme) => theme switch
     {
-        var themeName = await _localSettingsService.ReadSettingAsync<string>(SettingsKey);
+        AppTheme.Light => ThemeVariant.Light,
+        AppTheme.Dark => ThemeVariant.Dark,
+        _ => ThemeVariant.Default,
+    };
+
+    private async Task<AppTheme> LoadThemeFromSettingsAsync()
+    {
+        var themeName = await _localSettingsService.ReadSettingAsync<string>(AppearanceSettingsKeys.RequestedTheme);
 
         return themeName switch
         {
-            "Light" => ThemeVariant.Light,
-            "Dark" => ThemeVariant.Dark,
-            _ => ThemeVariant.Default,
+            "Light" => AppTheme.Light,
+            "Dark" => AppTheme.Dark,
+            _ => AppTheme.Default,
         };
     }
 
-    private async Task SaveThemeInSettingsAsync(ThemeVariant theme)
-    {
-        var name = theme == ThemeVariant.Light ? "Light" : theme == ThemeVariant.Dark ? "Dark" : "Default";
-        await _localSettingsService.SaveSettingAsync(SettingsKey, name);
-    }
+    // Persisted as the member name ("Default"/"Light"/"Dark") - the same strings this saved back
+    // when it worked in ThemeVariant terms, so existing settings files keep loading unchanged.
+    private async Task SaveThemeInSettingsAsync(AppTheme theme) =>
+        await _localSettingsService.SaveSettingAsync(AppearanceSettingsKeys.RequestedTheme, theme.ToString());
 }

@@ -60,6 +60,11 @@ public class ProcessCommandRunnerTests : IDisposable
         using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            _runner.RunAsync("sleep 30", _workingDirectory, cancellationTokenSource.Token));
+            _runner.RunAsync(
+                // `sleep` isn't a Windows command: cmd would fail fast and could finish before the
+                // token is cancelled.
+                OperatingSystem.IsWindows() ? "ping -n 30 127.0.0.1 > nul" : "sleep 30",
+                _workingDirectory,
+                cancellationTokenSource.Token));
     }
 }

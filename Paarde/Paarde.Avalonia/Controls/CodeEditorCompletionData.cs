@@ -8,7 +8,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Avalonia.Controls;
 
-// specs/editor-autocomplete T3: thin ICompletionData adapter over an LspCompletionItem - no icon
+// Thin ICompletionData adapter over an LspCompletionItem - no icon
 // (R3's non-goal), Detail shown via Description (CompletionList's own item template renders it as
 // the secondary text, R3.4). Complete replaces CompletionWindow's tracked completion segment with
 // InsertText, falling back to Label per R4.1 - deliberately not resolved on LspCompletionItem

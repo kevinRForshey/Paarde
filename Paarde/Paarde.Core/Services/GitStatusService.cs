@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Paarde.Core.Services;
 
 // Detects whether workingDirectoryPath sits inside a git working tree and, if so, which files are
-// currently dirty there (T4.3.1), and stages files after a successful apply (T4.3.3) - both by
+// currently dirty there, and stages files after a successful apply - both by
 // shelling out to the git CLI rather than taking a LibGit2Sharp-style native dependency, matching
 // the ClaudeCliRunner convention of treating an external CLI as the source of truth. Any failure to
 // run git at all (not installed, directory missing, not a repository) is treated the same as "not a
@@ -18,7 +18,7 @@ namespace Paarde.Core.Services;
 // than blocking an apply.
 public class GitStatusService : IGitStatusService
 {
-    // T9.2.1: optional and defaulted to a no-op so every existing `new GitStatusService()` call
+    // Optional and defaulted to a no-op so every existing `new GitStatusService()` call
     // site (production DI registration, every test) keeps compiling unchanged - only the Avalonia
     // host, which actually configures a logging provider, needs to pass a real one.
     private readonly ILogger<GitStatusService> _logger;
@@ -47,7 +47,7 @@ public class GitStatusService : IGitStatusService
             .Select(ParsePorcelainPath)
             .ToList();
 
-        // R3.2: a failed branch lookup never blocks the dirty-file result above - same fail-open
+        // A failed branch lookup never blocks the dirty-file result above - same fail-open
         // posture as the rest of this class - it just leaves BranchName null.
         var branchName = RunGit(workingDirectoryPath, new List<string> { "branch", "--show-current" }, out var branchOutput, "run `git branch --show-current`")
             ? branchOutput.Trim()

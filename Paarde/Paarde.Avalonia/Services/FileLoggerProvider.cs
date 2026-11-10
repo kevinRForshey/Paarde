@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Paarde.Avalonia.Services;
 
-// T9.2.1: a user-accessible plain-text log file under <ApplicationDataFolder>/Logs (App.axaml.cs
+// A user-accessible plain-text log file under <ApplicationDataFolder>/Logs (App.axaml.cs
 // resolves the path and registers this via ConfigureLogging, the same way Host.CreateDefaultBuilder
 // already wires up its own Console/Debug providers) - so a user hitting a bug can send a file
 // instead of a screen recording. No external logging package (Serilog/NLog) was pulled in for this:

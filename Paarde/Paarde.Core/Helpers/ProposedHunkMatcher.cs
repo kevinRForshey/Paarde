@@ -5,7 +5,7 @@ namespace Paarde.Core.Helpers;
 // Maps a tutorial step's resolved HunkLocation (its line range within the file's proposed content,
 // from HunkLocationResolver) onto the DiffHunk(s) from DiffBuilder.GroupIntoHunks that actually cover
 // those lines. This is what lets "apply this step" eventually mean "apply these specific diff hunks"
-// (T3.1.3) instead of today's per-file apply wearing a per-step label.
+// instead of today's per-file apply wearing a per-step label.
 public static class ProposedHunkMatcher
 {
     public static IReadOnlyList<DiffHunk> FindMatches(IReadOnlyList<DiffHunk> diffHunks, HunkLocation? location)

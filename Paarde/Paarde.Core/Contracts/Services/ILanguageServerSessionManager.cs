@@ -2,7 +2,7 @@ using Paarde.Core.Models;
 
 namespace Paarde.Core.Contracts.Services;
 
-// Epic 18 (specs/multi-language-support): the new layer between ExplorerViewModel and
+// The new layer between ExplorerViewModel and
 // ILanguageServerClient - owns zero-or-more per-language client instances for the current working
 // directory and routes every call to whichever one (if any) handles the file involved, by
 // extension (LanguageIdResolver). ILanguageServerClient itself is unchanged and still represents
@@ -14,11 +14,11 @@ public interface ILanguageServerSessionManager
     // for a subscriber to filter to "the file I currently have open," same as Epic 17.
     event Action<string, IReadOnlyList<LspDiagnostic>>? DiagnosticsPublished;
 
-    // specs/ide-workbench-shell, R3.4: every LanguageId currently running a server - a snapshot,
+    // Every LanguageId currently running a server - a snapshot,
     // not a live collection, so a caller (the status bar) can't mutate session state through it.
     IReadOnlyCollection<string> RunningLanguageIds { get; }
 
-    // specs/ide-workbench-shell, R3.4: raised after RunningLanguageIds' underlying set actually
+    // Raised after RunningLanguageIds' underlying set actually
     // changes - at the end of StartAllAsync (whatever did or didn't start) and StopAllAsync - so a
     // subscriber like the status bar can re-read RunningLanguageIds without needing to know
     // StartAllAsync/StopAllAsync are the only two things that ever change it.
@@ -45,15 +45,15 @@ public interface ILanguageServerSessionManager
 
     Task<IReadOnlyList<LspLocation>> GetReferencesAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 
-    // specs/editor-autocomplete: same no-client/unmapped-extension no-op rule as every other
+    // Same no-client/unmapped-extension no-op rule as every other
     // request above.
     Task<IReadOnlyList<LspCompletionItem>> GetCompletionAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 
-    // specs/editor-intelligence R1: same no-client/unmapped-extension no-op rule - returns null
+    // Same no-client/unmapped-extension no-op rule - returns null
     // (not an empty outline) when there's no client to ask, same "null means nothing to show"
     // convention ILanguageServerClient.GetDocumentSymbolsAsync itself documents.
     Task<LspDocumentSymbol?> GetDocumentSymbolsAsync(string filePath, CancellationToken cancellationToken = default);
 
-    // specs/editor-intelligence R2: same no-client/unmapped-extension no-op rule.
+    // Same no-client/unmapped-extension no-op rule.
     Task<LspHover?> GetHoverAsync(string filePath, LspPosition position, CancellationToken cancellationToken = default);
 }

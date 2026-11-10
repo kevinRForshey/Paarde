@@ -5,10 +5,11 @@ using Avalonia.Media;
 
 using Paarde.Avalonia.Helpers;
 using Paarde.Core.Models;
+using Paarde.Presentation.Helpers;
 
 namespace Paarde.Avalonia.Controls;
 
-// T8.3.3/T8.3.4: renders one diff line's text as plain runs, combining two independent
+// Renders one diff line's text as plain runs, combining two independent
 // tokenizations of the same LineText - DiffBuilder.BuildWordDiff's word-level diff (which tokens
 // actually changed against this line's Removed/Added partner, given a background highlight) and
 // SyntaxTokenizer's TextMate grammar tokens (what color each token's syntax gets, as a foreground)

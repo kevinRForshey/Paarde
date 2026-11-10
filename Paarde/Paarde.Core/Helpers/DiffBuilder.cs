@@ -13,7 +13,7 @@ public static class DiffBuilder
     // excessive memory use on huge files/lines.
     private const int MaxLcsCells = 4_000_000;
 
-    // T8.3.3: splits a line into word/non-word/whitespace runs without losing any characters -
+    // Splits a line into word/non-word/whitespace runs without losing any characters -
     // joining every token back together reproduces the original line exactly - so BuildWordDiff can
     // diff at word granularity while still being able to reconstruct the full line from its tokens.
     private static readonly Regex WordBoundaryRegex = new(@"(?<=\w)(?=\W)|(?<=\W)(?=\w)", RegexOptions.Compiled);
@@ -21,7 +21,7 @@ public static class DiffBuilder
     public static IReadOnlyList<DiffLine> BuildLineDiff(string originalText, string proposedText) =>
         ComputeDiff(SplitLines(originalText), SplitLines(proposedText));
 
-    // T8.3.3: the same LCS diff as BuildLineDiff, just tokenized at the word level instead of split
+    // The same LCS diff as BuildLineDiff, just tokenized at the word level instead of split
     // into lines - used to find which part of a single changed line actually differs, for intra-line
     // highlighting. Only meaningful for an actual Removed/Added pair (see
     // BuildSideBySideRows/ComputeInlineWordSpans, which are the only callers).
@@ -54,7 +54,7 @@ public static class DiffBuilder
         return result;
     }
 
-    // T8.3.1: pairs up a flat line-level diff into side-by-side rows for the diff viewer's
+    // Pairs up a flat line-level diff into side-by-side rows for the diff viewer's
     // side-by-side mode. Each maximal run of consecutive Removed/Added lines is split back into
     // its removed-only and added-only sub-sequences (preserving each's own relative order) and
     // paired off index-by-index, so a changed line's old and new text land on the same row -
@@ -76,7 +76,7 @@ public static class DiffBuilder
                 var left = i < removedRun.Count ? removedRun[i] : null;
                 var right = i < addedRun.Count ? addedRun[i] : null;
 
-                // T8.3.3: only a genuine pair (not one side padded out) has anything on the other
+                // Only a genuine pair (not one side padded out) has anything on the other
                 // side to diff against at word level.
                 IReadOnlyList<DiffLine>? originalWordSpans = null;
                 IReadOnlyList<DiffLine>? proposedWordSpans = null;
@@ -117,7 +117,7 @@ public static class DiffBuilder
         return rows;
     }
 
-    // T8.3.2: splits a flat line-level diff into display rows for the Diffs page's inline view, where
+    // Splits a flat line-level diff into display rows for the Diffs page's inline view, where
     // a long run of Unchanged lines far from any change is folded into a single clickable
     // placeholder instead of rendering every line - expandedSegmentStarts (keyed by the placeholder's
     // own LineIndex, i.e. the segment's start index within diffLines) names the ones the user has
@@ -150,7 +150,7 @@ public static class DiffBuilder
         return rows;
     }
 
-    // T8.3.3: the inline view's equivalent of what BuildSideBySideRows's FlushRun computes inline -
+    // The inline view's equivalent of what BuildSideBySideRows's FlushRun computes inline -
     // pairs up each run's Removed/Added lines index-by-index and, for each actual pair, works out
     // that pair's word-level diff - but keyed by the line's own index within diffLines (rather than
     // built into rows), since the inline view keeps one row per diffLines index regardless of
@@ -198,7 +198,7 @@ public static class DiffBuilder
         return spansByIndex;
     }
 
-    // T8.3.2: the side-by-side equivalent of BuildCollapsibleRows - same segmenting, but each
+    // The side-by-side equivalent of BuildCollapsibleRows - same segmenting, but each
     // visible segment's lines are paired up via the existing BuildSideBySideRows rather than listed
     // one row per line. A segment boundary never splits a Removed/Added run (FindCollapsibleSegments
     // only ever cuts through Unchanged lines), so pairing each visible segment independently gives

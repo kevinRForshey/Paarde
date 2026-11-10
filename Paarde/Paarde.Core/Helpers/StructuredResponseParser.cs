@@ -3,8 +3,8 @@ using Paarde.Core.Models;
 namespace Paarde.Core.Helpers;
 
 // Entry point for parsing a Claude response under the Epic 5 JSON contract: prefer the structured
-// ClaudeJsonResponseParser, and only fall back to the legacy markdown ClaudeResponseParser (T5.1.3)
-// when the JSON contract couldn't be satisfied - surfacing why, so a caller can retry once (T5.1.2)
+// ClaudeJsonResponseParser, and only fall back to the legacy markdown ClaudeResponseParser
+// when the JSON contract couldn't be satisfied - surfacing why, so a caller can retry once
 // before accepting the fallback as final.
 public static class StructuredResponseParser
 {

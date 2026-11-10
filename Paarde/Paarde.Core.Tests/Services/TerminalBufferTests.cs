@@ -36,6 +36,35 @@ public class TerminalBufferTests : IDisposable
     }
 
     [Fact]
+    public void Feed_CursorPositionQuery_RaisesResponseReadyWithReport()
+    {
+        var responses = new List<string>();
+        _buffer.ResponseReady += bytes => responses.Add(Encoding.UTF8.GetString(bytes));
+
+        _buffer.Feed(Encoding.UTF8.GetBytes("\x1b[3;4H\x1b[6n"));
+
+        Assert.Equal(["\x1b[3;4R"], responses);
+    }
+
+    // The view models send RIS before each new command, so a TUI killed mid-run (blue background,
+    // alternate screen) doesn't leave the next command drawing in its colours.
+    [Fact]
+    public void Feed_FullReset_ClearsColorsAndAlternateScreenLeftByAKilledProgram()
+    {
+        _buffer.Feed(Encoding.UTF8.GetBytes("A"));
+        var defaultBackground = _buffer.GetRow(0).Cells[0].Background;
+        _buffer.Feed(Encoding.UTF8.GetBytes("\x1b[?1049h\x1b[44mblue"));
+
+        _buffer.Feed(Encoding.UTF8.GetBytes("\u001bcB"));
+
+        var cell = _buffer.GetRow(0).Cells[0];
+        Assert.Equal("B", cell.Content);
+        Assert.Equal(defaultBackground, cell.Background);
+        Assert.Equal(defaultBackground, _buffer.GetRow(1).Cells[0].Background);
+        Assert.Equal((0, 1), (_buffer.CursorPosition.Row, _buffer.CursorPosition.Col));
+    }
+
+    [Fact]
     public void Feed_BasicAnsiColorSequence_ResolvesForegroundToPaletteColor()
     {
         // SGR 31 = basic red. Verified against the real library (XTerm.NET 3.0.0's default

@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:helpers="using:Paarde.Avalonia.Helpers"
-             xmlns:vm="using:Paarde.Avalonia.ViewModels"
+             xmlns:vm="using:Paarde.Avalonia.ViewModels"             xmlns:pvm="using:Paarde.Presentation.ViewModels"
              xmlns:controls="using:Paarde.Avalonia.Controls"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:models="using:Paarde.Core.Models"
@@ -51,7 +51,7 @@
                         Margin="12,0,0,0"
                         VerticalAlignment="Center"
                         Message="{Binding StatusMessage}"
-                        Severity="{Binding StatusSeverity}"
+                        Severity="{Binding StatusSeverity, Converter={StaticResource NotificationSeverityToInfoBarSeverityConverter}}"
                         IsClosable="False"
                         IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         </Grid>
@@ -69,19 +69,19 @@
                             PaneDisplayMode="LeftCompact"
                             Header="{Binding Selected, Converter={StaticResource SelectedNavigationItemToHeaderConverter}}">
             <ui:NavigationView.MenuItems>
-                <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.ExplorerViewModel">
+                <ui:NavigationViewItem Content="Explorer" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.ExplorerViewModel">
                     <ui:NavigationViewItem.IconSource>
                         <ui:SymbolIconSource Symbol="Folder" />
                     </ui:NavigationViewItem.IconSource>
                 </ui:NavigationViewItem>
                 <!-- specs/fluent-design-pass R3: Keyboard, not Play, so this nav icon doesn't collide
                      with the Run buttons' Play icon. -->
-                <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.TerminalViewModel">
+                <ui:NavigationViewItem Content="Terminal" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.TerminalViewModel">
                     <ui:NavigationViewItem.IconSource>
                         <ui:SymbolIconSource Symbol="Keyboard" />
                     </ui:NavigationViewItem.IconSource>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Avalonia.ViewModels.HistoryViewModel">
+                <ui:NavigationViewItem Content="History" helpers:NavigationHelper.NavigateTo="Paarde.Presentation.ViewModels.HistoryViewModel">
                     <ui:NavigationViewItem.IconSource>
                         <ui:SymbolIconSource Symbol="Clock" />
                     </ui:NavigationViewItem.IconSource>
@@ -143,7 +143,7 @@
                              SelectedItem="{Binding SelectedResult}"
                              DoubleTapped="OnCommandPaletteResultDoubleTapped">
                         <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PaletteCommand">
+                            <DataTemplate x:DataType="pvm:PaletteCommand">
                                 <TextBlock Text="{Binding Name}" IsEnabled="{Binding IsEnabled}" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -214,7 +214,7 @@
                 <TabItem Header="Problems">
                     <ListBox Name="ProblemsList">
                         <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProblemRow">
+                            <DataTemplate x:DataType="pvm:ProblemRow">
                                 <TextBlock Text="{Binding Summary}" FontFamily="Cascadia Mono,Consolas,monospace" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -257,7 +257,7 @@
                         <ui:InfoBar Grid.Row="2"
                                     Margin="0,4,0,0"
                                     Message="{Binding StatusMessage}"
-                                    Severity="{Binding StatusSeverity}"
+                                    Severity="{Binding StatusSeverity, Converter={StaticResource NotificationSeverityToInfoBarSeverityConverter}}"
                                     IsClosable="False"
                                     IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                     </Grid>

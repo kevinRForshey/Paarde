@@ -1,6 +1,6 @@
 namespace Paarde.Core.Models;
 
-// Result of one IBuildTestRunner.RunAsync call (T12.1.1) - deliberately the same shape
+// Result of one IBuildTestRunner.RunAsync call - deliberately the same shape
 // ClaudeCliRunner/GitStatusService already capture from a child process (exit code, stdout,
 // stderr), just without any CLI-specific fields (cost, tokens, session id) that don't apply to an
 // arbitrary shell command.

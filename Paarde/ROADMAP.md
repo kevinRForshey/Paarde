@@ -3243,6 +3243,47 @@ spec: `specs/editor-focus-layout/requirements.md`.*
 
 ---
 
+### EPIC 30 — Extract `Paarde.Presentation` (UI-agnostic view models) — ✅ Done 2026-11-09, manually verified
+
+*Why: a WinUI 3 Windows front end is planned (its licensing terms are preferred over Avalonia's),
+and it should reuse the view models and settings/runner services instead of duplicating them.
+Pure refactor, no behavior change: 70 files (21 of 22 view models, contracts, settings/runner
+services, helpers, models, strings) moved from `Paarde.Avalonia` to a new `Paarde.Presentation`
+class library with no UI-framework references, enforced by a guard test. Avalonia leaks were
+replaced by small abstractions that map 1:1 to WinUI 3: `NotificationSeverity`
+(`InfoBarSeverity`), `IUiDispatcher`/`IUiTimer` (`DispatcherQueue`), `AppTheme` (`ElementTheme`),
+a `Frame`-free `INavigationService`, and `IWindowAppearanceService`. Tests split into
+`Paarde.Presentation.Tests` (shared fakes live there). Full spec: `specs/presentation-extraction/`.*
+
+---
+
+### EPIC 31 — WinUI 3 front end (`Paarde.WinUI`) — ✅ Done 2026-11-10, manually verified
+
+*Why: a Windows-native front end under licensing terms preferred over Avalonia's, built on Epic
+30's `Paarde.Presentation`.*
+
+- **Shape:** a Windows-only app, unpackaged and self-contained (Windows App SDK 2.6.5), in its own
+  `Paarde.Windows.slnx` so `Paarde.slnx` stays cross-platform. Same pages, modes and settings as
+  the Avalonia app, which is kept.
+- **Code editor:** Monaco 0.57.0 in WebView2, with a JS↔C# bridge for ghost text, LSP
+  completion, hover, go-to-definition and the proposed-change decorations.
+- **Terminal:** `TerminalControl` draws with plain XAML elements; Win2D was dropped because its
+  package licence isn't MIT.
+
+Fixes that came out of the work and also apply to the Avalonia app:
+- The terminal now answers query sequences, so TUIs like `edit` render.
+- Stop/Cancel kills the whole process tree.
+- Ctrl+C reaches the running command.
+- A full terminal reset runs before each command.
+- `LocalSettingsService` is serialized.
+- The settings folder moved to `%AppData%/Paarde/ApplicationData`, with automatic migration.
+- The Core test suite runs on Windows.
+
+`Paarde.WinUI.UiTests` adds 12 FlaUI smoke tests: every page in both modes, UIA names, layout
+overflow and a few key flows. Full spec: `specs/winui-frontend/`.
+
+---
+
 ## 4. Suggested execution order
 
 1. **Epic 1** — one codebase, or everything after this costs double.
@@ -3346,3 +3387,8 @@ spec: `specs/editor-focus-layout/requirements.md`.*
     only (Epic 26's Flow/Wizard mode has no tree/Assistant-panel layout to zen/split). Sequenced
     last since it's the most purely cosmetic/ergonomic of the three, with no other epic depending
     on it. Full spec: `specs/editor-focus-layout/`.
+29. **Epic 30** — extract `Paarde.Presentation` so a WinUI 3 front end can reuse the view models.
+    Prerequisite for any second UI; independent of Epics 25-28. Full spec:
+    `specs/presentation-extraction/`. ✅ Done 2026-11-09, manually verified.
+30. **Epic 31** — the WinUI 3 front end, `Paarde.WinUI`, on top of Epic 30. Full spec:
+    `specs/winui-frontend/`. ✅ Done 2026-11-10, manually verified.

@@ -8,10 +8,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Paarde.Core.Services;
 
-// Drives "Apply Selected" across every file in a tutorial result (F3.3), on top of
+// Drives "Apply Selected" across every file in a tutorial result, on top of
 // IFileChangeApplyService's single-file write. Each file is handled independently: a conflict or a
-// failed write on one file is recorded and the batch moves on to the next rather than stopping
-// (T3.3.4).
+// failed write on one file is recorded and the batch moves on to the next rather than stopping.
 public class ApplyOrchestrationService : IApplyOrchestrationService
 {
     private readonly IFileChangeApplyService _fileChangeApplyService;
@@ -21,7 +20,7 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
     private readonly IGitStatusService _gitStatusService;
     private readonly IRunSessionStore _runSessionStore;
 
-    // T9.2.1: see GitStatusService's constructor remark - optional/defaulted so the many existing
+    // See GitStatusService's constructor remark - optional/defaulted so the many existing
     // direct-construction call sites (DI registration, every test) don't need to change.
     private readonly ILogger<ApplyOrchestrationService> _logger;
 
@@ -51,14 +50,14 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
         // selected step individually, matching what the per-file SelectionSummary already shows.
         var changeCount = filesToApply.Sum(f => f.HasSelectableHunks ? f.SelectedHunkCount : 1);
 
-        // Surfaced up front (T4.1.2) so the confirmation prompt can warn about protected targets
+        // Surfaced up front so the confirmation prompt can warn about protected targets
         // before ApplySelected skips them, rather than the user only finding out after the fact.
         var protectedPathFiles = filesToApply
             .Where(f => ProtectedPathChecker.IsProtected(workingDirectoryPath, f.FilePath))
             .Select(f => f.FilePath)
             .ToList();
 
-        // T4.3.1: warn about files this apply would overwrite that git already sees as dirty, not
+        // Warn about files this apply would overwrite that git already sees as dirty, not
         // every dirty file in the repository - a stray unrelated uncommitted file elsewhere isn't
         // this apply's problem. GitStatus.NotARepository (no repo, git missing, or the call failed)
         // naturally yields IsGitRepository = false and an empty intersection below.
@@ -114,7 +113,7 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
         {
             _runSessionStore.Resave();
 
-            // T4.3.3: stage exactly the files this batch actually wrote - never the whole working
+            // Stage exactly the files this batch actually wrote - never the whole working
             // tree - so the user's next `git status` already reflects what Paarde just applied.
             // Fails open (same posture as GitStatusService.GetStatus): not a repository, or git
             // isn't installed, just means nothing gets staged, it never blocks or undoes the apply
@@ -130,7 +129,7 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
     }
 
     // Undoes the most recently applied batch by writing each of its files' pre-apply content back
-    // to disk (T4.2.2). False (with an empty result) if nothing's been applied this session, or
+    // to disk. False (with an empty result) if nothing's been applied this session, or
     // everything applied has already been undone.
     public bool TryUndoLastApply(string workingDirectoryPath, out RevertResult result)
     {
@@ -198,7 +197,7 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
 
     private (FileApplyResult Result, string? PreApplyContent) ApplyOne(ProposedFileChangeViewModel file, string workingDirectoryPath, bool allowProtectedPaths)
     {
-        // Checked before touching disk at all (T4.1.2) - unlike Conflict, there's nothing to re-diff
+        // Checked before touching disk at all - unlike Conflict, there's nothing to re-diff
         // and retry here, so this short-circuits ahead of the read/write below rather than sharing
         // their try/catch.
         if (!allowProtectedPaths && ProtectedPathChecker.IsProtected(workingDirectoryPath, file.FilePath))
@@ -231,7 +230,7 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
         if (currentDiskContent != file.OriginalContent)
         {
             // Don't write - the caller can offer file.RefreshOriginalContent(workingDirectoryPath) to
-            // re-diff against what's actually there and let the user decide again (T3.3.3).
+            // re-diff against what's actually there and let the user decide again.
             return (new FileApplyResult(file.FilePath, FileApplyOutcome.Conflict), null);
         }
 
@@ -240,11 +239,11 @@ public class ApplyOrchestrationService : IApplyOrchestrationService
             // Delegates the actual write to IFileChangeApplyService rather than writing
             // BuildSelectedContent() to fullPath directly here, so there's exactly one place that
             // knows how selection turns into bytes on disk and marks each hunk's IsApplied
-            // afterward (T3.3.2) - this orchestration only decides which files get attempted and
+            // afterward - this orchestration only decides which files get attempted and
             // reports what happened to each.
             _fileChangeApplyService.Apply(file, workingDirectoryPath);
 
-            // Recorded only after a write actually succeeds (T4.2.1) - a conflicted, blocked, or
+            // Recorded only after a write actually succeeds - a conflicted, blocked, or
             // failed attempt never touched the file, so there's nothing to back up. SnapshotIfAbsent
             // is a no-op past the first successful write to this path, so the backup always reflects
             // what was on disk before this session touched the file at all, not an intermediate state.

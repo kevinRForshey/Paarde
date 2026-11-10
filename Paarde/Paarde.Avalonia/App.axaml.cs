@@ -5,21 +5,23 @@ using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 
 using Paarde.Avalonia.Contracts.Services;
-using Paarde.Avalonia.Models;
+using Paarde.Presentation.Models;
 using Paarde.Avalonia.Services;
 using Paarde.Avalonia.ViewModels;
 using Paarde.Avalonia.Views;
 using Paarde.Core.Contracts.Services;
-using Paarde.Core.Services;
+using Paarde.Presentation;
+using Paarde.Presentation.Contracts.Services;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using Serilog;
 using Serilog.Events;
+using Paarde.Presentation.Services;
+using Paarde.Presentation.ViewModels;
 
 namespace Paarde.Avalonia;
 
@@ -64,7 +66,7 @@ public partial class App : Application
         Host = Microsoft.Extensions.Hosting.Host.
         CreateDefaultBuilder().
         UseContentRoot(AppContext.BaseDirectory).
-        // T9.2.1: replaces CreateDefaultBuilder's default ILoggerFactory wiring with Serilog, writing
+        // Replaces CreateDefaultBuilder's default ILoggerFactory wiring with Serilog, writing
         // a daily-rolling log file under <ApplicationDataFolder>/Logs - this is the one a user without
         // a terminal/debugger attached can actually find and include in a bug report. Serilog's File
         // sink also handles rotation/retention (14 days) for free, which a hand-rolled provider would
@@ -86,149 +88,33 @@ public partial class App : Application
         }).
         ConfigureServices((context, services) =>
         {
-            // Services
-            services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
-            services.AddSingleton<ISecureStorageService, SecureStorageService>();
-            services.AddSingleton<IThemeSelectorService, ThemeSelectorService>();
-            services.AddSingleton<ClaudeCliOptionsProvider>();
-            services.AddSingleton<AnthropicApiOptionsProvider>();
+            // The Core + Presentation graph shared with every front end.
+            services.AddPaardePresentation();
 
-            // T6.3.2/T6.3.3: ILlmRunner itself resolves to LlmRunnerSelector, which picks between
-            // these two concrete runners per-call based on the Settings page's runner choice - see
-            // LlmRunnerSelector's own comment. Each concrete runner is built directly (not also
-            // registered as ILlmRunner) so there's no ambiguity over which one DI would hand to a
-            // constructor that asked for "the" ILlmRunner.
-            services.AddSingleton(sp => new ClaudeCliRunner(sp.GetRequiredService<ClaudeCliOptionsProvider>().GetOptionsAsync));
-            services.AddSingleton(sp => new AnthropicApiRunner(sp.GetRequiredService<AnthropicApiOptionsProvider>().GetOptionsAsync));
-            services.AddSingleton<ILlmRunner>(sp => new LlmRunnerSelector(
-                sp.GetRequiredService<ILocalSettingsService>(),
-                sp.GetRequiredService<ClaudeCliRunner>(),
-                sp.GetRequiredService<AnthropicApiRunner>()));
+            // Avalonia-specific implementations of Presentation contracts.
+            services.AddSingleton<IThemeSelectorService, ThemeSelectorService>();
             services.AddTransient<IFolderPickerService, FolderPickerService>();
             services.AddTransient<IFilePickerService, FilePickerService>();
             services.AddTransient<IFileSavePickerService, FileSavePickerService>();
-            services.AddSingleton<IPromptResultStore, PromptResultStore>();
-            services.AddSingleton<IPromptTemplateProvider, PromptTemplateProvider>();
-            services.AddTransient<IFileChangeApplyService, FileChangeApplyService>();
-            services.AddSingleton<IApplyBackupStore, ApplyBackupStore>();
-            services.AddSingleton<IApplyHistoryStore, ApplyHistoryStore>();
-            services.AddSingleton<IApplyHistoryLog, ApplyHistoryLog>();
-
-            // T7.1.1: persists each run to %AppData%/<ApplicationDataFolder>/Sessions/*.json - reads
-            // the same LocalSettingsOptions.ApplicationDataFolder LocalSettingsService uses (rather
-            // than hardcoding a second copy of that folder name) so a user-configured data folder
-            // covers sessions too.
-            services.AddSingleton<IRunSessionStore>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<LocalSettingsOptions>>().Value;
-                var applicationDataFolder = ResolveApplicationDataFolder(options);
-                var sessionsFolder = Path.Combine(applicationDataFolder, "Sessions");
-
-                return new RunSessionStore(
-                    sp.GetRequiredService<IFileService>(),
-                    sp.GetRequiredService<IPromptResultStore>(),
-                    sp.GetRequiredService<IApplyHistoryLog>(),
-                    sessionsFolder);
-            });
-
-            services.AddTransient<IGitStatusService, GitStatusService>();
-            services.AddTransient<IBuildTestRunner, ProcessCommandRunner>();
-            services.AddTransient<IHeadroomService, HeadroomService>();
-            services.AddTransient<IHeadroomCoordinator, HeadroomCoordinator>();
-            services.AddSingleton<IHeadroomStatusStore, HeadroomStatusStore>();
-
-            // T14.2.1/T14.2.2: singleton so its per-working-directory TF-IDF index survives across
-            // prompts in the same session instead of re-tokenizing the whole project on every
-            // "Suggest relevant files" click.
-            services.AddSingleton<ICodebaseIndexService, TfIdfCodebaseIndexService>();
-
-            // Epic 17 (T17.2.1)/Epic 18 (specs/multi-language-support): singleton, not transient
-            // like the per-call runners above - ILanguageServerSessionManager owns zero-or-more
-            // long-lived per-language server processes tied to Explorer's current working
-            // directory, started/stopped by ExplorerViewModel rather than spun up fresh per call.
-            services.AddSingleton<LanguageServerOptionsProvider>();
-            services.AddSingleton<IProjectTypeDetector, ProjectTypeDetector>();
-            services.AddSingleton<ILanguageServerSessionManager>(sp => new LanguageServerSessionManager(
-                sp.GetRequiredService<IProjectTypeDetector>(),
-                sp.GetRequiredService<LanguageServerOptionsProvider>().GetOptionsAsync,
-                logger: sp.GetRequiredService<ILogger<LanguageServerSessionManager>>()));
-
-            // specs/ide-workbench-shell, R4: subscribes to ILanguageServerSessionManager directly
-            // (not relayed through ExplorerViewModel), so it has to be a singleton constructed
-            // before any page navigates anywhere - WorkbenchDockViewModel's own eager construction
-            // (via ShellViewModel) is what actually guarantees that, the same way RunPanelViewModel
-            // already guarantees it for Build/Run.
-            services.AddSingleton<IDiagnosticsAggregator, DiagnosticsAggregator>();
-
-            // Epic 20 (specs/build-and-run): RunConfigurationsProvider/RunPanelViewModel are
-            // singletons for the same reason ILanguageServerSessionManager above is - they back
-            // ShellView's persistent toolbar (R5.1), not any one page.
-            services.AddSingleton<IRunConfigurationDetector, RunConfigurationDetector>();
-            services.AddSingleton<RunConfigurationsProvider>();
-
-            // Epic 21 (specs/terminal-emulation T6): RunPanelViewModel starts processes through
-            // this instead of the retired IRunProcessManager - singleton because it owns at most
-            // one long-lived PTY-backed process at a time, the same ownership shape
-            // ILanguageServerSessionManager has for its per-language server processes.
-            services.AddSingleton<IPtyProcessManager, PtyProcessManager>();
-
-            // specs/terminal-emulation T7: TerminalViewModel gets its own, separately keyed
-            // PtyProcessManager instance rather than sharing RunPanelViewModel's - Run's
-            // persistent toolbar and the Terminal page are independent features (same as the
-            // pre-epic IRunProcessManager/ITerminalCommandRunner split), so a command typed into
-            // one must not stop or report status for whatever's running in the other.
-            services.AddKeyedSingleton<IPtyProcessManager, PtyProcessManager>(TerminalViewModel.PtyProcessManagerKey);
-            services.AddSingleton<IWorkingDirectoryContext, WorkingDirectoryContext>();
-            services.AddSingleton<IActiveEditorContext, ActiveEditorContext>();
-            services.AddSingleton<RunPanelViewModel>();
-            services.AddSingleton<StatusBarViewModel>();
-
-            // specs/ide-workbench-shell R1.3: promoted from AddTransient so the Terminal page and
-            // the workbench dock's Terminal tab share the exact same instance/session - see this
-            // class's own remark.
-            services.AddSingleton<TerminalViewModel>();
-            services.AddSingleton<WorkbenchDockViewModel>();
-
-            // Epic 24, R1/R2/R3: Quick Open and the command palette - reachable from anywhere via
-            // ShellViewModel-owned global KeyBindings, so each must be one instance, not one per
-            // page navigation.
-            services.AddSingleton<QuickOpenViewModel>();
-            services.AddSingleton<CommandPaletteViewModel>();
-
-            // specs/editor-intelligence R7: Go to Symbol in File - same "reachable from anywhere
-            // via a global KeyBinding" reason as the two singletons above.
-            services.AddSingleton<SymbolQuickPickViewModel>();
-            services.AddTransient<IApplyOrchestrationService, ApplyOrchestrationService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();
             services.AddTransient<IDialogService, DialogService>();
 
             services.AddSingleton<IPageService, PageService>();
-            services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<NavigationService>();
+            services.AddSingleton<IFrameNavigationService>(sp => sp.GetRequiredService<NavigationService>());
+            services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<NavigationService>());
 
-            // Core Services
-            services.AddSingleton<IFileService, FileService>();
+            // View models marshal onto the UI thread through
+            // this rather than Avalonia's Dispatcher directly.
+            services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
+            services.AddSingleton<IWindowAppearanceService, WindowAppearanceService>();
 
-            // Views and ViewModels
-            services.AddTransient<SettingsViewModel>();
+            // Views
             services.AddTransient<SettingsView>();
-            // Epic 25, T6: AddSingleton rather than AddTransient - the Assistant panel must be
-            // reachable from HistoryViewModel's Fork/Rerun without depending on ExplorerView ever
-            // having been constructed, and a second accidental instance would mean "Fork" from
-            // History silently updates a PromptViewModel/TutorialViewModel nobody is looking at.
-            services.AddSingleton<AssistantPanelViewModel>();
-            services.AddSingleton<TutorialViewModel>();
-            services.AddTransient<HistoryViewModel>();
             services.AddTransient<HistoryView>();
-            services.AddTransient<ExplorerViewModel>();
             services.AddTransient<ExplorerView>();
             services.AddTransient<TerminalView>();
-            services.AddSingleton<PromptViewModel>();
             services.AddTransient<PromptView>();
-
-            // Epic 26 (specs/interface-mode R5/R6): FlowWizard mode's Home/Review pages - AddTransient
-            // like every other page-scoped view model/view pair above, since neither is reachable
-            // from outside navigation the way AssistantPanelViewModel/TutorialViewModel are.
-            services.AddTransient<MainViewModel>();
             services.AddTransient<MainView>();
             services.AddTransient<ReviewView>();
 
@@ -241,17 +127,16 @@ public partial class App : Application
         Build();
     }
 
-    // T9.2.1: shared by the logging setup above (which runs ahead of DI and so only has
-    // IConfiguration to read LocalSettingsOptions from) and the IRunSessionStore registration
-    // (which already has it bound via IOptions<LocalSettingsOptions>) - previously each resolved
-    // this path with its own duplicated default-folder literal; now there's exactly one.
-    private static string ResolveApplicationDataFolder(IConfiguration configuration) =>
-        ResolveApplicationDataFolder(configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>() ?? new LocalSettingsOptions());
-
-    private static string ResolveApplicationDataFolder(LocalSettingsOptions options)
+    // The logging setup above runs ahead of DI and so only has IConfiguration to read
+    // LocalSettingsOptions from; ApplicationDataPaths is the one shared resolution.
+    private static string ResolveApplicationDataFolder(IConfiguration configuration)
     {
-        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(localApplicationData, options.ApplicationDataFolder ?? "Paarde.Avalonia/ApplicationData");
+        var configuredFolder = configuration.GetSection(nameof(LocalSettingsOptions)).Get<LocalSettingsOptions>()?.ApplicationDataFolder;
+
+        // Logging is the first thing to open a file in the folder, so the one-time move happens here.
+        ApplicationDataPaths.MoveLegacyFolder(configuredFolder);
+
+        return ApplicationDataPaths.Resolve(configuredFolder);
     }
 
     public override void Initialize()
@@ -259,7 +144,7 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
-    // T9.2.2: a last-resort safety net for whatever an inner try/catch didn't - these are the two
+    // A last-resort safety net for whatever an inner try/catch didn't - these are the two
     // places .NET surfaces an exception that unwound past every frame on its own thread/task
     // rather than one this app explicitly awaited. Neither handler can stop the process from
     // terminating (AppDomain.UnhandledException always precedes a crash; an unobserved task
@@ -296,8 +181,8 @@ public partial class App : Application
 
 #if DEBUG
             // Avalonia.Diagnostics is Debug-only (Paarde.Avalonia.csproj), same as this call.
-            // The Avalonia.Generators default (F12) is disabled in that csproj because it collides
-            // with CodeEditor's own F12 go-to-definition binding (Epic 17) - Ctrl+Shift+F12 instead.
+            // The Avalonia.Generators default is disabled in that csproj because it collides
+            // with CodeEditor's own F12 go-to-definition binding - Ctrl+Shift+F12 instead.
             window.AttachDevTools(new KeyGesture(Key.F12, KeyModifiers.Control | KeyModifiers.Shift));
 #endif
 
@@ -308,17 +193,17 @@ public partial class App : Application
             // InvokeShutdown() call, sidesteps the race instead of letting Avalonia's internal teardown hit it.
             desktop.Exit += (_, _) =>
             {
-                // Epic 17 (T17.2.1)/Epic 18: every language server is a child process with no
+                // Epic 17/Epic 18: every language server is a child process with no
                 // owner other than this app - Environment.Exit(0) below terminates this process
                 // immediately and would otherwise orphan it/them. Each client's StopAsync kill is
                 // bounded (a couple of seconds at most), so blocking briefly here is acceptable on
                 // the way out.
                 GetService<ILanguageServerSessionManager>().StopAllAsync().GetAwaiter().GetResult();
 
-                // Epic 20 (specs/build-and-run R4.6)/Epic 21 (specs/terminal-emulation R1.2, T6,
+                // Epic 20/Epic 21 (specs/terminal-emulation R1.2, T6,
                 // T7): a Run or Terminal session is the same kind of app-owned, otherwise-orphaned
                 // child process - Stop() is synchronous and already bounded by killing the process
-                // tree, so no extra waiting is needed here. Two separately keyed instances (T7),
+                // tree, so no extra waiting is needed here. Two separately keyed instances,
                 // so both need stopping independently.
                 GetService<IPtyProcessManager>().Stop();
                 GetKeyedService<IPtyProcessManager>(TerminalViewModel.PtyProcessManagerKey).Stop();
@@ -332,7 +217,7 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    // T9.2.3: async void because OnFrameworkInitializationCompleted (an override, so its own
+    // Async void because OnFrameworkInitializationCompleted (an override, so its own
     // signature can't change) can't await it - any exception thrown here would otherwise unwind
     // past that override and surface as an AppDomain.UnhandledException crash (see
     // RegisterGlobalCrashHandlers above) instead of a reported, recoverable failure. Wrapping it
@@ -346,19 +231,19 @@ public partial class App : Application
             await themeSelectorService.InitializeAsync();
             await themeSelectorService.SetRequestedThemeAsync();
 
-            // T7.1.2: pushes the last recorded run's tutorial/files/apply-log into IPromptResultStore/
+            // Pushes the last recorded run's tutorial/files/apply-log into IPromptResultStore/
             // IApplyHistoryLog before anything navigates, so the Tutorial and Diffs pages already have
             // it whenever the user first visits them - a no-op if no run has ever been recorded.
             GetService<IRunSessionStore>().RestoreLastSession();
 
-            // Epic 26 (specs/interface-mode R2): which shell the app starts into - EditorFocused
+            // Which shell the app starts into - EditorFocused
             // keeps today's Explorer-first behavior, FlowWizard starts on the Home/Compose/Review
             // flow instead.
             var interfaceMode = await GetService<ILocalSettingsService>().ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;
             var startupViewModelType = interfaceMode == InterfaceMode.FlowWizard ? typeof(MainViewModel) : typeof(ExplorerViewModel);
             GetService<INavigationService>().NavigateTo(startupViewModelType.FullName!);
 
-            // specs/fluent-design-pass R1: off by default - see AppearanceSettingsKeys/
+            // Off by default - see AppearanceSettingsKeys/
             // MainWindow.ApplyTransparency.
             var transparencyEnabled = await GetService<ILocalSettingsService>().ReadSettingAsync<bool?>(AppearanceSettingsKeys.TransparencyEnabled) ?? false;
             (MainWindow as Views.MainWindow)?.ApplyTransparency(transparencyEnabled);
@@ -372,7 +257,7 @@ public partial class App : Application
 
             if (headroomIntegrationEnabled && !string.IsNullOrWhiteSpace(savedWorkingDirectory))
             {
-                var (message, severity) = await GetService<IHeadroomCoordinator>().CheckAndOfferFixesAsync(savedWorkingDirectory);
+                var (message, severity) = await GetService<IHeadroomCoordinator>().CheckAndOfferFixesAsync(savedWorkingDirectory, isAutomaticCheck: true);
                 GetService<IHeadroomStatusStore>().SetResult(message, severity);
             }
         }
