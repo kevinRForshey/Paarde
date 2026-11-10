@@ -9,8 +9,9 @@ public class TerminalViewModelTests
 {
     private readonly FakePtyProcessManager _ptyProcessManager = new();
     private readonly FakeLocalSettingsService _localSettingsService = new();
+    private readonly FakeUiDispatcher _uiDispatcher = new();
 
-    private TerminalViewModel CreateSut() => new(_ptyProcessManager, _localSettingsService, new FakeUiDispatcher());
+    private TerminalViewModel CreateSut() => new(_ptyProcessManager, _localSettingsService, _uiDispatcher);
 
     private async Task SetSavedWorkingDirectoryAsync(string path) =>
         await _localSettingsService.SaveSettingAsync(WorkingDirectorySettingsKeys.WorkingDirectory, path);
@@ -114,8 +115,30 @@ public class TerminalViewModelTests
         sut.OnNavigatedFrom();
     }
 
-    // TerminalViewModel.OnProcessOutputReceived/OnProcessExited marshal through
-    // Dispatcher.UIThread.Post, same as RunPanelViewModel's own handlers (see that class's test
-    // comment) - not exercised here since nothing pumps Dispatcher.UIThread in this plain xunit
-    // host. OutputBuffer is likewise not asserted against directly here for the same reason.
+    [Theory]
+    [InlineData(-1073741510)] // STATUS_CONTROL_C_EXIT on Windows
+    [InlineData(130)] // 128 + SIGINT from sh
+    public void ProcessExited_StoppedWithCtrlC_ReportsItAsInformationalNotAnError(int exitCode)
+    {
+        var sut = CreateSut();
+
+        _ptyProcessManager.RaiseExited(exitCode);
+        _uiDispatcher.RunPending();
+
+        Assert.Equal("Stopped with Ctrl+C.", sut.StatusMessage);
+        Assert.Equal(NotificationSeverity.Informational, sut.StatusSeverity);
+        Assert.False(sut.IsRunning);
+    }
+
+    [Fact]
+    public void ProcessExited_NonZeroCode_ReportsAnError()
+    {
+        var sut = CreateSut();
+
+        _ptyProcessManager.RaiseExited(1);
+        _uiDispatcher.RunPending();
+
+        Assert.Equal("Process exited (code 1).", sut.StatusMessage);
+        Assert.Equal(NotificationSeverity.Error, sut.StatusSeverity);
+    }
 }

@@ -1,6 +1,7 @@
 using System.Text;
 
 using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Helpers;
 using Paarde.Presentation.Models;
 
 using Paarde.Presentation.Contracts.ViewModels;
@@ -171,7 +172,10 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         _uiDispatcher.Post(() =>
         {
             IsRunning = false;
-            StatusMessage = exitCode is null ? "Terminal_Stopped".Resolve() : string.Format("Terminal_Exited".Resolve(), exitCode);
-            StatusSeverity = exitCode is null or 0 ? NotificationSeverity.Informational : NotificationSeverity.Error;
+            var interrupted = ExitCodes.IsInterrupted(exitCode);
+            StatusMessage = exitCode is null ? "Terminal_Stopped".Resolve()
+                : interrupted ? "Terminal_Interrupted".Resolve()
+                : string.Format("Terminal_Exited".Resolve(), exitCode);
+            StatusSeverity = exitCode is null or 0 || interrupted ? NotificationSeverity.Informational : NotificationSeverity.Error;
         });
 }

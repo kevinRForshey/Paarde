@@ -7,7 +7,8 @@ on:
     branches: ["main", "Development"]
 
 jobs:
-  build-test-coverage:
+  # The cross-platform solution (Core, Presentation, Avalonia) on Linux, with the coverage gate.
+  linux:
     runs-on: ubuntu-latest
     # The actual .slnx/.csproj files live under Paarde/ rather than the repo root.
     defaults:
@@ -21,63 +22,100 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # Paarde/ holds two solutions, so each command names one. Paarde.slnx leaves out the
+      # Windows-only WinUI projects.
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore Paarde.slnx
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build Paarde.slnx --no-restore --configuration Release
 
       # Run one test project per `dotnet test` invocation rather than the whole .slnx at once.
       # `dotnet test` against a solution runs each project's tests concurrently as separate
       # testhost processes - on this runner's limited cores, that starves Porta.Pty's native PTY
       # exit-notification thread (PtyProcessManagerTests) long enough to intermittently lose/delay
-      # it, timing the test out. Confirmed locally: Paarde.Core.Tests alone with coverage passed
-      # 6/6 reruns in ~2s each, but running it alongside Paarde.Avalonia.Tests via the .slnx
-      # (matching CI's prior command) reproduced the exact timeout, with Core.Tests itself slowing
-      # from ~2s to ~18s.
+      # it, timing the test out. Each project gets its own results folder so the coverage gate
+      # knows which report is which.
       - name: Test Paarde.Core.Tests with coverage
         run: >
           dotnet test Paarde.Core.Tests/Paarde.Core.Tests.csproj --no-build --configuration Release
           --collect:"XPlat Code Coverage"
-          --results-directory ./coverage
+          --results-directory ./coverage/Paarde.Core.Tests
 
-      - name: Test Paarde.Avalonia.Tests with coverage
+      - name: Test Paarde.Presentation.Tests with coverage
         run: >
-          dotnet test Paarde.Avalonia.Tests/Paarde.Avalonia.Tests.csproj --no-build --configuration Release
+          dotnet test Paarde.Presentation.Tests/Paarde.Presentation.Tests.csproj --no-build --configuration Release
           --collect:"XPlat Code Coverage"
-          --results-directory ./coverage
+          --results-directory ./coverage/Paarde.Presentation.Tests
 
-      # T9.1.1 set a 90% aspirational floor for Paarde.Core; actual coverage today is ~88% for Core
-      # and ~38% for Avalonia (expected - view/code-behind/converter UI glue isn't unit-testable the
-      # way pure logic is, per this project's established testing convention). These floors are set
-      # a few points below each project's current baseline so this gate catches real regressions
-      # without failing on day one; raise them as coverage improves rather than loosening either one.
+      - name: Test Paarde.Avalonia.Tests
+        run: dotnet test Paarde.Avalonia.Tests/Paarde.Avalonia.Tests.csproj --no-build --configuration Release
+
+      # Each floor is checked against the line coverage of the project's own assembly, not the
+      # report's total (which also counts referenced assemblies). Floors sit a few points below
+      # the 2026-11-10 baseline (Core ~86%, Presentation ~81%) so the gate catches real
+      # regressions; raise them as coverage improves rather than loosening them. Paarde.Avalonia
+      # has no floor: since Epic 30 moved its logic into Paarde.Presentation, it is views and
+      # code-behind, which these unit tests aren't meant to cover.
       - name: Enforce coverage floor
+        shell: python3 {0}
         run: |
-          set -e
-          core_floor=85
-          avalonia_floor=30
-          failed=0
+          import glob, re, sys
 
-          for f in $(find ./coverage -name "coverage.cobertura.xml"); do
-            rate=$(grep -o 'line-rate="[0-9.]*"' "$f" | head -1 | grep -o '[0-9.]*')
-            pct=$(awk "BEGIN { printf \"%.2f\", $rate * 100 }")
+          floors = {"Paarde.Core": 83, "Paarde.Presentation": 77}
+          failed = False
 
-            if grep -q '<package name="Paarde.Avalonia"' "$f"; then
-              project="Paarde.Avalonia.Tests"
-              floor=$avalonia_floor
-            else
-              project="Paarde.Core.Tests"
-              floor=$core_floor
-            fi
+          for assembly, floor in floors.items():
+              reports = glob.glob(f"coverage/{assembly}.Tests/*/coverage.cobertura.xml")
+              if not reports:
+                  print(f"::error::No coverage report found for {assembly}.Tests")
+                  failed = True
+                  continue
 
-            echo "$project line coverage: ${pct}% (floor: ${floor}%)"
+              text = open(reports[0], encoding="utf-8").read()
+              match = re.search(rf'<package name="{re.escape(assembly)}" line-rate="([0-9.]+)"', text)
+              if not match:
+                  print(f"::error::{assembly} is missing from its coverage report")
+                  failed = True
+                  continue
 
-            below=$(awk "BEGIN { print ($pct < $floor) ? 1 : 0 }")
-            if [ "$below" = "1" ]; then
-              echo "::error::$project coverage ${pct}% is below the ${floor}% floor"
-              failed=1
-            fi
-          done
+              pct = float(match.group(1)) * 100
+              print(f"{assembly} line coverage: {pct:.2f}% (floor: {floor}%)")
+              if pct < floor:
+                  print(f"::error::{assembly} coverage {pct:.2f}% is below the {floor}% floor")
+                  failed = True
 
-          exit $failed
+          sys.exit(1 if failed else 0)
+
+  # Everything, including the WinUI 3 front end, on Windows - the only place Paarde.WinUI builds,
+  # and the platform where the PTY, process-kill and cmd.exe code paths differ most.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Paarde
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Paarde.Windows.slnx
+
+      # Also downloads Monaco from the npm registry (checked against its SHA-512) for Paarde.WinUI.
+      - name: Build
+        run: dotnet build Paarde.Windows.slnx --no-restore --configuration Release
+
+      # Paarde.WinUI.UiTests is left out: it drives the real app through UI Automation and sends
+      # keys, so it needs an interactive desktop nobody else is using. Run it locally.
+      - name: Test Paarde.Core.Tests
+        run: dotnet test Paarde.Core.Tests/Paarde.Core.Tests.csproj --no-build --configuration Release
+
+      - name: Test Paarde.Presentation.Tests
+        run: dotnet test Paarde.Presentation.Tests/Paarde.Presentation.Tests.csproj --no-build --configuration Release
+
+      - name: Test Paarde.Avalonia.Tests
+        run: dotnet test Paarde.Avalonia.Tests/Paarde.Avalonia.Tests.csproj --no-build --configuration Release

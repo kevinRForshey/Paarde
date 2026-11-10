@@ -316,9 +316,10 @@ What the first run found (all fixed):
     settings, and has tests.
 
   **Left as is:**
-  - A command stopped with Ctrl+C reports "Process exited (code -1073741510)" as an error. That
-    comes from the shared view model, so both apps do it.
-  - Enter in the Terminal command box doesn't run the command (as in Avalonia).
+  - ~~A command stopped with Ctrl+C reports "Process exited (code -1073741510)" as an error.~~
+    Fixed afterwards in the shared view models (`ExitCodes.IsInterrupted`): Run and Terminal now
+    say "Stopped with Ctrl+C." as information.
+  - ~~Enter in the Terminal command box doesn't run the command.~~ Fixed afterwards in both apps.
   - Avalonia's Assistant panel has the same squeezed prompt box; only WinUI was fixed.
 
   **Builds and tests:** both solutions build with 0 warnings. Core 569/569, Presentation 420/420,

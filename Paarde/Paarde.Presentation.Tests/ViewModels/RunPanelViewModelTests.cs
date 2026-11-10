@@ -1,6 +1,7 @@
 using Paarde.Presentation.Tests.Fakes;
 using Paarde.Core.Models;
 using Paarde.Core.Services;
+using Paarde.Presentation.Models;
 using Paarde.Presentation.Services;
 using Paarde.Presentation.ViewModels;
 
@@ -14,6 +15,7 @@ public class RunPanelViewModelTests
     private readonly FakeBuildTestRunner _buildTestRunner = new();
     private readonly FakePtyProcessManager _ptyProcessManager = new();
     private readonly FakeWorkingDirectoryContext _workingDirectoryContext = new();
+    private readonly FakeUiDispatcher _uiDispatcher = new();
     private readonly RunConfigurationsProvider _runConfigurationsProvider;
 
     public RunPanelViewModelTests()
@@ -22,7 +24,7 @@ public class RunPanelViewModelTests
     }
 
     private RunPanelViewModel CreateSut() =>
-        new(_runConfigurationsProvider, _buildTestRunner, _ptyProcessManager, _localSettingsService, _workingDirectoryContext, new FakeUiDispatcher());
+        new(_runConfigurationsProvider, _buildTestRunner, _ptyProcessManager, _localSettingsService, _workingDirectoryContext, _uiDispatcher);
 
     private async Task SetSavedWorkingDirectoryAsync(string path)
     {
@@ -184,10 +186,29 @@ public class RunPanelViewModelTests
         Assert.Equal("config-2", await _localSettingsService.ReadSettingAsync<string>(RunConfigurationSettingsKeys.SelectedConfigurationId("/repo")));
     }
 
-    // RunPanelViewModel.OnProcessOutputReceived/OnProcessExited marshal through
-    // Dispatcher.UIThread.Post the same way TerminalViewModel's onOutputLine does (see
-    // TerminalViewModelTests' comment on that) - not exercised here since nothing pumps
-    // Dispatcher.UIThread in this plain xunit host. BuildOutputBuffer/RunOutputBuffer
-    // (specs/terminal-emulation T6, split in specs/ide-workbench-shell R1.2) are likewise not
-    // asserted against directly here for the same reason.
+    [Fact]
+    public async Task ProcessExited_StoppedWithCtrlC_ReportsItAsInformationalNotAnError()
+    {
+        var sut = CreateSut();
+        await Task.Yield();
+
+        _ptyProcessManager.RaiseExited(-1073741510);
+        _uiDispatcher.RunPending();
+
+        Assert.Equal("Stopped with Ctrl+C.", sut.StatusMessage);
+        Assert.Equal(NotificationSeverity.Informational, sut.StatusSeverity);
+    }
+
+    [Fact]
+    public async Task ProcessExited_NonZeroCode_ReportsAnError()
+    {
+        var sut = CreateSut();
+        await Task.Yield();
+
+        _ptyProcessManager.RaiseExited(1);
+        _uiDispatcher.RunPending();
+
+        Assert.Equal("Process exited (code 1).", sut.StatusMessage);
+        Assert.Equal(NotificationSeverity.Error, sut.StatusSeverity);
+    }
 }

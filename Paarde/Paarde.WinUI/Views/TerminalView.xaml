@@ -27,6 +27,7 @@
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0"
                      Text="{x:Bind ViewModel.CommandText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     KeyDown="OnCommandTextBoxKeyDown"
                      PlaceholderText="Type a command to run in the current working directory..."
                      FontFamily="{StaticResource MonospaceFontFamily}" />
             <Button AutomationProperties.Name="Run" Grid.Column="1" Command="{x:Bind ViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">

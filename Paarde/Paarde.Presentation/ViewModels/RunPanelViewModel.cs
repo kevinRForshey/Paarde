@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text;
 
 using Paarde.Presentation.Contracts.Services;
+using Paarde.Presentation.Helpers;
 using Paarde.Presentation.Models;
 
 using Paarde.Presentation.Services;
@@ -292,8 +293,11 @@ public partial class RunPanelViewModel : ObservableObject
         _uiDispatcher.Post(() =>
         {
             IsRunning = false;
-            StatusMessage = exitCode is null ? "RunPanel_Stopped".Resolve() : string.Format("RunPanel_Exited".Resolve(), exitCode);
-            StatusSeverity = exitCode is null or 0 ? NotificationSeverity.Informational : NotificationSeverity.Error;
+            var interrupted = ExitCodes.IsInterrupted(exitCode);
+            StatusMessage = exitCode is null ? "RunPanel_Stopped".Resolve()
+                : interrupted ? "RunPanel_Interrupted".Resolve()
+                : string.Format("RunPanel_Exited".Resolve(), exitCode);
+            StatusSeverity = exitCode is null or 0 || interrupted ? NotificationSeverity.Informational : NotificationSeverity.Error;
         });
 
     partial void OnIsBuildingChanged(bool value)

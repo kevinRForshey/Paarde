@@ -26,6 +26,7 @@ public class FlowWizardSmokeTests(FlowWizardApp app) : IClassFixture<FlowWizardA
         app.NavigateTo("Explorer");
         var findPresetBox = () => app.Window.FindFirstDescendant(app.By.ByControlType(ControlType.ComboBox).And(app.By.ByName("Preset")));
         var assistantButton = app.Window.FindFirstDescendant(app.By.ByControlType(ControlType.Button).And(app.By.ByName("Assistant")));
+        Assert.NotNull(assistantButton);
         Assert.Null(findPresetBox());
 
         assistantButton.Patterns.Invoke.Pattern.Invoke();

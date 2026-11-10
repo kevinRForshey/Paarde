@@ -1,6 +1,7 @@
 using System.ComponentModel;
 
 using Avalonia.Controls;
+using Avalonia.Input;
 
 using Paarde.Presentation.ViewModels;
 
@@ -36,6 +37,16 @@ public partial class TerminalView : UserControl
         if (e.PropertyName == nameof(TerminalViewModel.IsRunning) && ViewModel.IsRunning)
         {
             OutputTerminal.Focus();
+        }
+    }
+
+    // Enter in the command box runs the command, like pressing Run.
+    private void OnCommandTextBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && ViewModel.RunCommandCommand.CanExecute(null))
+        {
+            ViewModel.RunCommandCommand.Execute(null);
+            e.Handled = true;
         }
     }
 }

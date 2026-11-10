@@ -2,6 +2,9 @@ using System.ComponentModel;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+
+using Windows.System;
 
 using Paarde.Presentation.ViewModels;
 
@@ -35,6 +38,16 @@ public sealed partial class TerminalView : Page
         if (e.PropertyName == nameof(TerminalViewModel.IsRunning) && ViewModel.IsRunning)
         {
             OutputTerminal.Focus(FocusState.Programmatic);
+        }
+    }
+
+    // Enter in the command box runs the command, like pressing Run.
+    private void OnCommandTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter && ViewModel.RunCommandCommand.CanExecute(null))
+        {
+            ViewModel.RunCommandCommand.Execute(null);
+            e.Handled = true;
         }
     }
 }

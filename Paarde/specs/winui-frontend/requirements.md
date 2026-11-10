@@ -53,8 +53,10 @@ Confirmed by direct inspection, 2026-11-09:
 - Settings live under `%AppData%/Paarde/ApplicationData`, the `LocalSettingsOptions` default in
   `LocalSettingsService` and `appsettings.json`. They used to live under
   `Paarde.Avalonia/ApplicationData`, and are moved across on first start.
-- There is no CI; `dotnet build Paarde.slnx` is the documented build and is expected to work on
-  Linux/macOS for the Avalonia app.
+- `dotnet build Paarde.slnx` is the documented build and is expected to work on Linux/macOS for
+  the Avalonia app. CI (`.github/workflows/ci.yml`) builds `Paarde.slnx` on Linux and
+  `Paarde.Windows.slnx` on Windows, and runs the unit tests on both. It was broken from F31.0,
+  when the second solution file made its bare `dotnet restore` ambiguous, until 2026-11-10.
 
 ## Requirements
 
