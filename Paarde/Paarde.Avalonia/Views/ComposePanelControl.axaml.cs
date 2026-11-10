@@ -24,6 +24,11 @@ public partial class ComposePanelControl : UserControl
         InitializeComponent();
     }
 
+    // A ScrollViewer gives its content unlimited height, so the prompt box's * row would only get
+    // its minimum; holding RootGrid at the viewport's height lets it fill a tall panel.
+    private void OnRootScrollViewerSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        RootGrid.MinHeight = Math.Max(0, e.NewSize.Height - RootGrid.Margin.Top - RootGrid.Margin.Bottom);
+
     private void OnPromptTextBoxTextChanged(object? sender, TextChangedEventArgs e)
     {
         // Bug fix: switching away from the Compose tab tears down this control (TabControl

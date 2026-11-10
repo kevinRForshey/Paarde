@@ -320,7 +320,11 @@ What the first run found (all fixed):
     Fixed afterwards in the shared view models (`ExitCodes.IsInterrupted`): Run and Terminal now
     say "Stopped with Ctrl+C." as information.
   - ~~Enter in the Terminal command box doesn't run the command.~~ Fixed afterwards in both apps.
-  - Avalonia's Assistant panel has the same squeezed prompt box; only WinUI was fixed.
+  - ~~Avalonia's Assistant panel has the same squeezed prompt box; only WinUI was fixed.~~ Fixed
+    afterwards: Avalonia's `ComposePanelControl` now scrolls, wraps its button rows and stacks the
+    Run options, which also stopped its Timeout box cutting off the last digit.
+  - ~~The Terminal page showed "Terminal" twice (page header plus its own title).~~ Fixed
+    afterwards in both apps.
 
   **Builds and tests:** both solutions build with 0 warnings. Core 569/569, Presentation 420/420,
   Avalonia 52/52, WinUI UI smoke tests 12/12.

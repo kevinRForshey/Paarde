@@ -7,13 +7,9 @@
              x:Class="Paarde.Avalonia.Views.TerminalView"
              x:DataType="vm:TerminalViewModel">
 
-    <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto">
-        <TextBlock Grid.Row="0"
-                   Text="Terminal"
-                   FontSize="20"
-                   FontWeight="SemiBold" />
-
-        <Grid Grid.Row="1" Margin="0,8,0,0" ColumnDefinitions="*,Auto,Auto,Auto">
+    <!-- No title of its own: the shell's page header already says "Terminal". -->
+    <Grid Margin="16" RowDefinitions="Auto,*,Auto">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto">
             <TextBox Grid.Column="0"
                       Text="{Binding CommandText}"
                       KeyDown="OnCommandTextBoxKeyDown"
@@ -44,12 +40,12 @@
              swap ShellView.axaml's output strip already got in T6. InputReceived/Resized are
              wired in code-behind (TerminalView.axaml.cs), same reasoning. -->
         <controls:TerminalControl Name="OutputTerminal"
-                                  Grid.Row="2"
+                                  Grid.Row="1"
                                   Margin="0,8,0,0"
                                   FontSize="14"
                                   Buffer="{Binding OutputBuffer}" />
 
-        <ui:InfoBar Grid.Row="3"
+        <ui:InfoBar Grid.Row="2"
                     Margin="0,4,0,0"
                     Message="{Binding StatusMessage}"
                     Severity="{Binding StatusSeverity, Converter={StaticResource NotificationSeverityToInfoBarSeverityConverter}}"

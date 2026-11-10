@@ -9,7 +9,11 @@
     <!-- Epic 25, T9: PromptView.axaml's body, moved here unchanged - DataContext now comes from
          AssistantPanelControl's Compose property (bound by whoever hosts it) rather than this
          control resolving PromptViewModel itself from DI/navigation. -->
-    <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto">
+    <!-- Scrolls when the panel is too short for everything (Explorer's Assistant panel). Code-behind
+         keeps RootGrid at least the viewport's height, so on a tall panel the prompt box still fills
+         the spare space. -->
+    <ScrollViewer Name="RootScrollViewer" VerticalScrollBarVisibility="Auto" SizeChanged="OnRootScrollViewerSizeChanged">
+    <Grid Name="RootGrid" Margin="16" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto">
         <TextBlock Grid.Row="0"
                    Text="Prompt"
                    FontSize="20"
@@ -44,33 +48,35 @@
         </Grid>
 
         <StackPanel Grid.Row="2" Margin="0,8,0,0" Spacing="4">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
-                <TextBlock Grid.Column="0" Text="Context files" FontSize="12" Opacity="0.7" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Command="{Binding AddContextFilesCommand}">
+            <TextBlock Text="Context files" FontSize="12" Opacity="0.7" />
+            <!-- Wraps rather than one fixed row: in Explorer's Assistant panel a row cut off
+                 "Remove selected" and "Suggest relevant files" entirely. -->
+            <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button Command="{Binding AddContextFilesCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ui:SymbolIcon Symbol="Attach" FontSize="14" />
                         <TextBlock Text="Add files..." />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding AddContextFolderCommand}">
+                <Button Command="{Binding AddContextFolderCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ui:SymbolIcon Symbol="Folder" FontSize="14" />
                         <TextBlock Text="Add folder..." />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding RemoveAttachedPathCommand}">
+                <Button Command="{Binding RemoveAttachedPathCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ui:SymbolIcon Symbol="DeleteFilled" FontSize="14" />
                         <TextBlock Text="Remove selected" />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="4" Margin="8,0,0,0" Command="{Binding SuggestRelevantFilesCommand}">
+                <Button Command="{Binding SuggestRelevantFilesCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ui:SymbolIcon Symbol="Target" FontSize="14" />
                         <TextBlock Text="Suggest relevant files" />
                     </StackPanel>
                 </Button>
-            </Grid>
+            </WrapPanel>
             <ListBox ItemsSource="{Binding AttachedPaths}" SelectedItem="{Binding SelectedAttachedPath}" MaxHeight="96" />
 
             <!-- T14.2.3: suggestions are never auto-attached - double-tap accepts one (removing it
@@ -93,14 +99,18 @@
             </Border>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Margin="0,8,0,0" Spacing="4">
-            <Grid ColumnDefinitions="*,Auto">
+        <!-- A Grid rather than a StackPanel so the prompt box fills the * row. -->
+        <Grid Grid.Row="3" Margin="0,8,0,0" RowDefinitions="Auto,*" RowSpacing="4">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <TextBlock Grid.Column="0" Text="Prompt text" FontSize="12" Opacity="0.7" />
                 <TextBlock Grid.Column="1" Text="{Binding EstimatedTokenCountDisplay}" FontSize="12" Opacity="0.7" />
             </Grid>
             <TextBox Name="PromptTextBox"
+                     Grid.Row="1"
                      Text="{Binding PromptText}"
                      Watermark="Enter the prompt you want to send to Claude Code..."
+                     MinHeight="96"
+                     VerticalContentAlignment="Top"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -113,6 +123,7 @@
                  verify caret-relative placement against, and the simpler anchor is just as
                  functional. -->
             <Popup Name="MentionPopup"
+                   Grid.Row="1"
                    PlacementTarget="PromptTextBox"
                    Placement="Bottom"
                    IsLightDismissEnabled="True"
@@ -127,9 +138,9 @@
                              DoubleTapped="OnMentionSuggestionDoubleTapped" />
                 </Border>
             </Popup>
-        </StackPanel>
+        </Grid>
 
-        <StackPanel Grid.Row="4" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8">
+        <WrapPanel Grid.Row="4" Margin="0,8,0,0" ItemSpacing="8" LineSpacing="8">
             <Button Command="{Binding SavePromptCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <ui:SymbolIcon Symbol="SaveFilled" FontSize="14" />
@@ -148,29 +159,48 @@
                     <TextBlock Text="Cancel" />
                 </StackPanel>
             </Button>
-            <CheckBox Content="Continue previous conversation"
-                      IsChecked="{Binding ContinuePreviousConversation}"
+            <CheckBox IsChecked="{Binding ContinuePreviousConversation}"
                       IsEnabled="{Binding HasPreviousSession}"
-                      VerticalAlignment="Center" />
+                      VerticalAlignment="Center">
+                <TextBlock Text="Continue previous conversation" TextWrapping="Wrap" />
+            </CheckBox>
             <ui:ProgressRing Width="20" Height="20" VerticalAlignment="Center" IsIndeterminate="True" IsActive="{Binding IsRunning}" />
             <TextBlock Text="{Binding ElapsedTimeDisplay}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" Opacity="0.7" />
             <TextBlock Text="{Binding StreamProgressDisplay}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" Opacity="0.7" />
-        </StackPanel>
+        </WrapPanel>
 
         <!-- T-UX.2: split from the action row above - these are per-run settings, not actions,
              and were competing visually with "Send to Claude Code" for attention. Grouped via a
              separator (common region) and de-emphasized opacity, matching the muted-label
              convention used elsewhere on this page, rather than hidden behind an Expander -
              desktop tolerates this density fine once it's grouped (see ux-desktop skill). -->
-        <Separator Grid.Row="5" Margin="0,12,0,8" Opacity="0.4" />
-        <StackPanel Grid.Row="5" Margin="0,16,0,0" Orientation="Horizontal" Spacing="8" Opacity="0.85">
-            <TextBlock Text="Run options" VerticalAlignment="Center" FontSize="12" Opacity="0.7" FontWeight="SemiBold" />
-            <TextBlock Text="Preset" VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7" />
-            <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" Width="120" />
-            <TextBlock Text="Tutorial detail" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
-            <ComboBox ItemsSource="{Binding AvailableDepths}" SelectedItem="{Binding SelectedDepth}" Width="120" />
-            <TextBlock Text="Timeout (seconds)" VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7" />
-            <NumericUpDown Value="{Binding TimeoutSeconds}" Minimum="1" Maximum="86400" Increment="30" Width="140" />
+        <StackPanel Grid.Row="5" Margin="0,12,0,0" Spacing="8">
+            <Separator Margin="0" Opacity="0.4" />
+            <!-- Each label above its control rather than one horizontal row, which ran past the
+                 edge of Explorer's Assistant panel. Side by side, the NumericUpDown's spinner
+                 buttons left too little room and cut off the timeout's last digit. -->
+            <!-- A capped star column rather than HorizontalAlignment="Left": the controls fill a
+                 narrow panel but stop at 340 px, left-aligned, in a wide one. -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="340" />
+                </Grid.ColumnDefinitions>
+            <StackPanel Spacing="8" Opacity="0.85">
+                <TextBlock Text="Run options" FontSize="12" Opacity="0.7" FontWeight="SemiBold" />
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Preset" Opacity="0.7" />
+                    <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" HorizontalAlignment="Stretch" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tutorial detail" Opacity="0.7" />
+                    <ComboBox ItemsSource="{Binding AvailableDepths}" SelectedItem="{Binding SelectedDepth}" HorizontalAlignment="Stretch" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Timeout (seconds)" Opacity="0.7" />
+                    <NumericUpDown Value="{Binding TimeoutSeconds}" Minimum="1" Maximum="86400" Increment="30" HorizontalAlignment="Stretch" />
+                </StackPanel>
+            </StackPanel>
+            </Grid>
         </StackPanel>
 
         <!-- Epic 11 (F11.2.2): same "Expander, collapsed until non-empty" pattern as ExplorerView's
@@ -194,4 +224,5 @@
                     IsOpen="{Binding StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         <TextBlock Grid.Row="7" Margin="0,24,0,0" HorizontalAlignment="Right" Text="{Binding UsageSummary}" Opacity="0.7" FontSize="12" />
     </Grid>
+    </ScrollViewer>
 </UserControl>
