@@ -1,4 +1,6 @@
 # Paarde
+Pronounced like Party, but with a soft t like pardy.
+
 
 **P**rompt **A**ssist **A**nd **R**eview **D**evelopment **E**nvironment
 
