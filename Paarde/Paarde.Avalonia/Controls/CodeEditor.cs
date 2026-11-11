@@ -634,9 +634,14 @@ public class CodeEditor : TextEditor
         _shownHoverSuggestion = hover;
 
         ToolTip.SetIsOpen(this, false);
-        ToolTip.SetTip(this, hover.Contents);
+        ToolTip.SetTip(this, ToPlainHoverText(hover.Contents));
         ToolTip.SetIsOpen(this, true);
     }
+
+    // Language servers send hover text as Markdown, usually with the signature in a ```lang fence.
+    // This tooltip shows plain text, so the fence lines themselves are dropped rather than shown.
+    internal static string ToPlainHoverText(string markdown) =>
+        string.Join('\n', markdown.ReplaceLineEndings("\n").Split('\n').Where(line => !line.TrimStart().StartsWith("```", StringComparison.Ordinal))).Trim();
 
     private void HideHoverTooltip()
     {

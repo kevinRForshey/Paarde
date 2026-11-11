@@ -99,3 +99,11 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
   icon+label across every page; the `MainView` brand mark follows the accent color; corner radii
   stay consistent across theme changes; `InfoBar` severities render with the correct color/icon
   per message type. _(validates AC-1 through AC-6)_
+  Partly done on Windows 11 in Paarde.Avalonia, Light and Dark: Mica shows through when the
+  backdrop setting is on; Quick Open, Command Palette and Go to Symbol share one chrome; the brand
+  mark uses the accent colour; Informational/Warning/Error InfoBars show the right colour and icon.
+  Fixed along the way: all three popups had no background (black, in both themes) - `popup-chrome`
+  used `SystemControlBackgroundChromeMediumLowBrush`, which FluentAvalonia doesn't resolve; it uses
+  `FlyoutPresenterBackground` now. Still open: the fallback on a platform without Mica (not
+  checkable here), and a few buttons are still text-only - Explorer's "Close Tab", Home's "Send"
+  and Settings' "Check Headroom status now".

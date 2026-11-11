@@ -8,44 +8,49 @@
              x:DataType="vm:ExplorerViewModel">
 
     <Grid RowDefinitions="Auto,Auto,*">
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="8" VerticalAlignment="Center">
+        <!-- The path trims at MaxWidth so a deep working directory can't push the buttons away. -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="8">
             <TextBlock Text="{Binding WorkingDirectoryPath}"
+                       ToolTip.Tip="{Binding WorkingDirectoryPath}"
+                       MaxWidth="600"
                        FontWeight="Bold"
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
-            <Button Command="{Binding RefreshTreeCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ui:SymbolIcon Symbol="Refresh" FontSize="14" />
-                    <TextBlock Text="Refresh" />
-                </StackPanel>
-            </Button>
-            <!-- Epic 25, T12 (R10): lets the user pick a working directory from Explorer itself,
-                 rather than only ever inheriting whichever one Compose/Prompt last saved. -->
-            <Button Command="{Binding OpenFolderCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ui:SymbolIcon Symbol="OpenFolder" FontSize="14" />
-                    <TextBlock Text="Open folder..." />
-                </StackPanel>
-            </Button>
-            <!-- Epic 25, T12 (R2): collapses/expands the docked Assistant panel by driving the
-                 same "width 0 is collapsed" convention ResizablePaneHelper already uses for the
-                 tree pane - see ExplorerView.axaml.cs's OnToggleAssistantPanelButtonClick. -->
-            <Button Name="ToggleAssistantPanelButton" Click="OnToggleAssistantPanelButtonClick" ToolTip.Tip="Show or hide the Assistant panel.">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ui:SymbolIcon Symbol="Comment" FontSize="14" />
-                    <TextBlock Text="Assistant" />
-                </StackPanel>
-            </Button>
-            <!-- specs/editor-focus-layout R1: hides the tree + Assistant panel for a
-                 distraction-free view of the editor(s) alone. Ctrl+K Z does the same thing - see
-                 ExplorerView.axaml.cs's OnViewKeyDown. -->
-            <Button Command="{Binding ToggleZenModeCommand}" ToolTip.Tip="Toggle zen mode (Ctrl+K, Z).">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ui:SymbolIcon Symbol="FullScreen" FontSize="14" />
-                    <TextBlock Text="Zen mode" />
-                </StackPanel>
-            </Button>
-        </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Command="{Binding RefreshTreeCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="Refresh" FontSize="14" />
+                        <TextBlock Text="Refresh" />
+                    </StackPanel>
+                </Button>
+                <!-- Epic 25, T12 (R10): lets the user pick a working directory from Explorer itself,
+                     rather than only ever inheriting whichever one Compose/Prompt last saved. -->
+                <Button Command="{Binding OpenFolderCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="OpenFolder" FontSize="14" />
+                        <TextBlock Text="Open folder..." />
+                    </StackPanel>
+                </Button>
+                <!-- Epic 25, T12 (R2): collapses/expands the docked Assistant panel by driving the
+                     same "width 0 is collapsed" convention ResizablePaneHelper already uses for the
+                     tree pane - see ExplorerView.axaml.cs's OnToggleAssistantPanelButtonClick. -->
+                <Button Name="ToggleAssistantPanelButton" Click="OnToggleAssistantPanelButtonClick" ToolTip.Tip="Show or hide the Assistant panel.">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="Comment" FontSize="14" />
+                        <TextBlock Text="Assistant" />
+                    </StackPanel>
+                </Button>
+                <!-- specs/editor-focus-layout R1: hides the tree + Assistant panel for a
+                     distraction-free view of the editor(s) alone. Ctrl+K Z does the same thing - see
+                     ExplorerView.axaml.cs's OnViewKeyDown. -->
+                <Button Command="{Binding ToggleZenModeCommand}" ToolTip.Tip="Toggle zen mode (Ctrl+K, Z).">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:SymbolIcon Symbol="FullScreen" FontSize="14" />
+                        <TextBlock Text="Zen mode" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
 
         <ui:InfoBar Grid.Row="1"
                     Margin="8,0,8,8"
@@ -126,8 +131,9 @@
                         </Grid.ColumnDefinitions>
 
                         <ui:TabView Grid.Column="0"
+                                    Name="PrimaryTabView"
                                     TabItems="{Binding PrimaryGroupTabs}"
-                                    SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                                    SelectionChanged="OnTabViewSelectionChanged"
                                     CanDragTabs="True"
                                     CanReorderTabs="True"
                                     IsAddTabButtonVisible="False"
@@ -158,12 +164,12 @@
                                                            ToolTip.Tip="This file has unsaved edits." />
                                             </StackPanel>
                                         </ui:TabViewItem.Header>
-                                        <ui:TabViewItem.ContextMenu>
-                                            <ContextMenu>
+                                        <ui:TabViewItem.ContextFlyout>
+                                            <MenuFlyout>
                                                 <MenuItem Header="{Binding PinMenuItemLabel}" Command="{Binding TogglePinCommand}" />
                                                 <MenuItem Header="Split right" Command="{Binding RequestSplitRightCommand}" IsVisible="{Binding CanSplitRight}" />
-                                            </ContextMenu>
-                                        </ui:TabViewItem.ContextMenu>
+                                            </MenuFlyout>
+                                        </ui:TabViewItem.ContextFlyout>
                                         <!-- Bug fix (blank editor on open): FluentAvalonia's TabView
                                              reparents this control out of the TabViewItem into its own
                                              TabContentPresenter once this tab is selected (confirmed via
@@ -192,9 +198,10 @@
                                       IsVisible="{Binding HasSecondaryGroupTabs}" />
 
                         <ui:TabView Grid.Column="2"
+                                    Name="SecondaryTabView"
                                     IsVisible="{Binding HasSecondaryGroupTabs}"
                                     TabItems="{Binding SecondaryGroupTabs}"
-                                    SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                                    SelectionChanged="OnTabViewSelectionChanged"
                                     CanDragTabs="True"
                                     CanReorderTabs="True"
                                     IsAddTabButtonVisible="False"
@@ -218,11 +225,11 @@
                                                            ToolTip.Tip="This file has unsaved edits." />
                                             </StackPanel>
                                         </ui:TabViewItem.Header>
-                                        <ui:TabViewItem.ContextMenu>
-                                            <ContextMenu>
+                                        <ui:TabViewItem.ContextFlyout>
+                                            <MenuFlyout>
                                                 <MenuItem Header="{Binding PinMenuItemLabel}" Command="{Binding TogglePinCommand}" />
-                                            </ContextMenu>
-                                        </ui:TabViewItem.ContextMenu>
+                                            </MenuFlyout>
+                                        </ui:TabViewItem.ContextFlyout>
                                         <!-- Bug fix (blank editor on open): see matching comment on the
                                              primary TabView's item template above - same fix. -->
                                         <views:ExplorerFileTabControl DataContext="{Binding DataContext, ElementName=TabContainer}" />

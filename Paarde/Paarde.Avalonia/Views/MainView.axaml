@@ -75,32 +75,39 @@
                        FontSize="20"
                        FontWeight="SemiBold" />
 
+            <!-- Grid rows, not horizontal StackPanels: a horizontal StackPanel measures its children
+                 with unlimited width, so the step text never wrapped and ran off the window. -->
             <StackPanel Spacing="12">
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                    <TextBlock Text="1." FontWeight="SemiBold" Width="20" />
-                    <TextBlock TextWrapping="Wrap"
+                <Grid ColumnDefinitions="20,*" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="1." FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1"
+                               TextWrapping="Wrap"
                                Text="Open the Compose tab and click Browse... to choose the project folder you want Claude Code to work in." />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                    <TextBlock Text="2." FontWeight="SemiBold" Width="20" />
-                    <TextBlock TextWrapping="Wrap"
+                </Grid>
+                <Grid ColumnDefinitions="20,*" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="2." FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1"
+                               TextWrapping="Wrap"
                                Text="Describe what you want built or changed in the prompt box. Optionally attach context files or folders, pick a preset and tutorial detail level, then click Send to Claude Code." />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                    <TextBlock Text="3." FontWeight="SemiBold" Width="20" />
-                    <TextBlock TextWrapping="Wrap"
+                </Grid>
+                <Grid ColumnDefinitions="20,*" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="3." FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1"
+                               TextWrapping="Wrap"
                                Text="Once it finishes, you'll be taken to the Review tab to read the explanation, or see the proposed changes file by file." />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                    <TextBlock Text="4." FontWeight="SemiBold" Width="20" />
-                    <TextBlock TextWrapping="Wrap"
+                </Grid>
+                <Grid ColumnDefinitions="20,*" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="4." FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1"
+                               TextWrapping="Wrap"
                                Text="On the Review tab, select the files or individual hunks you want - editing the proposed content first if you'd like - then click Apply Selected to write them to disk. Undo Last Apply and Revert All Applied are there if you change your mind." />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                    <TextBlock Text="5." FontWeight="SemiBold" Width="20" />
-                    <TextBlock TextWrapping="Wrap"
+                </Grid>
+                <Grid ColumnDefinitions="20,*" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="5." FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1"
+                               TextWrapping="Wrap"
                                Text="Visit Settings to point the app at your claude CLI executable, customize the prompt template, switch themes, or switch back to the Editor-focused interface." />
-                </StackPanel>
+                </Grid>
             </StackPanel>
 
         </StackPanel>

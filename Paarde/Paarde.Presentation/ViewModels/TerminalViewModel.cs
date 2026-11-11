@@ -85,7 +85,9 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
     // Async void because INavigationAware.OnNavigatedTo returns void, same reasoning as
     // ExplorerViewModel.OnNavigatedTo - a corrupt settings file is logged rather than unwound
     // unobserved out of NavigationService.OnNavigated.
-    public async void OnNavigatedTo(object parameter)
+    public async void OnNavigatedTo(object parameter) => await LoadWorkingDirectoryAsync();
+
+    private async Task LoadWorkingDirectoryAsync()
     {
         try
         {
@@ -93,7 +95,7 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
-            _logger.LogError(ex, "Failed to load the saved working directory while navigating to the Terminal page.");
+            _logger.LogError(ex, "Failed to load the saved working directory for the terminal.");
         }
     }
 
@@ -110,6 +112,13 @@ public partial class TerminalViewModel : ObservableObject, INavigationAware
     [RelayCommand(CanExecute = nameof(CanRunCommand))]
     private async Task RunCommandAsync()
     {
+        // The workbench dock's Terminal tab shares this instance but never navigates here, so
+        // OnNavigatedTo may not have run yet.
+        if (string.IsNullOrWhiteSpace(WorkingDirectoryPath))
+        {
+            await LoadWorkingDirectoryAsync();
+        }
+
         if (string.IsNullOrWhiteSpace(WorkingDirectoryPath))
         {
             StatusMessage = "Terminal_NoWorkingDirectory".Resolve();

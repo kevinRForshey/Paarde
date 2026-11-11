@@ -7,5 +7,7 @@ namespace Paarde.Presentation.ViewModels;
 // ShellView.axaml.cs's code-behind, not a new ViewModel-level collection type (design.md).
 public record ProblemRow(string FilePath, LspPosition Position, LspDiagnosticSeverity Severity, string Message)
 {
-    public string Summary => $"{FilePath}:{Position.Line + 1}:{Position.Character + 1} [{Severity}] {Message}";
+    // File name only: a full path pushed the message itself off the edge of the dock. The full path
+    // is the row's tooltip.
+    public string Summary => $"{Path.GetFileName(FilePath)}:{Position.Line + 1}:{Position.Character + 1} [{Severity}] {Message}";
 }

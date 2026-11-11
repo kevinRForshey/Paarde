@@ -121,9 +121,16 @@ Each task references the requirement(s) it satisfies.
   on a settings read inside a `[Fact]`) — fixed by making both affected tests `async Task` and
   awaiting the read directly instead. `dotnet build Paarde.slnx`: 0 warnings/0 errors. Full
   solution test run: 908/908 passed.)_
-- [ ] T8 Manual verification: dock tabs switch and persist across restart; Build/Run keep
+- [x] T8 Manual verification: dock tabs switch and persist across restart; Build/Run keep
   independent output; Terminal tab and the Terminal page show the same live session; Problems
   lists diagnostics across files not just the one open in Explorer; status bar updates for
   branch/dirty count, configuration, LSP state, and caret position. Same sandboxed-environment
   limitation already documented for every other Avalonia-UI-touching task in this repo (no real
   display/window manager available here). _(validates R1–R4, R6.2-equivalent)_
+  Done on Windows in Paarde.Avalonia. Fixed along the way: Problems rows led with the full path,
+  pushing the message off the dock - `ProblemRow.Summary` shows the file name, with the full path
+  as the tooltip (both apps); the dock's terminal command box ignored Enter (both apps), and before
+  the Terminal page had been visited it reported "no working directory" because only
+  `OnNavigatedTo` loaded it - `RunCommandAsync` now loads it when empty; the Windows caption buttons
+  sat over the toolbar's Stop button, and a long working directory pushed Explorer's toolbar
+  buttons off-screen.

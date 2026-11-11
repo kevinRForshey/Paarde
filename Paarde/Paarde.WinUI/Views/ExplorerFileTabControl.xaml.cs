@@ -24,9 +24,9 @@ public sealed partial class ExplorerFileTabControl : UserControl
     }
 
     // specs/ide-workbench-shell R3.5 / editor-intelligence R7: the editor that last had focus owns
-    // IActiveEditorContext (the status bar's caret readout, Go to Symbol's outline and jump). Avalonia
-    // gives it up on LostFocus; here only the caret readout is cleared then, because opening Go to
-    // Symbol from inside the editor moves focus to the popup before the pick is made.
+    // IActiveEditorContext (the status bar's caret readout, Go to Symbol's outline and jump). Losing
+    // focus only clears the caret readout, because opening Go to Symbol from inside the editor moves
+    // focus to the popup before the pick is made. Paarde.Avalonia's ExplorerFileTabControl does the same.
     private static ExplorerFileTabControl? s_activeEditorOwner;
 
     private readonly IActiveEditorContext _activeEditorContext;

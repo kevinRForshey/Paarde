@@ -62,6 +62,19 @@ public class TerminalViewModelTests
     }
 
     [Fact]
+    public async Task RunCommandAsync_NeverNavigatedTo_StillUsesTheSavedWorkingDirectory()
+    {
+        await SetSavedWorkingDirectoryAsync("/home/user/project");
+        var sut = CreateSut();
+        sut.CommandText = "ls";
+
+        await sut.RunCommandCommand.ExecuteAsync(null);
+
+        Assert.Single(_ptyProcessManager.StartCalls);
+        Assert.Equal("/home/user/project", _ptyProcessManager.StartCalls[0].WorkingDirectoryPath);
+    }
+
+    [Fact]
     public async Task RunCommandAsync_NoWorkingDirectory_SetsStatusMessageAndDoesNotStart()
     {
         var sut = CreateSut();

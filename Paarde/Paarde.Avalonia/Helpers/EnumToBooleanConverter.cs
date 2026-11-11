@@ -1,5 +1,6 @@
 using System.Globalization;
 
+using Avalonia.Data;
 using Avalonia.Data.Converters;
 
 namespace Paarde.Avalonia.Helpers;
@@ -27,6 +28,9 @@ public class EnumToBooleanConverter : IValueConverter
             throw new ArgumentException("Converter parameter must be a member name.");
         }
 
-        return Enum.Parse(targetType, name);
+        // Only the button being checked writes back. The group unchecking the others must not:
+        // that used to push the unchecked button's value into the property, so opening Settings with
+        // Flow/Wizard (or the Anthropic API runner) saved reset it to the first option.
+        return value is true ? Enum.Parse(targetType, name) : BindingOperations.DoNothing;
     }
 }

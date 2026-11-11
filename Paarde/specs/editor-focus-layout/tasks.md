@@ -49,9 +49,16 @@ Each task references the requirement(s) it satisfies.
   (pin-to-front-of-group, unpin leaves position), `TabGroup`/group-collection membership across
   add/close/reassign, `_mruOrder` updates including closing the current front entry. _(validates
   R2, R3, R5, R7)_
-- [ ] T10 Manual verification: zen mode collapses/restores both panes together; split-right shows
+- [x] T10 Manual verification: zen mode collapses/restores both panes together; split-right shows
   two independently scrollable tab areas; pinning/reordering tabs behaves as expected and survives
   opening/closing other tabs; `Ctrl+Tab` cycles and activates correctly; a fresh settings store
   opens Explorer with the editor visibly dominant. _(validates AC-1 through AC-6; same
   sandboxed-environment limitation as every other Avalonia-rendering manual-verification task in
   this roadmap - no X server/real LSP servers available here)_
+  Done on Windows in Paarde.Avalonia. Fixed along the way: the tab right-click menu (Pin / Split
+  right) never opened - a `ContextMenu` on a FluentAvalonia `TabViewItem` doesn't stay open, so it's
+  a `ContextFlyout` now; pinning blanked the editor and split view showed two blank groups, because
+  both TabViews bound `SelectedItem` two-way to the one `SelectedTab` - ExplorerView now syncs each
+  group's selection itself, like Paarde.WinUI; `Ctrl+Tab` did nothing with focus in the file tree,
+  since the tree handles Tab first - the key handler is a tunnel handler now. Not covered: dragging
+  a tab to reorder it by mouse.

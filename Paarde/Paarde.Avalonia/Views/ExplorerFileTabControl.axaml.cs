@@ -35,9 +35,15 @@ public partial class ExplorerFileTabControl : UserControl
     // per-page since every open tab gets its own OutlinePanelGrid.
     private readonly ResizablePaneHelper _outlinePaneHelper;
 
+    private static ExplorerFileTabControl? s_activeEditorOwner;
+
+    private readonly IActiveEditorContext _activeEditorContext;
+
     public ExplorerFileTabControl()
     {
         InitializeComponent();
+
+        _activeEditorContext = App.GetService<IActiveEditorContext>();
 
         _outlinePaneHelper = new ResizablePaneHelper(OutlinePanelGrid.ColumnDefinitions[0], App.GetService<ILocalSettingsService>(), WorkspaceLayoutSettingsKeys.OutlinePanelWidth, defaultWidth: 200);
         Loaded += async (_, _) => await _outlinePaneHelper.RestoreAsync();
@@ -138,43 +144,39 @@ public partial class ExplorerFileTabControl : UserControl
             }
         };
 
-        // Only the editor that currently has focus should drive
-        // the status bar's caret readout - every ExplorerFileTabControl instance (one per open
-        // tab) shares the same IActiveEditorContext singleton with ExplorerView and
-        // TutorialDetailControl, so each only reports while its own Editor is focused and clears
-        // on LostFocus rather than leaving a stale position from whichever tab had focus last.
-        var activeEditorContext = App.GetService<IActiveEditorContext>();
+        // The editor that last had focus owns IActiveEditorContext (the status bar's caret readout,
+        // Go to Symbol's outline and jump), same as Paarde.WinUI's ExplorerFileTabControl. Losing
+        // focus only clears the caret readout: opening Go to Symbol from inside the editor moves
+        // focus to the picker before the pick is made, so the outline and jump have to stay.
+        // AvaloniaEdit's TextEditor never holds focus itself - it passes it to its inner TextArea
+        // and marks GotFocus handled, so Editor.IsFocused stays false and Editor.GotFocus never
+        // fires - which is why focus is tracked on the TextArea.
+        var textArea = Editor.TextArea;
         Editor.PropertyChanged += (_, e) =>
         {
-            if (e.Property == CodeEditor.CaretPositionProperty && Editor.IsFocused)
+            if (e.Property == CodeEditor.CaretPositionProperty && textArea.IsFocused && s_activeEditorOwner == this)
             {
-                activeEditorContext.SetCaretPosition(Editor.CaretPosition);
+                _activeEditorContext.SetCaretPosition(Editor.CaretPosition);
             }
 
-            // Same "only report while this Editor is focused" rule
-            // as CaretPosition above - DocumentSymbols is re-reported on every settled-edit
-            // refresh (T3's debounce) so the symbol picker never filters against a stale outline.
-            if (e.Property == CodeEditor.DocumentSymbolsProperty && Editor.IsFocused && DataContext is OpenFileTabViewModel tab)
+            // DocumentSymbols is re-reported on every settled-edit refresh (T3's debounce) so the
+            // symbol picker never filters against a stale outline.
+            if (e.Property == CodeEditor.DocumentSymbolsProperty && s_activeEditorOwner == this && DataContext is OpenFileTabViewModel tab)
             {
-                activeEditorContext.SetActiveDocument(tab.FilePath, Editor.DocumentSymbols);
+                _activeEditorContext.SetActiveDocument(tab.FilePath, Editor.DocumentSymbols);
             }
         };
-        Editor.GotFocus += (_, _) =>
+        textArea.GotFocus += (_, _) => TakeActiveEditor();
+        textArea.LostFocus += (_, _) =>
         {
-            activeEditorContext.SetCaretPosition(Editor.CaretPosition);
-            if (DataContext is OpenFileTabViewModel tab)
+            if (s_activeEditorOwner == this)
             {
-                activeEditorContext.SetActiveDocument(tab.FilePath, Editor.DocumentSymbols);
+                _activeEditorContext.SetCaretPosition(null);
             }
+        };
 
-            activeEditorContext.NavigationRequested += JumpCaretTo;
-        };
-        Editor.LostFocus += (_, _) =>
-        {
-            activeEditorContext.SetCaretPosition(null);
-            activeEditorContext.SetActiveDocument(null, null);
-            activeEditorContext.NavigationRequested -= JumpCaretTo;
-        };
+        // A closed tab's control leaves the visual tree; it mustn't keep owning the context.
+        Unloaded += (_, _) => ReleaseActiveEditor();
     }
 
     // Go to Symbol only ever jumps within the file that's already
@@ -199,6 +201,32 @@ public partial class ExplorerFileTabControl : UserControl
             // Stale position from a file that's since changed since the picker's list was built -
             // nothing sensible to do but skip it.
         }
+    }
+
+    private void TakeActiveEditor()
+    {
+        if (s_activeEditorOwner != this)
+        {
+            s_activeEditorOwner?.ReleaseActiveEditor();
+            s_activeEditorOwner = this;
+            _activeEditorContext.NavigationRequested += JumpCaretTo;
+        }
+
+        _activeEditorContext.SetCaretPosition(Editor.CaretPosition);
+        _activeEditorContext.SetActiveDocument((DataContext as OpenFileTabViewModel)?.FilePath, Editor.DocumentSymbols);
+    }
+
+    private void ReleaseActiveEditor()
+    {
+        if (s_activeEditorOwner != this)
+        {
+            return;
+        }
+
+        s_activeEditorOwner = null;
+        _activeEditorContext.NavigationRequested -= JumpCaretTo;
+        _activeEditorContext.SetCaretPosition(null);
+        _activeEditorContext.SetActiveDocument(null, null);
     }
 
     private void ShowReferencesFlyout(IReadOnlyList<LspLocation> locations)

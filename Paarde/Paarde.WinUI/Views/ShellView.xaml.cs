@@ -229,6 +229,17 @@ public sealed partial class ShellView : UserControl
         }
     }
 
+    // Enter in the dock's command box runs the command, same as TerminalView's own command box.
+    private void OnDockCommandTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        var terminalViewModel = ViewModel.WorkbenchDockViewModel.TerminalViewModel;
+        if (e.Key == VirtualKey.Enter && terminalViewModel.RunCommandCommand.CanExecute(null))
+        {
+            terminalViewModel.RunCommandCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     // Changed fires off the UI thread.
     private void OnDiagnosticsAggregatorChanged() => DispatcherQueue.TryEnqueue(RefreshProblemRows);
 

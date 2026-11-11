@@ -52,6 +52,16 @@ public partial class ExplorerView : UserControl
     private readonly DispatcherTimer _chordTimeoutTimer;
     private bool _isCtrlKArmed;
 
+    // Each tab group shows one of its own tabs (same rule as Paarde.WinUI's ExplorerView):
+    // SelectedTab if it's in that group, else whatever the group showed last, else its first tab.
+    // The TabViews used to bind SelectedItem two-way to SelectedTab, but a group that doesn't
+    // contain the selected tab then cleared it - blanking the other group too - and a reorder
+    // (Move) cleared it as well.
+    private OpenFileTabViewModel? _primaryShownTab;
+    private OpenFileTabViewModel? _secondaryShownTab;
+    private bool _isGroupSyncQueued;
+    private bool _isSyncingTabViews;
+
     public ExplorerView()
     {
         ViewModel = App.GetService<ExplorerViewModel>();
@@ -72,11 +82,15 @@ public partial class ExplorerView : UserControl
 
         ViewModel.ZenModeToggled += OnZenModeToggled;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        ViewModel.PrimaryGroupTabs.CollectionChanged += (_, _) => QueueGroupSync();
+        ViewModel.SecondaryGroupTabs.CollectionChanged += (_, _) => QueueGroupSync();
 
         _chordTimeoutTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
         _chordTimeoutTimer.Tick += (_, _) => DisarmCtrlK();
 
-        KeyDown += OnViewKeyDown;
+        // Tunnel, like Paarde.WinUI's PreviewKeyDown: the file tree and TabView handle Tab
+        // themselves (focus moves), so a bubbling handler never saw Ctrl+Tab.
+        AddHandler(KeyDownEvent, OnViewKeyDown, RoutingStrategies.Tunnel);
         KeyUp += OnViewKeyUp;
     }
 
@@ -127,8 +141,50 @@ public partial class ExplorerView : UserControl
         }
     }
 
+    private void OnTabViewSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (!_isSyncingTabViews && sender is TabView { SelectedItem: OpenFileTabViewModel tab })
+        {
+            ViewModel.SelectedTab = tab;
+        }
+    }
+
+    // Coalesced: a reorder is a Remove then an Insert, and a group shouldn't switch files in between.
+    private void QueueGroupSync()
+    {
+        if (_isGroupSyncQueued)
+        {
+            return;
+        }
+
+        _isGroupSyncQueued = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isGroupSyncQueued = false;
+            _primaryShownTab = SyncGroup(ViewModel.PrimaryGroupTabs, _primaryShownTab, PrimaryTabView);
+            _secondaryShownTab = SyncGroup(ViewModel.SecondaryGroupTabs, _secondaryShownTab, SecondaryTabView);
+        });
+    }
+
+    private OpenFileTabViewModel? SyncGroup(IList<OpenFileTabViewModel> groupTabs, OpenFileTabViewModel? shownTab, TabView tabView)
+    {
+        var tab = ViewModel.SelectedTab is { } selected && groupTabs.Contains(selected)
+            ? selected
+            : shownTab is not null && groupTabs.Contains(shownTab) ? shownTab : groupTabs.FirstOrDefault();
+
+        _isSyncingTabViews = true;
+        tabView.SelectedItem = tab;
+        _isSyncingTabViews = false;
+        return tab;
+    }
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ExplorerViewModel.SelectedTab))
+        {
+            QueueGroupSync();
+        }
+
         if (e.PropertyName == nameof(ExplorerViewModel.HasSecondaryGroupTabs) && _splitGroupHelper is { } helper)
         {
             if (ViewModel.HasSecondaryGroupTabs)

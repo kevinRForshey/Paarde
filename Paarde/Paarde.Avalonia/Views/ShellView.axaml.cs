@@ -132,6 +132,14 @@ public partial class ShellView : UserControl
             return;
         }
 
+        // MainWindow extends its content into the title bar, where Windows still draws its own
+        // minimize/maximize/close buttons (three 46-px buttons) over the top-right corner - so the
+        // toolbar stops short of them rather than putting Stop underneath.
+        if (OperatingSystem.IsWindows() && window.ExtendClientAreaToDecorationsHint)
+        {
+            ToolbarGrid.Margin = new Thickness(ToolbarGrid.Margin.Left, ToolbarGrid.Margin.Top, ToolbarGrid.Margin.Right + 138, ToolbarGrid.Margin.Bottom);
+        }
+
         window.KeyBindings.Add(new KeyBinding
         {
             Gesture = new KeyGesture(Key.P, KeyModifiers.Control),
@@ -339,6 +347,17 @@ public partial class ShellView : UserControl
         if (ViewModel.WorkbenchDockViewModel.ActiveTabKey == "Terminal")
         {
             DockTerminal.Focus();
+        }
+    }
+
+    // Enter in the dock's command box runs the command, same as TerminalView's own command box.
+    private void OnDockCommandTextBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        var terminalViewModel = ViewModel.WorkbenchDockViewModel.TerminalViewModel;
+        if (e.Key == Key.Enter && terminalViewModel.RunCommandCommand.CanExecute(null))
+        {
+            terminalViewModel.RunCommandCommand.Execute(null);
+            e.Handled = true;
         }
     }
 

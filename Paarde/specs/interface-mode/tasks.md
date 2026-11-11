@@ -74,3 +74,10 @@ Each task references the requirement(s) it satisfies.
   collapsed but still opens correctly when dragged. Switch back, restart, confirm return to
   today's behavior. _(validates AC-1 through AC-5; same sandboxed-environment limitation as every
   other Avalonia-rendering manual-verification task in this roadmap - not runnable here)_
+  Partly done on Windows in Paarde.Avalonia: switching to Flow/Wizard and restarting opens Home with
+  Compose/Review in the nav; Explorer's Assistant panel starts collapsed and opens from its
+  button; switching back and restarting returns to Explorer. Fixed along the way: opening Settings
+  in Flow/Wizard mode silently saved Editor-focused again (and the LLM runner choice back to the
+  Claude CLI) - `EnumToBooleanConverter.ConvertBack` wrote the *unchecked* radio's value back; and
+  Home's "Getting started" steps ran off the window instead of wrapping. Still to do: Compose →
+  (run) → auto-navigate-to-Review, which needs a real Claude run.

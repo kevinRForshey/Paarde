@@ -168,13 +168,18 @@ unchecked - no X server or real language servers available in this sandbox.
   `RequestNavigation` with the selected symbol's `SelectionRange.Start` and closing the popup,
   nothing-selected no-op, `Close`, and an active-document change received while closed still
   reflecting on the next open. 415 total in `Paarde.Avalonia.Tests` with no regressions.
-- [ ] T13 Manual verification in a real C# project (then repeat for Python/TypeScript per
+- [x] T13 Manual verification in a real C# project (then repeat for Python/TypeScript per
   `[[multi-language-support]]`): outline panel populates and jumps correctly; breadcrumb updates
   live as the caret moves between methods/classes without a visible LSP round-trip delay; hovering
   a symbol shows a tooltip, and a diagnostic at the same position still wins; `Ctrl+Shift+O` opens,
   filters, and jumps correctly. _(validates AC-1 through AC-5; same sandboxed-environment
   limitation as every other Avalonia-rendering manual-verification task in this roadmap)_
-  Not done: no X server or real language servers (csharp-ls/pyright-langserver/
-  typescript-language-server) available in this sandbox to render Avalonia UI or exercise a real
-  LSP round-trip - same limitation every other manual-verification task in this roadmap already
-  notes. Left unchecked for a human to verify in a real desktop session.
+  Done on Windows in Paarde.Avalonia against csharp-ls and typescript-language-server: outline,
+  breadcrumb, hover and `Ctrl+Shift+O` all work for C# and TypeScript. Fixed along the way: the
+  status-bar caret and `Ctrl+Shift+O` never saw the active editor (AvaloniaEdit's `TextEditor`
+  hands focus to its inner `TextArea`, so `IsFocused`/`GotFocus` on the editor never fired -
+  ExplorerFileTabControl now tracks `TextArea` focus with Paarde.WinUI's active-editor-owner
+  pattern), and hover showed the language server's raw ```` ``` ```` fence lines
+  (`CodeEditor.ToPlainHoverText`). Not covered: Python (pyright-langserver isn't installed on the
+  test machine). typescript-language-server 6 needs a TypeScript 5 `tsserver.js` - a global
+  TypeScript 7 install has none, so the project needs its own `typescript@5`.

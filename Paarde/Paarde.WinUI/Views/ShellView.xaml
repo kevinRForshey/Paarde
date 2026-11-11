@@ -241,7 +241,7 @@
                           ItemContainerStyle="{StaticResource PlainListViewItemStyle}">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="pvm:ProblemRow">
-                            <TextBlock Text="{x:Bind Summary}" FontFamily="{StaticResource MonospaceFontFamily}" />
+                            <TextBlock Text="{x:Bind Summary}" ToolTipService.ToolTip="{x:Bind FilePath}" FontFamily="{StaticResource MonospaceFontFamily}" />
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
@@ -264,7 +264,8 @@
                         <TextBox Grid.Column="0"
                                  Text="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.CommandText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  PlaceholderText="Type a command to run in the current working directory..."
-                                 FontFamily="{StaticResource MonospaceFontFamily}" />
+                                 FontFamily="{StaticResource MonospaceFontFamily}"
+                                 KeyDown="OnDockCommandTextBoxKeyDown" />
                         <Button AutomationProperties.Name="Run" Grid.Column="1" Command="{x:Bind ViewModel.WorkbenchDockViewModel.TerminalViewModel.RunCommandCommand}" Style="{StaticResource AccentButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <SymbolIcon Symbol="Play" />

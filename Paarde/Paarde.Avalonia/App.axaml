@@ -60,7 +60,10 @@
              Symbol/MRU switcher popups, which all used the same inline
              Background/BorderBrush/BorderThickness/Padding before this. -->
         <Style Selector="Border.popup-chrome">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <!-- FlyoutPresenterBackground, not the legacy SystemControlBackgroundChromeMediumLowBrush:
+                 FluentAvalonia doesn't resolve that key, so the popups had no background at all and
+                 rendered black in both themes. Same surface as the tab context menus' MenuFlyout. -->
+            <Setter Property="Background" Value="{DynamicResource FlyoutPresenterBackground}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="8" />

@@ -15,6 +15,7 @@
          R5.1/R5.2, the one piece of the broader "wizard -> IDE" problem this epic can't defer. -->
     <Grid RowDefinitions="Auto,*,Auto,Auto">
         <Grid Grid.Row="0"
+              Name="ToolbarGrid"
               ColumnDefinitions="*,Auto,Auto,Auto,Auto"
               Margin="8"
               DataContext="{Binding RunPanelViewModel}">
@@ -215,7 +216,7 @@
                     <ListBox Name="ProblemsList">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="pvm:ProblemRow">
-                                <TextBlock Text="{Binding Summary}" FontFamily="Cascadia Mono,Consolas,monospace" />
+                                <TextBlock Text="{Binding Summary}" ToolTip.Tip="{Binding FilePath}" FontFamily="Cascadia Mono,Consolas,monospace" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -229,7 +230,8 @@
                             <TextBox Grid.Column="0"
                                       Text="{Binding CommandText}"
                                       Watermark="Type a command to run in the current working directory..."
-                                      FontFamily="Cascadia Mono,Consolas,monospace" />
+                                      FontFamily="Cascadia Mono,Consolas,monospace"
+                                      KeyDown="OnDockCommandTextBoxKeyDown" />
                             <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding RunCommandCommand}" Classes="accent">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <ui:SymbolIcon Symbol="Play" FontSize="14" />
