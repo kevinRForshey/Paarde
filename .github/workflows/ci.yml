@@ -30,12 +30,10 @@ jobs:
       - name: Build
         run: dotnet build Paarde.slnx --no-restore --configuration Release
 
-      # Run one test project per `dotnet test` invocation rather than the whole .slnx at once.
-      # `dotnet test` against a solution runs each project's tests concurrently as separate
-      # testhost processes - on this runner's limited cores, that starves Porta.Pty's native PTY
-      # exit-notification thread (PtyProcessManagerTests) long enough to intermittently lose/delay
-      # it, timing the test out. Each project gets its own results folder so the coverage gate
-      # knows which report is which.
+      # Run one test project per `dotnet test` invocation rather than the whole .slnx at once, so
+      # the real-process tests (PtyProcessManagerTests and friends) don't compete with other
+      # projects' testhosts for this runner's few cores. Each project gets its own results folder
+      # so the coverage gate knows which report is which.
       - name: Test Paarde.Core.Tests with coverage
         run: >
           dotnet test Paarde.Core.Tests/Paarde.Core.Tests.csproj --no-build --configuration Release

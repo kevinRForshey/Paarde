@@ -24,6 +24,11 @@ public class PtyProcessManager : IPtyProcessManager
         public required IPtyConnection Connection { get; init; }
 
         public bool StoppedByUs { get; set; }
+
+        private int _exitReported;
+
+        // ProcessExited and StartAsync's already-exited check can both see the same exit.
+        public bool TryMarkExitReported() => Interlocked.Exchange(ref _exitReported, 1) == 0;
     }
 
     private RunningPty? _current;
@@ -68,18 +73,39 @@ public class PtyProcessManager : IPtyProcessManager
         var connection = await PtyProvider.SpawnAsync(options, cancellationToken);
         var entry = new RunningPty { Connection = connection };
 
-        connection.ProcessExited += (_, e) =>
-        {
-            _isRunning = false;
-            // Meaningless when Stop() caused the exit - same reasoning
-            // RunProcessManager.Process.Exited already documents.
-            Exited?.Invoke(entry.StoppedByUs ? null : e.ExitCode);
-        };
-
         _current = entry;
         _isRunning = true;
 
+        connection.ProcessExited += (_, e) => ReportExit(entry, e.ExitCode);
+
+        // Porta.Pty starts watching for the exit inside SpawnAsync (on Linux/macOS, a thread that
+        // raises ProcessExited the moment waitpid returns), so a quick command like `exit 3` can
+        // exit - and raise the event with nobody subscribed - before the line above runs.
+        if (connection.WaitForExit(0))
+        {
+            ReportExit(entry, connection.ExitCode);
+        }
+
         _ = ReadLoopAsync(entry);
+    }
+
+    private void ReportExit(RunningPty entry, int exitCode)
+    {
+        if (!entry.TryMarkExitReported())
+        {
+            return;
+        }
+
+        // A run that Stop() replaced can finish exiting after the next one has started; it mustn't
+        // mark the new run as stopped.
+        if (ReferenceEquals(_current, entry))
+        {
+            _isRunning = false;
+        }
+
+        // Meaningless when Stop() caused the exit - same reasoning
+        // RunProcessManager.Process.Exited already documents.
+        Exited?.Invoke(entry.StoppedByUs ? null : exitCode);
     }
 
     private async Task ReadLoopAsync(RunningPty entry)
