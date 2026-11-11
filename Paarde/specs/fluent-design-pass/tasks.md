@@ -46,6 +46,10 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
   - `SettingsView`: has no top-level toolbar row (plain settings form) - its Delete/Add run
     configuration/Reset to default buttons are in-context actions inside specific settings
     sections, not a toolbar, and were left as bare text buttons.
+  - Follow-up (found during T8, both apps): `ExplorerView`'s "Close Tab", `DiffsDetailControl`'s
+    Copy / Side-by-side / Previous change / Next change row, and `MainView`'s quick-prompt "Send"
+    converted. `ExplorerFileTabControl`'s "Explain this file" stays plain on purpose (see its
+    comment), as do in-context buttons like "Dismiss" and Home's recent-run/project buttons.
 
 ## F29.4 — Brand color and corner radius
 
@@ -104,6 +108,5 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
   mark uses the accent colour; Informational/Warning/Error InfoBars show the right colour and icon.
   Fixed along the way: all three popups had no background (black, in both themes) - `popup-chrome`
   used `SystemControlBackgroundChromeMediumLowBrush`, which FluentAvalonia doesn't resolve; it uses
-  `FlyoutPresenterBackground` now. Still open: the fallback on a platform without Mica (not
-  checkable here), and a few buttons are still text-only - Explorer's "Close Tab", Home's "Send"
-  and Settings' "Check Headroom status now".
+  `FlyoutPresenterBackground` now. Toolbar buttons the T3 audit missed are converted too (see T3).
+  Still open: the fallback on a platform without Mica (not checkable here).

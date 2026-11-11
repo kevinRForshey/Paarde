@@ -143,12 +143,17 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Button Grid.Row="0"
-                            Content="Close Tab"
+                    <Button AutomationProperties.Name="Close Tab"
+                            Grid.Row="0"
                             HorizontalAlignment="Right"
                             Margin="8,0,0,4"
                             Command="{x:Bind ViewModel.CloseSelectedTabCommand}"
-                            ToolTipService.ToolTip="Close the active tab." />
+                            ToolTipService.ToolTip="Close the active tab.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <SymbolIcon Symbol="Cancel" />
+                            <TextBlock Text="Close Tab" />
+                        </StackPanel>
+                    </Button>
 
                     <Grid x:Name="SplitGroupGrid" Grid.Row="1">
                         <Grid.ColumnDefinitions>

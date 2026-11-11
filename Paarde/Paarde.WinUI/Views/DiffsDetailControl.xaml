@@ -21,14 +21,34 @@
             <TextBlock VerticalAlignment="Center"
                        Text="{x:Bind ViewModel.FilePath, Mode=OneWay}"
                        Style="{StaticResource SubtitleTextBlockStyle}" />
-            <Button Content="Copy file contents" Click="OnCopyButtonClick" />
+            <Button AutomationProperties.Name="Copy file contents" Click="OnCopyButtonClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Copy" />
+                    <TextBlock Text="Copy file contents" />
+                </StackPanel>
+            </Button>
             <!-- T8.3.1: local view-only state toggling between the flat inline diff and a
                  side-by-side one. -->
-            <ToggleButton x:Name="SideBySideToggle" Content="Side-by-side" Click="OnViewModeToggled" />
+            <ToggleButton x:Name="SideBySideToggle" AutomationProperties.Name="Side-by-side" Click="OnViewModeToggled">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="TwoPage" />
+                    <TextBlock Text="Side-by-side" />
+                </StackPanel>
+            </ToggleButton>
             <!-- T8.3.4: next/previous-change navigation - always jumps the inline view, since
                  there's no side-by-side-row equivalent of a hunk's SourceRangeStart. -->
-            <Button x:Name="PreviousChangeButton" Content="Previous change" Click="OnPreviousChangeClick" />
-            <Button x:Name="NextChangeButton" Content="Next change" Click="OnNextChangeClick" />
+            <Button x:Name="PreviousChangeButton" AutomationProperties.Name="Previous change" Click="OnPreviousChangeClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE70E;" FontSize="14" />
+                    <TextBlock Text="Previous change" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="NextChangeButton" AutomationProperties.Name="Next change" Click="OnNextChangeClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE70D;" FontSize="14" />
+                    <TextBlock Text="Next change" />
+                </StackPanel>
+            </Button>
             <TextBlock x:Name="ChangeNavigationStatusText" VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 

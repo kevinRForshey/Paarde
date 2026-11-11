@@ -15,16 +15,36 @@
                        FontSize="18"
                        FontWeight="SemiBold"
                        x:CompileBindings="False" />
-            <Button Content="Copy file contents" Click="OnCopyButtonClick" />
+            <Button Click="OnCopyButtonClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="Copy" FontSize="14" />
+                    <TextBlock Text="Copy file contents" />
+                </StackPanel>
+            </Button>
             <!-- T8.3.1: local view-only state (not persisted, not on the shared Core view model -
                  see DiffsDetailControl.axaml.cs) toggling between the flat inline diff and a
                  side-by-side one. -->
-            <ToggleButton Name="SideBySideToggle" Content="Side-by-side" Click="OnViewModeToggled" />
+            <ToggleButton Name="SideBySideToggle" Click="OnViewModeToggled">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="TwoPage" FontSize="14" />
+                    <TextBlock Text="Side-by-side" />
+                </StackPanel>
+            </ToggleButton>
             <!-- T8.3.4: next/previous-change navigation - always jumps the inline view (see
                  DiffsDetailControl.axaml.cs's ScrollToHunk) since there's no side-by-side-row
                  equivalent of a hunk's SourceRangeStart to scroll to. -->
-            <Button Name="PreviousChangeButton" Content="Previous change" Click="OnPreviousChangeClick" />
-            <Button Name="NextChangeButton" Content="Next change" Click="OnNextChangeClick" />
+            <Button Name="PreviousChangeButton" Click="OnPreviousChangeClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="ChevronUp" FontSize="14" />
+                    <TextBlock Text="Previous change" />
+                </StackPanel>
+            </Button>
+            <Button Name="NextChangeButton" Click="OnNextChangeClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ui:SymbolIcon Symbol="ChevronDown" FontSize="14" />
+                    <TextBlock Text="Next change" />
+                </StackPanel>
+            </Button>
             <TextBlock Name="ChangeNavigationStatusText" VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 

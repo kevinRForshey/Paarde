@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Paarde.Presentation.ViewModels"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              x:Class="Paarde.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
@@ -32,9 +33,13 @@
                               Watermark="Describe what you want built or changed..."
                               Width="560"
                               AcceptsReturn="False" />
-                    <Button Content="Send"
-                            Command="{Binding SendQuickPromptCommand}"
-                            ToolTip.Tip="Load this onto the Compose page (with your last-used working directory) to review before sending." />
+                    <Button Command="{Binding SendQuickPromptCommand}"
+                            ToolTip.Tip="Load this onto the Compose page (with your last-used working directory) to review before sending.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:SymbolIcon Symbol="Send" FontSize="14" />
+                            <TextBlock Text="Send" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </StackPanel>
 

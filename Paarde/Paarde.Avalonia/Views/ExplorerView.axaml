@@ -109,11 +109,15 @@
 
                 <Grid Grid.Row="1" RowDefinitions="Auto,*" IsVisible="{Binding HasOpenTabs}">
                     <Button Grid.Row="0"
-                             Content="Close Tab"
                              HorizontalAlignment="Right"
                              Margin="8,0,0,4"
                              Command="{Binding CloseSelectedTabCommand}"
-                             ToolTip.Tip="Close the active tab." />
+                             ToolTip.Tip="Close the active tab.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            <TextBlock Text="Close Tab" />
+                        </StackPanel>
+                    </Button>
 
                     <!-- specs/editor-focus-layout R2/R3/R4: FluentAvalonia's ui:TabView (native
                          CanDragTabs/CanReorderTabs, vs. the plain TabControl this used to be) -

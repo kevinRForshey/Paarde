@@ -37,9 +37,14 @@
                              PlaceholderText="Describe what you want built or changed..."
                              Width="560"
                              AcceptsReturn="False" />
-                    <Button Content="Send"
+                    <Button AutomationProperties.Name="Send"
                             Command="{x:Bind ViewModel.SendQuickPromptCommand}"
-                            ToolTipService.ToolTip="Load this onto the Compose page (with your last-used working directory) to review before sending." />
+                            ToolTipService.ToolTip="Load this onto the Compose page (with your last-used working directory) to review before sending.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <SymbolIcon Symbol="Send" />
+                            <TextBlock Text="Send" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </StackPanel>
 
