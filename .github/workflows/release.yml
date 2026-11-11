@@ -5,7 +5,7 @@ on:
     tags:
       - "v*"
 
-# Self-contained, single-file publishes for all four target platforms are built from one
+# Self-contained, single-file Avalonia publishes for all four target platforms are built from one
 # ubuntu-latest host (no macOS/Windows runners needed) - .NET resolves each RID's runtime pack from
 # NuGet regardless of the build host, so cross-publishing works the same as a native build. This
 # produces unsigned binaries; macOS Gatekeeper/Windows SmartScreen will warn on first launch since
@@ -31,9 +31,9 @@ jobs:
             archive: tar.gz
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
@@ -62,22 +62,61 @@ jobs:
           cd publish/${{ matrix.rid }}
           tar -czf "$GITHUB_WORKSPACE/Paarde-${{ steps.version.outputs.version }}-${{ matrix.rid }}.tar.gz" .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Paarde-${{ matrix.rid }}
           path: Paarde-${{ steps.version.outputs.version }}-${{ matrix.rid }}.*
 
+  # The WinUI 3 front end only builds on Windows. It's a folder publish rather than single-file:
+  # the self-contained Windows App SDK runtime, its .pri resource files and Monaco's Editor/vs
+  # folder all have to sit next to the exe.
+  publish-winui:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Paarde
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Also downloads Monaco from the npm registry (checked against its SHA-512).
+      - name: Publish win-x64
+        run: >
+          dotnet publish Paarde.WinUI -c Release -r win-x64
+          --self-contained true
+          -p:Version=${{ steps.version.outputs.version }}
+          -o publish/winui-win-x64
+
+      - name: Archive (zip)
+        run: |
+          cd publish/winui-win-x64
+          7z a -tzip "$GITHUB_WORKSPACE/Paarde-WinUI-${{ steps.version.outputs.version }}-win-x64.zip" .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Paarde-WinUI-win-x64
+          path: Paarde-WinUI-${{ steps.version.outputs.version }}-win-x64.zip
+
   release:
-    needs: publish
+    needs: [publish, publish-winui]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
