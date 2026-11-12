@@ -29,12 +29,14 @@ public sealed partial class MainWindow : Window
 
     // Off by default - called once at startup
     // with whatever was saved, and again live from SettingsViewModel when toggled. Same fallback order
-    // as Paarde.Avalonia: Mica, then Acrylic, then a solid background.
+    // as Paarde.Avalonia: Acrylic, then Mica, then a solid background. Acrylic first because it
+    // blurs the windows behind the app; Mica only tints from the wallpaper, which in Dark theme
+    // was a 1-2 RGB-value difference - the toggle looked like it did nothing.
     public void ApplyTransparency(bool enabled)
     {
         SystemBackdrop = !enabled ? null
-            : MicaController.IsSupported() ? new MicaBackdrop()
             : DesktopAcrylicController.IsSupported() ? new DesktopAcrylicBackdrop()
+            : MicaController.IsSupported() ? new MicaBackdrop()
             : null;
 
         SolidBackground.Visibility = SystemBackdrop is null ? Visibility.Visible : Visibility.Collapsed;

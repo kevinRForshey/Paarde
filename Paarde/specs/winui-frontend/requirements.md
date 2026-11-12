@@ -23,7 +23,7 @@ Confirmed by direct inspection, 2026-11-09:
   | `IUiDispatcher` / `IUiTimer` | `AvaloniaUiDispatcher` (`Dispatcher.UIThread`, `DispatcherTimer`) |
   | `INavigationService` | `NavigationService` (FluentAvalonia `Frame`, 197 lines) |
   | `IThemeSelectorService` | `ThemeSelectorService` (`AppTheme` → `ThemeVariant`, persists the name) |
-  | `IWindowAppearanceService` | `WindowAppearanceService` → `MainWindow.ApplyTransparency` (Mica → Acrylic → none) |
+  | `IWindowAppearanceService` | `WindowAppearanceService` → `MainWindow.ApplyTransparency` (Acrylic → Mica → none) |
   | `IDialogService` | `DialogService` (FluentAvalonia `ContentDialog`) |
   | `IFilePickerService`, `IFileSavePickerService`, `IFolderPickerService` | Avalonia `StorageProvider` |
 
@@ -91,7 +91,7 @@ R3.1 Implement every contract in the table above for WinUI: `IUiDispatcher` on `
 /`DispatcherQueueTimer`; `INavigationService` on WinUI `Frame` with the same page-key contract
 (`typeof(VM).FullName`, `INavigationAware`, `IConfirmNavigationAway`, `clearNavigation`);
 `IThemeSelectorService` on `ElementTheme` with the same persisted values; `IWindowAppearanceService`
-on `MicaBackdrop` → `DesktopAcrylicBackdrop` → none; `IDialogService` on `ContentDialog` (with
+on `DesktopAcrylicBackdrop` → `MicaBackdrop` → none; `IDialogService` on `ContentDialog` (with
 `XamlRoot` set, `Close` as the default button for confirms); pickers on
 `Windows.Storage.Pickers` initialized with the main window handle.
 R3.2 WinUI equivalents of `PageService`, `NavigationViewService` and `ShellViewModel`.

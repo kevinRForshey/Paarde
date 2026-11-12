@@ -121,5 +121,9 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
   @-mention popup repeated it inline with different padding (4 / none). It's now one app-level
   `PopupChromeBorderStyle` in `App.xaml` (Paarde.Avalonia's `popup-chrome`), used by all five; the
   palettes' fixed width stays in `ShellView`'s `BasedOn` style. Build clean, WinUI UI smoke tests
-  12/12. Still to eyeball in Paarde.WinUI: Light/Dark/theme switch for popups and InfoBar colours,
-  and the Mica toggle.
+  12/12. Still to eyeball in Paarde.WinUI: Light/Dark/theme switch for popups and InfoBar colours.
+  Backdrop changed to Acrylic-first (2026-11-11, both apps): with Mica the toggle looked like it
+  did nothing - measured 1-2 RGB values of difference in Dark theme, since Mica only tints from
+  the wallpaper. Acrylic blurs the windows behind; verified in Paarde.WinUI with a red window
+  behind it (title bar 32,32,32 -> 135,8,8 while active). Like Mica, it falls back to solid when
+  the window is inactive - by design. Settings label now "Transparent window backdrop (Acrylic)".

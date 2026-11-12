@@ -19,11 +19,13 @@ public partial class MainWindow : Window
     // Background only needs to go transparent when the backdrop hint is actually in play; without
     // it, a transparent Background would just show the desktop through an unfilled window, so
     // disabling clears the local value and lets the theme's own Window background style apply.
+    // AcrylicBlur before Mica: Acrylic blurs the windows behind the app, while Mica only tints from
+    // the wallpaper and is barely visible in Dark theme.
     public void ApplyTransparency(bool enabled)
     {
         if (enabled)
         {
-            TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.None];
+            TransparencyLevelHint = [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
             Background = Brushes.Transparent;
         }
         else

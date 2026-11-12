@@ -208,7 +208,7 @@ public sealed partial class CodeEditor : UserControl
                 {
                     var script = _pendingScripts[0];
                     _pendingScripts.RemoveAt(0);
-                    await _webView.CoreWebView2.ExecuteScriptAsync(script);
+                    await ExecuteScriptAsync(script);
                 }
 
                 _isReady = true;
@@ -317,6 +317,28 @@ public sealed partial class CodeEditor : UserControl
             return;
         }
 
-        await _webView.CoreWebView2.ExecuteScriptAsync(script);
+        await ExecuteScriptAsync(script);
+    }
+
+    // Calls are fire-and-forget (async void), so a failure here would take the whole app down.
+    // The usual one is ERROR_INVALID_STATE (0x8007139F): the WebView2 was closed (tab/page
+    // unloaded, app shutting down) or its browser process died while a call - often a slow
+    // completion/hover/ghost-text answer - was still in flight. The editor is gone at that point,
+    // so there's nothing to deliver the script to; drop it.
+    private async Task ExecuteScriptAsync(string script)
+    {
+        if (_isClosed || _webView.CoreWebView2 is not { } core)
+        {
+            return;
+        }
+
+        try
+        {
+            await core.ExecuteScriptAsync(script);
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or ObjectDisposedException or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine($"CodeEditor: dropped script, WebView2 not available ({ex.Message.Trim()}).");
+        }
     }
 }

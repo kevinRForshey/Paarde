@@ -34,7 +34,7 @@
         </StackPanel>
 
         <StackPanel Margin="0,8,0,0" Spacing="4">
-            <CheckBox Content="Transparent window backdrop (Mica/Acrylic)" IsChecked="{Binding IsTransparencyEnabled, Mode=TwoWay}"
+            <CheckBox Content="Transparent window backdrop (Acrylic)" IsChecked="{Binding IsTransparencyEnabled, Mode=TwoWay}"
                       ToolTip.Tip="Lets the desktop's window-manager backdrop material show through the window chrome. Off by default - falls back to a solid background on platforms that don't support it." />
         </StackPanel>
 
