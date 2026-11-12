@@ -110,3 +110,16 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
   used `SystemControlBackgroundChromeMediumLowBrush`, which FluentAvalonia doesn't resolve; it uses
   `FlyoutPresenterBackground` now. Toolbar buttons the T3 audit missed are converted too (see T3).
   Still open: the fallback on a platform without Mica (not checkable here).
+  Paarde.WinUI, code audit against AC-1 to AC-6 (2026-11-11): backdrop toggle falls back Mica ->
+  DesktopAcrylic -> solid `SolidBackground` (`MainWindow.ApplyTransparency`); brand mark uses
+  `AccentFillColorDefaultBrush` (its literal `14` radius documented); no other literal corner
+  radii; every page-level status line (`ExplorerView`, `ExplorerFileTabControl`, `ShellView`'s Run
+  and dock-Terminal lines, `TerminalView`, `ComposePanelControl` - which `PromptView` hosts) is an
+  `InfoBar` bound to `StatusSeverity`; toolbar rows are icon+label (remaining bare-text buttons are
+  the same in-context exceptions as in Avalonia). Fixed: popup chrome wasn't shared - only
+  `ShellView`'s three palettes used one (view-local) style, while the Ctrl+Tab switcher and the
+  @-mention popup repeated it inline with different padding (4 / none). It's now one app-level
+  `PopupChromeBorderStyle` in `App.xaml` (Paarde.Avalonia's `popup-chrome`), used by all five; the
+  palettes' fixed width stays in `ShellView`'s `BasedOn` style. Build clean, WinUI UI smoke tests
+  12/12. Still to eyeball in Paarde.WinUI: Light/Dark/theme switch for popups and InfoBar colours,
+  and the Mica toggle.

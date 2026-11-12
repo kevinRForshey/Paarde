@@ -19,16 +19,10 @@
     </UserControl.KeyboardAccelerators>
 
     <UserControl.Resources>
-        <!-- The palette popups' chrome, same brushes as ComposePanelControl's mention popup. A fixed
-             width (Avalonia's MinWidth is 420) so code-behind can centre the popup without
-             measuring it. -->
-        <Style x:Key="PalettePopupBorderStyle" TargetType="Border">
+        <!-- The palette popups: App.xaml's shared popup chrome plus a fixed width (Avalonia's
+             MinWidth is 420) so code-behind can centre the popup without measuring it. -->
+        <Style x:Key="PalettePopupBorderStyle" TargetType="Border" BasedOn="{StaticResource PopupChromeBorderStyle}">
             <Setter Property="Width" Value="480" />
-            <Setter Property="Padding" Value="8" />
-            <Setter Property="Background" Value="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}" />
-            <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeColorFlyoutBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
         </Style>
     </UserControl.Resources>
 

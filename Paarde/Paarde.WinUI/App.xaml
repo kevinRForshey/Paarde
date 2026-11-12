@@ -63,6 +63,17 @@
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             </Style>
 
+            <!-- specs/fluent-design-pass R2: shared chrome for every floating popup (Quick Open,
+                 Command Palette, Go to Symbol, the Ctrl+Tab switcher, the @-mention list) -
+                 Paarde.Avalonia's Border.popup-chrome. Sizes stay on each popup. -->
+            <Style x:Key="PopupChromeBorderStyle" TargetType="Border">
+                <Setter Property="Padding" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeColorFlyoutBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+            </Style>
+
             <FontFamily x:Key="MonospaceFontFamily">Cascadia Mono, Consolas</FontFamily>
         </ResourceDictionary>
     </Application.Resources>

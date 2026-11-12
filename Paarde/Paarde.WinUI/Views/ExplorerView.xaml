@@ -221,12 +221,7 @@
             <Popup x:Name="MruSwitcherPopup"
                    Grid.ColumnSpan="5"
                    IsOpen="{x:Bind ViewModel.IsMruSwitcherOpen, Mode=OneWay}">
-                <Border Width="360"
-                        Padding="4"
-                        Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource OverlayCornerRadius}">
+                <Border Width="360" Style="{StaticResource PopupChromeBorderStyle}">
                     <ListView ItemsSource="{x:Bind ViewModel.MruSwitcherItems}"
                               SelectedItem="{x:Bind ViewModel.MruSwitcherHighlighted, Mode=OneWay}">
                         <ListView.ItemTemplate>

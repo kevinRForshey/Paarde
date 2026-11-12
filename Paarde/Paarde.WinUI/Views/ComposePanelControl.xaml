@@ -159,10 +159,7 @@
                    PlacementTarget="{x:Bind PromptTextBox}"
                    DesiredPlacement="BottomEdgeAlignedLeft"
                    IsOpen="{x:Bind ViewModel.HasMentionSuggestions, Mode=OneWay}">
-                <Border Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource OverlayCornerRadius}"
+                <Border Style="{StaticResource PopupChromeBorderStyle}"
                         MaxHeight="160"
                         MinWidth="240">
                     <ListView x:Name="MentionList"
