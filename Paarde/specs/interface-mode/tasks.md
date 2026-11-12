@@ -68,7 +68,7 @@ Each task references the requirement(s) it satisfies.
   `SendQuickPrompt` navigation targets. _(validates R5)_
 - [x] T13 `AssistantPanelViewModelTests` extension: `Tutorial`-changed subscription calls
   `NavigateTo` only in `FlowWizard` mode. _(validates R8)_
-- [ ] T14 Manual verification: with `EditorFocused` (default/unset), app behavior is pixel-for-
+- [x] T14 Manual verification: with `EditorFocused` (default/unset), app behavior is pixel-for-
   pixel identical to today's Epic 25 behavior. Switch to `FlowWizard` in Settings, restart, confirm
   Home → Compose → (run) → auto-navigate-to-Review, and confirm Explorer's Assistant panel starts
   collapsed but still opens correctly when dragged. Switch back, restart, confirm return to
@@ -85,4 +85,5 @@ Each task references the requirement(s) it satisfies.
   ~26s headless) but the app stayed on Compose. Cause: `AssistantPanelViewModel` owns the
   "run finished -> Review" subscription but, as a singleton, was only ever created by Explorer
   or History, so in Flow/Wizard mode (starting on Home) nothing was listening. Fixed in both
-  apps by resolving it at startup, right after `RestoreLastSession`. Needs one re-run to confirm.
+  apps by resolving it at startup, right after `RestoreLastSession`. Re-run confirmed by the user
+  2026-11-12: Compose → (run) → Review now navigates automatically.

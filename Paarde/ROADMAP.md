@@ -3243,6 +3243,27 @@ spec: `specs/editor-focus-layout/requirements.md`.*
 
 ---
 
+### EPIC 29 — Fluent Design cohesion pass — ✅ Done 2026-11-12, manually verified
+
+*Why: page-by-page work across Epics 20-28 left the chrome inconsistent - popups each styled
+inline, some toolbars icon+label and others bare text, a hard-coded brand colour, literal corner
+radii, and status messages as plain text with no severity. This pass makes the app read as one
+Fluent design, in both front ends:*
+- *Opt-in transparent window backdrop (Settings, off by default), Acrylic first, then Mica, then
+  solid. Acrylic-first because Mica only tints from the wallpaper and was barely visible in Dark.*
+- *One shared popup chrome for Quick Open, Command Palette, Go to Symbol, the Ctrl+Tab switcher
+  and the @-mention list (`popup-chrome` in Avalonia, `PopupChromeBorderStyle` in WinUI).*
+- *Icon+label toolbar buttons on every page; in-context actions stay text-only.*
+- *Brand mark follows the system accent colour; corner radii use theme tokens.*
+- *Page status messages are `InfoBar`s bound to a new `StatusSeverity`.*
+
+*Verification also found and fixed two bugs outside the epic's scope: the WebView2 code editor
+could crash the app when a script call landed after the editor closed, and Flow/Wizard mode never
+moved to Review after a run (closing Epic 26's last open check). Full spec:
+`specs/fluent-design-pass/tasks.md`.*
+
+---
+
 ### EPIC 30 — Extract `Paarde.Presentation` (UI-agnostic view models) — ✅ Done 2026-11-09, manually verified
 
 *Why: a WinUI 3 Windows front end is planned (its licensing terms are preferred over Avalonia's),
@@ -3387,8 +3408,12 @@ overflow and a few key flows. Full spec: `specs/winui-frontend/`.
     only (Epic 26's Flow/Wizard mode has no tree/Assistant-panel layout to zen/split). Sequenced
     last since it's the most purely cosmetic/ergonomic of the three, with no other epic depending
     on it. Full spec: `specs/editor-focus-layout/`.
-29. **Epic 30** — extract `Paarde.Presentation` so a WinUI 3 front end can reuse the view models.
+29. **Epic 29** — Fluent Design cohesion pass: shared popup chrome, icon+label toolbars, accent
+    brand mark, theme corner radii, severity `InfoBar`s, opt-in Acrylic backdrop. Polish over
+    Epics 20-28, applied to both front ends. Full spec: `specs/fluent-design-pass/`. ✅ Done
+    2026-11-12, manually verified.
+30. **Epic 30** — extract `Paarde.Presentation` so a WinUI 3 front end can reuse the view models.
     Prerequisite for any second UI; independent of Epics 25-28. Full spec:
     `specs/presentation-extraction/`. ✅ Done 2026-11-09, manually verified.
-30. **Epic 31** — the WinUI 3 front end, `Paarde.WinUI`, on top of Epic 30. Full spec:
+31. **Epic 31** — the WinUI 3 front end, `Paarde.WinUI`, on top of Epic 30. Full spec:
     `specs/winui-frontend/`. ✅ Done 2026-11-10, manually verified.

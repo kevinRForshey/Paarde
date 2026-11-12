@@ -1,6 +1,6 @@
 # Implementation tasks — Fluent Design cohesion pass
 
-Each task references the requirement(s) it satisfies. Not started — no code written yet.
+Each task references the requirement(s) it satisfies. ✅ All done 2026-11-12, manually verified.
 
 ## F29.1 — Window backdrop
 
