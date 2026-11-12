@@ -97,7 +97,7 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
 
 ## F29.6 — Verification
 
-- [ ] T8 Manual verification (by the user, on their own machine - this sandbox cannot render
+- [x] T8 Manual verification (by the user, on their own machine - this sandbox cannot render
   Avalonia UI): window backdrop renders Mica/Acrylic on a supporting platform and falls back
   cleanly elsewhere; all three popups share identical chrome; toolbar buttons are consistently
   icon+label across every page; the `MainView` brand mark follows the accent color; corner radii
@@ -121,7 +121,7 @@ Each task references the requirement(s) it satisfies. Not started — no code wr
   @-mention popup repeated it inline with different padding (4 / none). It's now one app-level
   `PopupChromeBorderStyle` in `App.xaml` (Paarde.Avalonia's `popup-chrome`), used by all five; the
   palettes' fixed width stays in `ShellView`'s `BasedOn` style. Build clean, WinUI UI smoke tests
-  12/12. Still to eyeball in Paarde.WinUI: Light/Dark/theme switch for popups and InfoBar colours.
+  12/12. Verified 2026-11-12 by driving Paarde.WinUI (FlaUI) through Dark -> Light -> Dark live switches: Command Palette chrome and Informational/Error InfoBars (Terminal page, exit 0 / exit 3) render correctly in each.
   Backdrop changed to Acrylic-first (2026-11-11, both apps): with Mica the toggle looked like it
   did nothing - measured 1-2 RGB values of difference in Dark theme, since Mica only tints from
   the wallpaper. Acrylic blurs the windows behind; verified in Paarde.WinUI with a red window

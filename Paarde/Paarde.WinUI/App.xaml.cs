@@ -189,6 +189,12 @@ public partial class App : Application
             // Restore the last recorded run before anything navigates.
             GetService<IRunSessionStore>().RestoreLastSession();
 
+            // AssistantPanelViewModel owns "a run finished -> show Review" (and, in FlowWizard mode,
+            // navigating to the Review page). It's a singleton otherwise only created by Explorer/
+            // History, so in FlowWizard mode - which starts on Home - a run from Compose went
+            // unnoticed. Created after RestoreLastSession so restoring doesn't itself count as a run.
+            GetService<AssistantPanelViewModel>();
+
             // Which shell the app starts into.
             var localSettingsService = GetService<ILocalSettingsService>();
             var interfaceMode = await localSettingsService.ReadSettingAsync<InterfaceMode?>(InterfaceModeSettingsKeys.Mode) ?? InterfaceMode.EditorFocused;

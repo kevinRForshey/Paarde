@@ -81,3 +81,8 @@ Each task references the requirement(s) it satisfies.
   Claude CLI) - `EnumToBooleanConverter.ConvertBack` wrote the *unchecked* radio's value back; and
   Home's "Getting started" steps ran off the window instead of wrapping. Still to do: Compose →
   (run) → auto-navigate-to-Review, which needs a real Claude run.
+  2026-11-12: that last step failed in Paarde.WinUI - a real run finished (the CLI itself takes
+  ~26s headless) but the app stayed on Compose. Cause: `AssistantPanelViewModel` owns the
+  "run finished -> Review" subscription but, as a singleton, was only ever created by Explorer
+  or History, so in Flow/Wizard mode (starting on Home) nothing was listening. Fixed in both
+  apps by resolving it at startup, right after `RestoreLastSession`. Needs one re-run to confirm.

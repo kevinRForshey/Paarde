@@ -236,6 +236,12 @@ public partial class App : Application
             // it whenever the user first visits them - a no-op if no run has ever been recorded.
             GetService<IRunSessionStore>().RestoreLastSession();
 
+            // AssistantPanelViewModel owns "a run finished -> show Review" (and, in FlowWizard mode,
+            // navigating to the Review page). It's a singleton otherwise only created by Explorer/
+            // History, so in FlowWizard mode - which starts on Home - a run from Compose went
+            // unnoticed. Created after RestoreLastSession so restoring doesn't itself count as a run.
+            GetService<AssistantPanelViewModel>();
+
             // Which shell the app starts into - EditorFocused
             // keeps today's Explorer-first behavior, FlowWizard starts on the Home/Compose/Review
             // flow instead.
